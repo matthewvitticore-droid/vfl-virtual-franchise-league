@@ -1,10 +1,10 @@
 import { Feather } from "@expo/vector-icons";
-import * as Clipboard from "expo-clipboard";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useMemo, useState } from "react";
 import {
   Alert, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from "react-native";
+import { exportRosterXLSX } from "@/utils/exportRoster";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
@@ -113,25 +113,8 @@ export default function RosterScreen() {
 
   async function handleExportCSV() {
     if (!team) return;
-    const header = "Name,Position,Overall,Age,Exp,Salary,Dev\n";
-    const rows = [...team.roster]
-      .sort((a, b) => b.overall - a.overall)
-      .map(p => `${p.name},${p.position},${p.overall},${p.age},${p.experience},${p.salary.toFixed(1)},${p.development}`)
-      .join("\n");
-    const csv = header + rows;
-    if (Platform.OS === "web") {
-      const blob = new Blob([csv], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${team.city}_${team.name}_roster.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-      Alert.alert("Exported!", "Roster CSV downloaded.");
-    } else {
-      await Clipboard.setStringAsync(csv);
-      Alert.alert("Copied!", "Roster CSV copied to clipboard. Paste into any spreadsheet app.");
-    }
+    const year = season?.year ?? new Date().getFullYear();
+    await exportRosterXLSX(team, year);
   }
 
   if (!team) return null;
