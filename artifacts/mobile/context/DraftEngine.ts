@@ -235,36 +235,102 @@ function generateCollegeStats(pos: NFLPosition, grade: number): ProspectCollegeS
   }
 }
 
-// ─── Strengths & Weaknesses ───────────────────────────────────────────────────
+// ─── Strengths & Weaknesses (rating-aware) ────────────────────────────────────
 
-const STRENGTHS_BY_POS: Partial<Record<NFLPosition, string[]>> = {
-  QB:  ["Quick release","Pocket presence","Arm strength","Accuracy on intermediate routes","Decision-making","Mobility","Anticipation","NFL-ready IQ","Deep ball accuracy","Pre-snap reads"],
-  RB:  ["Burst through gaps","Vision","Pass protection","Receiving ability","Elusiveness","Breaking tackles","Speed in open field","Ball security","Route running","Contact balance"],
-  WR:  ["Route running","Separation","Contested catches","Deep speed","Run after catch","Blocking","Release off line","Body control","Reliable hands","Red zone threat"],
-  TE:  ["In-line blocking","Receiving threat","Move tight end","Red zone target","Route running","Run blocking","Versatility","Seam routes","Physical mismatch","Pass protection"],
-  OL:  ["Pass protection","Run blocking","Quick feet","Hand technique","Strength at point of attack","Intelligence","Versatility","Drive blocking","Athletic ability","Anchor vs. power"],
-  DE:  ["First step quickness","Pass rush moves","Bend around edge","Power rush","Versatility","Motor","Run defense","Counter moves","Disruption","Get off the ball"],
-  DT:  ["Clogging the run","Pass rush push","Two-gap technique","Leverage","Motor","Strength","Pursuit","Disruption","First step","Stacking blockers"],
-  LB:  ["Run stopping","Coverage ability","Blitzing","Instincts","Tackling","Sideline-to-sideline speed","Pass rush","Awareness","Block shedding","Leadership"],
-  CB:  ["Man coverage","Zone coverage","Ball production","Press technique","Recovery speed","Physicality","Playing the ball","Technique","Tackling","Football IQ"],
-  S:   ["Range in coverage","Run support","Zone awareness","Ball hawking","Communication","Physicality","Tackling","Coverage versatility","Leadership","Reading the QB"],
-  K:   ["Leg strength","Accuracy","Kickoff consistency","Clutch performance"],
-  P:   ["Hang time","Directional punting","Pinning opponents deep","Rugby-style"],
+// Athletic traits: strength/weakness text tied to a specific rating.
+// Only shown when the player's measured value crosses the threshold.
+const ATHL_TRAITS: Array<{
+  key: "spd"|"acc"|"agi"|"exp"|"str"|"cth";
+  str: string; wk: string;
+  hi: number; lo: number;                              // rating thresholds
+  rel: Partial<Record<NFLPosition,"h"|"m"|"l">>;       // position relevance
+}> = [
+  { key:"spd", str:"Elite straight-line speed",          wk:"Lacks top-end speed",
+    hi:82, lo:68, rel:{ CB:"h",WR:"h",RB:"h",S:"h",DE:"m",LB:"m",TE:"l" } },
+  { key:"acc", str:"Elite change of direction",           wk:"Slow to change direction",
+    hi:82, lo:68, rel:{ CB:"h",RB:"h",WR:"h",DE:"h",LB:"m",QB:"m",OL:"l" } },
+  { key:"agi", str:"Exceptional lateral agility",         wk:"Below-average lateral agility",
+    hi:80, lo:66, rel:{ CB:"h",RB:"m",WR:"m",QB:"m",LB:"m",DE:"m" } },
+  { key:"exp", str:"Explosive athleticism off the mark",  wk:"Lacks first-step explosion",
+    hi:80, lo:65, rel:{ WR:"h",CB:"m",S:"m",TE:"m",RB:"m" } },
+  { key:"str", str:"Outstanding physical strength",       wk:"Needs to add strength and power",
+    hi:78, lo:62, rel:{ OL:"h",DT:"h",DE:"h",LB:"m",TE:"m",RB:"l" } },
+  { key:"cth", str:"Natural catcher with reliable hands", wk:"Inconsistent hands under pressure",
+    hi:76, lo:65, rel:{ WR:"h",TE:"h",RB:"m",CB:"l",S:"l" } },
+];
+
+// Football-only pools — no athletic references (those come from ATHL_TRAITS above)
+const FOOTBALL_STRENGTHS: Partial<Record<NFLPosition, string[]>> = {
+  QB:  ["Quick release","Pocket presence","Pre-snap reads","Decision-making","Anticipation","NFL-ready IQ","Command of offense","Deep ball timing"],
+  RB:  ["Vision in the run game","Pass protection","Ball security","Contact balance","Route running out of backfield","Hard to bring down"],
+  WR:  ["Route running precision","Separation at the top of routes","Body control on deep balls","Red zone threat","YAC ability","Release off the line"],
+  TE:  ["In-line blocking versatility","Seam route specialist","Red zone target","Move tight end skill","Pass protection IQ"],
+  OL:  ["Pass set technique","Run blocking leverage","Hand placement","Football IQ","Versatility across the line","Drive blocking"],
+  DE:  ["Pass rush variety","Bend around the edge","Motor","First step off the snap","Scheme versatility","Counter moves"],
+  DT:  ["Two-gap technique","Interior gap disruption","Clogging the run","Motor","Relentless pursuit","Stacking blockers"],
+  LB:  ["Run stopping instincts","Blitz recognition","Coverage IQ","Leadership","Sideline-to-sideline range","Block shedding"],
+  CB:  ["Man coverage technique","Zone awareness","Ball production","Press footwork","Football IQ","Playing the ball"],
+  S:   ["Range in coverage","Run support instincts","Ball hawking","Communication","QB-read ability","Coverage versatility"],
+  K:   ["Clutch under pressure","Kickoff consistency"],
+  P:   ["Hang time","Directional punting","Pinning opponents inside the 20"],
 };
-const WEAKNESSES_BY_POS: Partial<Record<NFLPosition, string[]>> = {
-  QB:  ["Happy feet under pressure","Accuracy on deep outs","Pre-snap reads","Footwork in pocket","Ball security","Decision-making","Holding ball too long","Size/frame","Interception-prone","Scramble timing"],
-  RB:  ["Pass blocking","Durability concerns","Size","Receiving out of backfield","Ball security","Consistency","Speed in long runs","Vision on cutback","NFL-level reads","Route diversity"],
-  WR:  ["Drops under pressure","Blocking","Creating separation vs. press","Body control","Route tree depth","YAC consistency","Concentration drops","Consistency","Size","Physicality"],
-  TE:  ["Run blocking","Route tree","Separation","Athleticism vs. LBs","Red zone inconsistency","Hands","Blocking footwork","Pass protection","Alignment versatility","Concentration"],
-  OL:  ["Pass sets vs. speed","Footwork in space","Run blocking leverage","Technique","Strength","Awareness on stunts","Depth of experience","Athleticism","Consistency","Competitive level"],
-  DE:  ["Setting the edge vs. run","Counter moves","Bend around corner","Pass rush consistency","Effort","Against double teams","Motor late in games","Hand use","Setting up rushes","Power at point of attack"],
-  DT:  ["Pass rush moves","Leverage","Against double teams","Motor","Consistency","Initial quickness","Stamina","Counter moves","Getting off blocks","Size"],
-  LB:  ["Coverage in space","Footwork in zone","Tackling technique","Blitz recognition","Getting off blocks","Pass rush","Consistency","Man coverage","Physical limitations","Block shedding"],
-  CB:  ["Coverage in zone","Tackling","Physical press coverage","Recovery speed","Ball awareness","Physicality","Coverage depth","Technique vs. physicality","Consistency","Size"],
-  S:   ["Man coverage","Tackling in space","Technique","Reaction time","Physicality","Reading complex concepts","Communication","Physicality vs. WRs","Alignment","Speed"],
-  K:   ["Short-range consistency","Performance in cold","Kickoff touchback rate"],
-  P:   ["Field position consistency","Hang time in wind","Return coverage"],
+
+const FOOTBALL_WEAKNESSES: Partial<Record<NFLPosition, string[]>> = {
+  QB:  ["Happy feet under pressure","Decision-making timing","Holding the ball too long","Pre-snap read depth","Footwork in the pocket","Interception-prone"],
+  RB:  ["Pass blocking fundamentals","Ball security concerns","Consistency vs. stacked boxes","Route diversity"],
+  WR:  ["Blocking effort","Route tree depth","YAC consistency","Concentration drops","Body control in traffic","Size for contested catches"],
+  TE:  ["Route tree limitations","Red zone consistency","Blocking footwork","Alignment versatility","Concentration"],
+  OL:  ["Technique vs. speed rushers","Awareness on stunts","Footwork in open space","Competitive-level concerns","Consistency"],
+  DE:  ["Counter moves off primary rush","Setting the edge vs. the run","Motor late in games","Hand use","Pass rush planning"],
+  DT:  ["Leverage in gap protection","Counter moves vs. double teams","Consistency in effort","Stamina"],
+  LB:  ["Footwork in zone coverage","Man coverage in space","Getting off blocks","Blitz recognition","Tackling technique"],
+  CB:  ["Zone coverage depth","Ball awareness","Tackling in run defense","Technique vs. physicality mismatch","Consistency","Size"],
+  S:   ["Man coverage assignments","Tackling technique in space","Reading complex routes","Alignment errors","Reaction time"],
+  K:   ["Short-range consistency","Performance in cold weather"],
+  P:   ["Consistency in field position","Hang time in wind","Return coverage"],
 };
+
+// Generate rating-consistent strengths and weaknesses
+function genStrengthsWeaknesses(
+  pos: NFLPosition, grade: number, combine: CombineMeasurables,
+): { strengths: string[]; weaknesses: string[] } {
+  const dnp = combine.didNotParticipate;
+  const spd   = dnp ? 70 : clamp(99 - (combine.fortyYardDash - 4.3) * 65, 40, 99);
+  const coneR = dnp ? 70 : clamp(99 - (combine.threeCone - 6.5) * 18, 40, 99);
+  const shutR = dnp ? 70 : clamp(99 - (combine.shuttleRun - 4.0) * 58, 40, 99);
+  const acc   = coneR;
+  const agi   = dnp ? 70 : (shutR + coneR) / 2;
+  const vertR = dnp ? 70 : clamp(40 + (combine.verticalJump - 22) * 3.278, 40, 99);
+  const broadR= dnp ? 70 : clamp(40 + (combine.broadJump - 90) * 1.967, 40, 99);
+  const exp   = dnp ? 70 : (vertR + broadR) / 2;
+  const str   = dnp ? 70 : clamp(combine.benchPress * 1.6 + 22, 40, 99);
+  const handR = dnp ? 70 : clamp(40 + (combine.handSize - 8.5) * 19.67, 40, 99);
+  const baseQ = clamp(50 + (grade / 100) * 45, 40, 99);
+  const cth   = dnp ? 70 : clamp(handR * 0.30 + baseQ * 0.45 + agi * 0.25, 40, 99);
+  const vals: Record<string, number> = { spd, acc, agi, exp, str, cth };
+
+  const athStrengths: string[] = [];
+  const athWeaknesses: string[] = [];
+  for (const t of ATHL_TRAITS) {
+    const r = t.rel[pos];
+    if (!r) continue;
+    const p = r === "h" ? 0.92 : r === "m" ? 0.65 : 0.28;
+    const v = vals[t.key];
+    if (v >= t.hi && Math.random() < p) athStrengths.push(t.str);
+    else if (v <= t.lo && Math.random() < p) athWeaknesses.push(t.wk);
+  }
+
+  const fStr = FOOTBALL_STRENGTHS[pos] ?? ["Motor","Football IQ","Work ethic"];
+  const fWk  = FOOTBALL_WEAKNESSES[pos] ?? ["Consistency","Technique","Experience"];
+  const tStr = irng(2, 4), tWk = irng(1, 3);
+
+  const strPool = [...new Set([...athStrengths, ...picks(fStr, tStr)])];
+  const wkPool  = [...new Set([...athWeaknesses,  ...picks(fWk, tWk)])];
+  return {
+    strengths: picks(strPool, Math.min(tStr, strPool.length)),
+    weaknesses: picks(wkPool,  Math.min(tWk,  wkPool.length)),
+  };
+}
 
 // ─── Combine → Athletic Score (position-weighted) ─────────────────────────────
 
@@ -404,10 +470,7 @@ export function generateDraftClass(year: number, count = 252): DraftProspect[] {
     const projRound = gradeToRound(adjustedGrade);
     const projPick = irng(1, 32);
 
-    const numStrengths = irng(2, 4);
-    const numWeaknesses = irng(1, 3);
-    const strPool = STRENGTHS_BY_POS[pos] ?? ["Athletic ability","Motor","Work ethic"];
-    const wkPool = WEAKNESSES_BY_POS[pos] ?? ["Inexperience","Technique","Consistency"];
+    const { strengths, weaknesses } = genStrengthsWeaknesses(pos, adjustedGrade, combine);
 
     prospects.push({
       id: uid(),
@@ -424,8 +487,8 @@ export function generateDraftClass(year: number, count = 252): DraftProspect[] {
       combine,
       collegeStats: generateCollegeStats(pos, adjustedGrade),
       accolades: genAccolades(pos, adjustedGrade),
-      strengths: picks(strPool, numStrengths),
-      weaknesses: picks(wkPool, numWeaknesses),
+      strengths,
+      weaknesses,
       isPickedUp: false,
       scoutingUnlocked: true,
     });

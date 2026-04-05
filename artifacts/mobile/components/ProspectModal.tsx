@@ -41,12 +41,12 @@ function ovrColor(v: number) {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function GradeBar({ label, value, fill, max = 100 }: { label: string; value: number; fill: string; max?: number }) {
+function GradeBar({ label, value, fill, max = 100, labelWidth }: { label: string; value: number; fill: string; max?: number; labelWidth?: number }) {
   const pct = Math.min(100, Math.max(0, (value / max) * 100));
   const valCol = value >= 85 ? ovrColor(value) : "#CBD5E1";
   return (
     <View style={pm.ratingRow}>
-      <Text style={pm.ratingLabel}>{label}</Text>
+      <Text style={[pm.ratingLabel, labelWidth ? { width: labelWidth } : undefined]}>{label}</Text>
       <View style={pm.ratingTrack}>
         <View style={[pm.ratingFill, { width: `${pct}%` as any, backgroundColor: fill }]} />
       </View>
@@ -182,6 +182,33 @@ export function ProspectModal({ prospect: p, visible, onClose, onDraft, isUserTu
   const derivedRatings = p.scoutingUnlocked ? deriveCombineRatings(p.position, p.combine, p.overallGrade) : {};
   const ratingKeys = POS_RATING_KEYS[p.position] ?? [];
 
+  // Core athletic ratings — same formulas as combine table, shown as badge strip
+  const athleticRatings: { label: string; val: number; color: string }[] | null =
+    (p.scoutingUnlocked && !p.combine.didNotParticipate) ? (() => {
+      const c = p.combine;
+      const base = Math.max(40, Math.min(99, 50 + (p.overallGrade / 100) * 45));
+      const spd  = Math.round(Math.max(40, Math.min(99, 99 - (c.fortyYardDash - 4.3) * 65)));
+      const coneR = Math.max(40, Math.min(99, 99 - (c.threeCone - 6.5) * 18));
+      const shutR = Math.max(40, Math.min(99, 99 - (c.shuttleRun - 4.0) * 58));
+      const acc   = Math.round(coneR);
+      const agi   = Math.round((shutR + coneR) / 2);
+      const vertR = Math.max(40, Math.min(99, 40 + (c.verticalJump - 22) * 3.278));
+      const broadR= Math.max(40, Math.min(99, 40 + (c.broadJump - 90) * 1.967));
+      const exp   = Math.round((vertR + broadR) / 2);
+      const str   = Math.round(Math.max(40, Math.min(99, c.benchPress * 1.6 + 22)));
+      const handR = Math.max(40, Math.min(99, 40 + (c.handSize - 8.5) * 19.67));
+      const cth   = Math.round(Math.max(40, Math.min(99, handR * 0.30 + base * 0.45 + agi * 0.25)));
+      const col = (v: number) => v >= 90 ? "#FFD700" : v >= 80 ? "#3FB950" : v >= 70 ? "#4F46E5" : v >= 60 ? "#FB4F14" : "#E31837";
+      return [
+        { label:"SPD", val:spd,  color:col(spd)  },
+        { label:"ACC", val:acc,  color:col(acc)  },
+        { label:"AGI", val:agi,  color:col(agi)  },
+        { label:"EXP", val:exp,  color:col(exp)  },
+        { label:"STR", val:str,  color:col(str)  },
+        { label:"CTH", val:cth,  color:col(cth)  },
+      ];
+    })() : null;
+
   const cs = p.collegeStats;
   const collegeItems: { label: string; value: string }[] = [];
   if (cs.completionPct != null) collegeItems.push({ label:"CMP%",  value:`${cs.completionPct}%` });
@@ -311,9 +338,20 @@ export function ProspectModal({ prospect: p, visible, onClose, onDraft, isUserTu
                     </TouchableOpacity>
                   ))}
                 </View>
+                {/* ── Combine Ratings Badge Strip (always visible) ── */}
+                {athleticRatings && (
+                  <View style={pm.athBadgeRow}>
+                    {athleticRatings.map(({ label, val, color }) => (
+                      <View key={label} style={[pm.athBadge, { borderColor: color + "55", backgroundColor: color + "18" }]}>
+                        <Text style={[pm.athBadgeVal, { color }]}>{val}</Text>
+                        <Text style={[pm.athBadgeLbl, { color: color + "BB" }]}>{label}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
                 {ratingTab === "ratings" ? (
-                  <View style={{ paddingTop: 12 }}>
-                    {/* Show overall grade as single bar if no pos ratings */}
+                  <View style={{ paddingTop: 8 }}>
                     <GradeBar label="OVR" value={p.overallGrade} fill={pc} />
                     <GradeBar label="POT" value={p.potential} fill={ovrColor(p.potential)} />
                     {ratingKeys.map(key => {
@@ -323,14 +361,15 @@ export function ProspectModal({ prospect: p, visible, onClose, onDraft, isUserTu
                     })}
                   </View>
                 ) : (
-                  <View style={{ paddingTop: 12 }}>
-                    {!p.combine.didNotParticipate ? (
+                  <View style={{ paddingTop: 8 }}>
+                    {athleticRatings ? (
                       <>
-                        <GradeBar label="SPEED" value={Math.round(Math.max(40, Math.min(99, 115 - p.combine.fortyYardDash * 18)))} fill="#E31837" />
-                        <GradeBar label="EXPLOSION" value={Math.round(Math.max(40, Math.min(99, (p.combine.verticalJump - 25) * 2.5 + 50)))} fill="#FB4F14" />
-                        <GradeBar label="STRENGTH" value={Math.round(Math.max(40, Math.min(99, p.combine.benchPress * 1.8 + 20)))} fill="#FFC20E" />
-                        <GradeBar label="AGILITY" value={Math.round(Math.max(40, Math.min(99, 160 - p.combine.threeCone * 18)))} fill="#3FB950" />
-                        <GradeBar label="QUICKNESS" value={Math.round(Math.max(40, Math.min(99, 120 - p.combine.shuttleRun * 22)))} fill="#00B5E2" />
+                        <GradeBar label="SPEED  (40-YD)"      value={athleticRatings[0].val} fill="#E31837" labelWidth={140} />
+                        <GradeBar label="ACCEL  (3-CONE)"     value={athleticRatings[1].val} fill="#FB4F14" labelWidth={140} />
+                        <GradeBar label="AGILITY (SHUT+CONE)" value={athleticRatings[2].val} fill="#00B5E2" labelWidth={140} />
+                        <GradeBar label="EXPLOS (VERT+BROAD)" value={athleticRatings[3].val} fill="#3FB950" labelWidth={140} />
+                        <GradeBar label="STRENGTH (BENCH)"    value={athleticRatings[4].val} fill="#FFC20E" labelWidth={140} />
+                        <GradeBar label="CATCHING (HANDS)"    value={athleticRatings[5].val} fill="#9C27B0" labelWidth={140} />
                       </>
                     ) : (
                       <Text style={[pm.dnpText, { color: colors.mutedForeground }]}>No combine data available</Text>
@@ -454,6 +493,12 @@ const pm = StyleSheet.create({
   ratingTabBar:   { flexDirection: "row", borderRadius: 8, padding: 3 },
   ratingTabBtn:   { flex: 1, alignItems: "center", paddingVertical: 7, borderRadius: 6 },
   ratingTabText:  { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+
+  athBadgeRow:    { flexDirection: "row", justifyContent: "space-between", marginTop: 10, marginBottom: 4, gap: 5 },
+  athBadge:       { flex: 1, alignItems: "center", paddingVertical: 7, borderRadius: 9, borderWidth: 1 },
+  athBadgeVal:    { fontSize: 15, fontFamily: "Inter_700Bold" },
+  athBadgeLbl:    { fontSize: 8, fontFamily: "Inter_700Bold", letterSpacing: 0.5, marginTop: 1 },
+
   ratingRow:      { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 5 },
   ratingLabel:    { width: 30, fontSize: 9, fontFamily: "Inter_700Bold", color: "rgba(255,255,255,0.45)", letterSpacing: 0.4 },
   ratingTrack:    { flex: 1, height: 5, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.10)", overflow: "hidden" },
