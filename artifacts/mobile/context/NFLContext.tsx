@@ -1305,10 +1305,17 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
 
     // When starting a new regular season from preseason
     if (next === "regular" && season.phase === "preseason") {
+      const archiveYear = season.year;
       const newTeams = season.teams.map(t => ({
         ...t,
         wins: 0, losses: 0, ties: 0,
         pointsFor: 0, pointsAgainst: 0,
+        // Archive this season's stats into each player's careerStats, then reset
+        roster: t.roster.map(p => ({
+          ...p,
+          careerStats: [...p.careerStats, { ...p.stats, season: archiveYear }],
+          stats: emptyStats(archiveYear + 1),
+        })),
       }));
       const { games: newGames, byeWeeks: newBye } = generateSchedule(newTeams);
       const newDraftProspects = generateDraftClass(season.year + 1, 252);

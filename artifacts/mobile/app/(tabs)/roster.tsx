@@ -12,6 +12,7 @@ import {
   GamePlan, Formation, NFLPosition, OffenseScheme, Player, useNFL,
 } from "@/context/NFLContext";
 import { PlayerCard } from "@/components/PlayerCard";
+import { PlayerStatsModal } from "@/components/PlayerStatsModal";
 
 const ALL_POS: NFLPosition[] = ["QB","RB","WR","TE","OL","DE","DT","LB","CB","S","K","P"];
 const POS_COLOR: Record<NFLPosition, string> = {
@@ -68,7 +69,10 @@ export default function RosterScreen() {
   const [posFilter, setPosFilter] = useState<NFLPosition | "ALL">("ALL");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const [statsPlayer, setStatsPlayer] = useState<Player | null>(null);
   const topPad = Platform.OS === "web" ? 67 : insets.top;
+
+  const gamesPlayed = season?.games.filter(g => g.status === "final").length ?? 0;
 
   const roster = useMemo(() => {
     if (!team) return [];
@@ -253,6 +257,13 @@ export default function RosterScreen() {
                       <ContractRow label="Dead Cap" value={`$${p.deadCap?.toFixed(1)}M`} color={colors.danger} />
                       <ContractRow label="Years Remaining" value={`${p.contractYears}`} />
                     </View>
+                    {/* Stats button always visible */}
+                    <TouchableOpacity
+                      onPress={() => setStatsPlayer(p)}
+                      style={[st.actionBtn, { backgroundColor: teamColor + "18", borderColor: teamColor + "40" }]}>
+                      <Feather name="bar-chart-2" size={12} color={teamColor} />
+                      <Text style={[st.actionBtnText, { color: teamColor }]}>View Stats</Text>
+                    </TouchableOpacity>
                     {isGM && (
                       <View style={st.actionRow}>
                         {p.contractYears >= 2 && (
@@ -346,11 +357,29 @@ export default function RosterScreen() {
                   expanded
                   showInjury
                 />
+                {/* Stats shortcut */}
+                <TouchableOpacity
+                  onPress={() => { setStatsPlayer(selectedPlayer); setSelectedPlayer(null); }}
+                  style={[st.statsBtn, { backgroundColor: teamColor + "18", borderColor: teamColor + "50" }]}
+                >
+                  <Feather name="bar-chart-2" size={14} color={teamColor} />
+                  <Text style={[st.statsBtnText, { color: teamColor }]}>Season &amp; Career Stats</Text>
+                  <Feather name="chevron-right" size={14} color={teamColor} style={{ opacity: 0.6 }} />
+                </TouchableOpacity>
               </ScrollView>
             )}
           </View>
         </View>
       </Modal>
+
+      {/* ── Stats Modal ── */}
+      <PlayerStatsModal
+        player={statsPlayer}
+        visible={!!statsPlayer}
+        onClose={() => setStatsPlayer(null)}
+        teamPrimaryColor={teamColor}
+        gamesPlayedThisSeason={gamesPlayed}
+      />
     </View>
   );
 }
@@ -483,4 +512,6 @@ const st = StyleSheet.create({
   signBtnText:    { fontSize: 12, fontFamily: "Inter_700Bold" },
   faNote:         { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
   expandedActions: { borderWidth: 1, borderTopWidth: 0, borderBottomLeftRadius: 16, borderBottomRightRadius: 16, padding: 14, gap: 10 },
+  statsBtn:        { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 12, borderWidth: 1, paddingVertical: 12, paddingHorizontal: 16, marginTop: 8 },
+  statsBtnText:    { flex: 1, fontSize: 14, fontFamily: "Inter_600SemiBold" },
 });
