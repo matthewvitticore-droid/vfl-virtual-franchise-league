@@ -14,7 +14,7 @@ import { CombineMeasurables } from "@/context/types";
 
 type Tab = "freeAgency" | "draft" | "trades";
 type DraftView = "board" | "combine" | "warRoom";
-type SortKey = "grade" | "fortyYardDash" | "tenYardSplit" | "benchPress" | "verticalJump" | "broadJump" | "shuttleRun" | "threeCone" | "speed" | "acceleration" | "agility" | "strength";
+type SortKey = "grade" | "fortyYardDash" | "tenYardSplit" | "benchPress" | "verticalJump" | "broadJump" | "shuttleRun" | "threeCone" | "speed" | "acceleration" | "agility" | "explosion" | "strength";
 
 const ALL_POS: NFLPosition[] = ["QB","RB","WR","TE","OL","DE","DT","LB","CB","S","K","P"];
 const POS_COLOR: Record<NFLPosition, string> = {
@@ -85,6 +85,12 @@ export default function FrontOfficeScreen() {
         const cRtg = Math.max(40, Math.min(99, 99 - (c.threeCone - 6.5) * 18));
         return Math.round((sRtg + cRtg) / 2);
       }
+      case "explosion": {
+        // Vert + broad jump — 40" vert = 99, 120" broad = 99
+        const vRtg = Math.max(40, Math.min(99, 40 + (c.verticalJump - 22) * 3.278));
+        const bRtg = Math.max(40, Math.min(99, 40 + (c.broadJump - 90) * 1.967));
+        return Math.round((vRtg + bRtg) / 2);
+      }
       case "strength":
         return Math.round(Math.max(40, Math.min(99, c.benchPress * 1.6 + 22)));
       default:
@@ -96,7 +102,7 @@ export default function FrontOfficeScreen() {
     if (!season) return [];
     let list = season.draftProspects.filter(p => !p.isPickedUp);
     if (posFilter !== "ALL") list = list.filter(p => p.position === posFilter);
-    const DERIVED_KEYS = ["speed", "acceleration", "agility", "strength"];
+    const DERIVED_KEYS = ["speed", "acceleration", "agility", "explosion", "strength"];
     const TIME_KEYS = ["fortyYardDash", "tenYardSplit", "shuttleRun", "threeCone"];
     return list.sort((a, b) => {
       if (sortKey === "grade") return sortAsc ? a.overallGrade - b.overallGrade : b.overallGrade - a.overallGrade;
@@ -286,6 +292,7 @@ export default function FrontOfficeScreen() {
                     <SortHeader label="SPD" sortKey="speed" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
                     <SortHeader label="ACC" sortKey="acceleration" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
                     <SortHeader label="AGI" sortKey="agility" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
+                    <SortHeader label="EXP" sortKey="explosion" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
                     <SortHeader label="STR" sortKey="strength" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
                   </View>
                   {prospects.slice(0, 60).map((p, idx) => (
@@ -705,6 +712,12 @@ function deriveCombineRating(key: "speed"|"acceleration"|"agility"|"strength", c
       const cRtg = Math.max(40, Math.min(99, 99 - (c.threeCone - 6.5) * 18));
       return Math.round((sRtg + cRtg) / 2);
     }
+    case "explosion": {
+      // Vert + broad jump — 40" vert = 99, 120" broad = 99
+      const vRtg = Math.max(40, Math.min(99, 40 + (c.verticalJump - 22) * 3.278));
+      const bRtg = Math.max(40, Math.min(99, 40 + (c.broadJump - 90) * 1.967));
+      return Math.round((vRtg + bRtg) / 2);
+    }
     case "strength":
       return Math.round(Math.max(40, Math.min(99, c.benchPress * 1.6 + 22)));
   }
@@ -718,6 +731,7 @@ function CombineRow({ p, rank, colors, teamColor, isUserTurn, isGM, onDraft, onT
   const spd  = dnp ? 0 : deriveCombineRating("speed", c);
   const acc  = dnp ? 0 : deriveCombineRating("acceleration", c);
   const agi  = dnp ? 0 : deriveCombineRating("agility", c);
+  const exp  = dnp ? 0 : deriveCombineRating("explosion", c);
   const str  = dnp ? 0 : deriveCombineRating("strength", c);
   const ratingColor = (v: number) => v >= 90 ? "#FFD700" : v >= 80 ? colors.success : v >= 70 ? colors.foreground : colors.mutedForeground;
   return (
@@ -743,6 +757,7 @@ function CombineRow({ p, rank, colors, teamColor, isUserTurn, isGM, onDraft, onT
       <ColCell value={dnp ? "—" : `${spd}`} color={ratingColor(spd)} />
       <ColCell value={dnp ? "—" : `${acc}`} color={ratingColor(acc)} />
       <ColCell value={dnp ? "—" : `${agi}`} color={ratingColor(agi)} />
+      <ColCell value={dnp ? "—" : `${exp}`} color={ratingColor(exp)} />
       <ColCell value={dnp ? "—" : `${str}`} color={ratingColor(str)} />
       {isGM && isUserTurn && (
         <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); onDraft(); }} style={[st.draftBtnSm, { backgroundColor: teamColor }]}>

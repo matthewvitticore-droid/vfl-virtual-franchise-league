@@ -271,8 +271,8 @@ const WEAKNESSES_BY_POS: Partial<Record<NFLPosition, string[]>> = {
 function combineAthlScore(pos: NFLPosition, c: CombineMeasurables): number {
   // Derived ratings (same formulas as frontoffice.tsx)
   const spd = clamp(99 - (c.fortyYardDash - 4.3) * 65, 40, 99);
-  const vertR  = clamp(40 + (c.verticalJump - 22) * 2.565, 40, 99);
-  const broadR = clamp(40 + (c.broadJump - 90) * 1.311, 40, 99);
+  const vertR  = clamp(40 + (c.verticalJump - 22) * 3.278, 40, 99); // 40" = 99
+  const broadR = clamp(40 + (c.broadJump - 90) * 1.967, 40, 99);   // 120" = 99
   const ath = (vertR + broadR) / 2;
   const shutR = clamp(99 - (c.shuttleRun - 3.9) * 57, 40, 99);
   const coneR = clamp(99 - (c.threeCone - 6.5) * 18, 40, 99);
