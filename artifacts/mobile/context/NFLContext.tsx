@@ -8,7 +8,7 @@ import type {
   Season, NFLTeam, Player, DraftProspect, DraftPick, NFLGame, NewsItem,
   TradeOffer, NFLContextValue, NFLPosition, ContractStatus, GamePlan, Formation,
   OffenseScheme, Conference, Division, PlayerSeasonStats, DevelopmentTrait,
-  DraftState, CompletedDraftPick, TeamCustomization, PosRatings,
+  DraftState, CompletedDraftPick, TeamCustomization, PosRatings, CombineMeasurables,
   EthnicityCode, FaceVariant, PlayoffSeed, PlayoffRound,
 } from "./types";
 
@@ -179,6 +179,52 @@ function genCareerStats(pos: NFLPosition, overall: number, yearsExp: number): Pl
     }
     return s;
   });
+}
+
+// ─── Combine → athleticism helper (same formulas as draft board) ───────────────
+
+function combineToAthletics(c: CombineMeasurables, grade: number) {
+  const cl = (v: number) => Math.max(40, Math.min(99, Math.round(v)));
+  if (c.didNotParticipate) {
+    const base = clamp(grade - 5, 45, 90);
+    return { spd: base, str: base, agi: cl(grade - 6), acc: cl(grade - 6), exp: cl(grade - 6) };
+  }
+  const spd = cl(99 - (c.fortyYardDash - 4.3) * 65);
+  const str = cl(c.benchPress * 1.6 + 22);
+  const sRtg = cl(99 - (c.shuttleRun - 4.0) * 58);
+  const cRtg = cl(99 - (c.threeCone - 6.5) * 18);
+  const agi = cl((sRtg + cRtg) / 2);
+  const acc = cRtg;
+  const vRtg = cl(40 + (c.verticalJump - 22) * 3.278);
+  const bRtg = cl(40 + (c.broadJump - 90) * 1.967);
+  const exp = cl((vRtg + bRtg) / 2);
+  return { spd, str, agi, acc, exp };
+}
+
+// Blend combine athleticism into posRatings for a drafted rookie
+function genPosRatingsFromProspect(
+  pos: NFLPosition, overall: number,
+  spd: number, str: number, agi: number, acc: number,
+): PosRatings {
+  const base = genPosRatings(pos, overall, false, false);
+  // Weight: combine-derived rating gets 55% weight vs technique (grade-based) 45%
+  const ab = (combine: number, technique: number, w = 0.55) =>
+    Math.round(clamp(combine * w + technique * (1 - w), 45, 99));
+  return {
+    ...base,
+    // Universal athletic overrides
+    agility:      ab(agi, base.agility),
+    acceleration: ab(acc, base.acceleration),
+    // Position-specific athletic blends
+    mobility: ["QB","WR","RB","CB","S"].includes(pos) ? ab(spd, base.mobility, 0.4) : base.mobility,
+    manCoverage:  pos === "CB" ? ab(spd, base.manCoverage, 0.5) : base.manCoverage,
+    zoneCoverage: ["CB","S"].includes(pos) ? ab(agi, base.zoneCoverage, 0.4) : base.zoneCoverage,
+    press:        pos === "CB" ? ab(spd, base.press, 0.45) : base.press,
+    powerMoves:   ["OL","DE","DT"].includes(pos) ? ab(str, base.powerMoves, 0.45) : base.powerMoves,
+    finesseMoves: ["DE","DT"].includes(pos) ? ab(agi, base.finesseMoves, 0.4) : base.finesseMoves,
+    blockShedding:["DE","DT"].includes(pos) ? ab(str, base.blockShedding, 0.4) : base.blockShedding,
+    breakTackle:  pos === "RB" ? ab(str, base.breakTackle, 0.4) : base.breakTackle,
+  };
 }
 
 // ─── Position-specific rating generator ───────────────────────────────────────
@@ -1134,8 +1180,11 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       prospectGrade: prospect.overallGrade,
     };
 
-    // Convert prospect to player
-    const rookieOvr = Math.round(prospect.overallGrade * 0.85 + irng(-3, 3));
+    // Convert prospect to player — preserve combine athleticism
+    const grade = prospect.overallGrade;
+    // OVR: rookies arrive slightly below their ceiling (grade * 0.92 ≈ first-year starter level)
+    const rookieOvr = clamp(Math.round(grade * 0.92 - 2 + irng(-3, 3)), 58, 94);
+    const { spd, str, agi, acc } = combineToAthletics(prospect.combine, grade);
     const newPlayer: Player = {
       id: uid(),
       name: prospect.name,
@@ -1143,11 +1192,11 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       age: 21 + irng(0, 2),
       overall: rookieOvr,
       potential: prospect.potential,
-      speed: gaussian(prospect.overallGrade - 5, 6),
-      strength: gaussian(prospect.overallGrade - 5, 6),
-      awareness: gaussian(prospect.overallGrade - 10, 6),
-      specific: gaussian(prospect.overallGrade - 3, 5),
-      posRatings: genPosRatings(prospect.position, rookieOvr, false, false),
+      speed: spd,                                           // ← from 40-yard dash
+      strength: str,                                        // ← from bench press
+      awareness: Math.round(gaussian(grade - 12, 5, 45, 82)),  // rookies lower awareness
+      specific: Math.round(gaussian(grade - 4, 4, 50, 90)),
+      posRatings: genPosRatingsFromProspect(prospect.position, rookieOvr, spd, str, agi, acc),
       ethnicityCode: genEthnicity(),
       faceVariant: irng(0, 3) as 0|1|2|3,
       yearsExperience: 0,
