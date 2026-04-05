@@ -14,7 +14,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { GameProvider } from "@/context/GameContext";
+import { NFLProvider } from "@/context/NFLContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -25,11 +25,8 @@ function RootLayoutNav() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen
-        name="match/[id]"
-        options={{
-          presentation: "card",
-          animation: "slide_from_right",
-        }}
+        name="game/[id]"
+        options={{ presentation: "card", animation: "slide_from_bottom" }}
       />
     </Stack>
   );
@@ -57,9 +54,9 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView>
             <KeyboardProvider>
-              <GameProvider>
+              <NFLProvider>
                 <RootLayoutNav />
-              </GameProvider>
+              </NFLProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>

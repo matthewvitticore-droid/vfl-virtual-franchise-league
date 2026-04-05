@@ -2,7 +2,7 @@
   "expo": {
     "name": "FootballSim",
     "slug": "mobile",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "mobile",
@@ -11,13 +11,13 @@
     "splash": {
       "image": "./assets/images/splash.png",
       "resizeMode": "cover",
-      "backgroundColor": "#0d1117"
+      "backgroundColor": "#0a0a0f"
     },
     "ios": {
       "supportsTablet": false
     },
     "android": {
-      "backgroundColor": "#0d1117"
+      "backgroundColor": "#0a0a0f"
     },
     "web": {
       "favicon": "./assets/images/icon.png"

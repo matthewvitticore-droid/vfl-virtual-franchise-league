@@ -1,42 +1,44 @@
 const colors = {
   light: {
     text: "#0d1117",
-    tint: "#00c853",
+    tint: "#013369",
 
-    background: "#0d1117",
-    foreground: "#f0f6fc",
+    background: "#0a0a0f",
+    foreground: "#f0f0f5",
 
-    card: "#161b22",
-    cardForeground: "#f0f6fc",
+    card: "#13131a",
+    cardForeground: "#f0f0f5",
 
-    primary: "#00c853",
-    primaryForeground: "#000000",
+    primary: "#013369",
+    primaryForeground: "#ffffff",
 
-    secondary: "#21262d",
-    secondaryForeground: "#c9d1d9",
+    secondary: "#1c1c26",
+    secondaryForeground: "#c0c0d0",
 
-    muted: "#21262d",
-    mutedForeground: "#8b949e",
+    muted: "#1c1c26",
+    mutedForeground: "#7070a0",
 
-    accent: "#1f6feb",
+    accent: "#d50a0a",
     accentForeground: "#ffffff",
 
     destructive: "#f85149",
     destructiveForeground: "#ffffff",
 
-    border: "#30363d",
-    input: "#21262d",
+    border: "#252535",
+    input: "#1c1c26",
 
-    success: "#3fb950",
-    warning: "#d29922",
-    danger: "#f85149",
+    success: "#00c853",
+    warning: "#ffd700",
+    danger: "#d50a0a",
 
-    teamHome: "#1f6feb",
-    teamAway: "#f85149",
+    nflBlue: "#013369",
+    nflRed: "#d50a0a",
+    nflGold: "#ffd700",
+    nflGreen: "#1a7a1a",
 
-    gold: "#e3b341",
-    silver: "#8b949e",
-    bronze: "#bc8c5b",
+    gold: "#ffd700",
+    silver: "#a0a0b0",
+    bronze: "#cd7f32",
   },
 
   radius: 12,
