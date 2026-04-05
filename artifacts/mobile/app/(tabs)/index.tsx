@@ -1,8 +1,10 @@
 import { Feather } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
 import { useRouter } from "expo-router";
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Platform,
   ScrollView,
   StyleSheet,
@@ -12,16 +14,19 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { NFLTeamBadge } from "@/components/NFLTeamBadge";
-import { RoleToggle } from "@/components/RoleToggle";
 import { useColors } from "@/hooks/useColors";
+import { useAuth } from "@/context/AuthContext";
 import { useNFL } from "@/context/NFLContext";
 
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { season, isLoading, getPlayerTeam, getWeekGames, simulateWeek, getStandings, activeRole } = useNFL();
-  const [simulating, setSimulating] = React.useState(false);
+  const { membership, signOut } = useAuth();
+  const { season, isLoading, isSyncing, syncError, getPlayerTeam, getWeekGames, simulateWeek, getStandings } = useNFL();
+
+  const [simulating, setSimulating] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   const team = getPlayerTeam();
   const weekGames = useMemo(() => getWeekGames(season?.currentWeek ?? 1), [season, getWeekGames]);
@@ -32,12 +37,27 @@ export default function HomeScreen() {
   const standings = getStandings(team?.conference);
   const myRank = standings.findIndex(t => t.id === season?.playerTeamId) + 1;
 
+  const role = membership?.role ?? "GM";
+  const roleColor = role === "GM" ? colors.nflBlue : role === "Coach" ? colors.nflRed : colors.nflGold;
+  const roleIcon = role === "GM" ? "briefcase" : role === "Coach" ? "target" : "search";
+
+  const topPad = Platform.OS === "web" ? 67 : insets.top;
+
+  const copyJoinCode = async () => {
+    if (!membership?.joinCode) return;
+    await Clipboard.setStringAsync(membership.joinCode);
+    setCodeCopied(true);
+    setTimeout(() => setCodeCopied(false), 2500);
+  };
+
   const handleSimulateWeek = async () => {
+    if (role === "Scout") {
+      Alert.alert("Permission Denied", "Only the GM or Coach can simulate games.");
+      return;
+    }
     setSimulating(true);
     try { await simulateWeek(); } finally { setSimulating(false); }
   };
-
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
 
   if (isLoading) {
     return (
@@ -49,7 +69,6 @@ export default function HomeScreen() {
   }
 
   const winPct = team ? (team.wins / Math.max(1, team.wins + team.losses)).toFixed(3).replace("0.", ".") : ".000";
-  const capUsed = team ? team.roster.reduce((s, p) => s + p.salary, 0).toFixed(1) : "0";
 
   return (
     <ScrollView
@@ -57,23 +76,82 @@ export default function HomeScreen() {
       contentContainerStyle={[styles.content, { paddingTop: topPad + 12, paddingBottom: Platform.OS === "web" ? 120 : 110 }]}
       showsVerticalScrollIndicator={false}
     >
-      {/* Header */}
+      {/* Top header */}
       <View style={styles.headerRow}>
         <View>
           <Text style={[styles.season, { color: colors.mutedForeground }]}>NFL {season?.year} Season</Text>
           <Text style={[styles.week, { color: colors.foreground }]}>Week {season?.currentWeek}</Text>
         </View>
-        <View style={[styles.weekPill, { backgroundColor: colors.nflBlue }]}>
-          <Text style={styles.weekPillText}>W{season?.currentWeek}</Text>
+        <View style={styles.headerRight}>
+          {isSyncing && (
+            <View style={[styles.syncBadge, { backgroundColor: colors.nflBlue + "30" }]}>
+              <ActivityIndicator color={colors.nflBlue} size="small" style={{ transform: [{ scale: 0.7 }] }} />
+              <Text style={[styles.syncText, { color: colors.nflBlue }]}>Syncing</Text>
+            </View>
+          )}
+          {syncError && !isSyncing && (
+            <View style={[styles.syncBadge, { backgroundColor: colors.danger + "20" }]}>
+              <Feather name="wifi-off" size={10} color={colors.danger} />
+              <Text style={[styles.syncText, { color: colors.danger }]}>Offline</Text>
+            </View>
+          )}
+          {!isSyncing && !syncError && membership && (
+            <View style={[styles.syncBadge, { backgroundColor: colors.success + "20" }]}>
+              <View style={[styles.liveDot, { backgroundColor: colors.success }]} />
+              <Text style={[styles.syncText, { color: colors.success }]}>Live</Text>
+            </View>
+          )}
+          <TouchableOpacity
+            onPress={() => Alert.alert("Sign Out", "Leave this session?", [{ text: "Cancel" }, { text: "Sign Out", style: "destructive", onPress: signOut }])}
+            style={[styles.avatarBtn, { backgroundColor: roleColor + "30", borderColor: roleColor }]}
+          >
+            <Feather name={roleIcon as any} size={14} color={roleColor} />
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* Role Toggle */}
-      <View style={styles.roleRow}>
-        <RoleToggle />
-      </View>
+      {/* Franchise / Multiplayer Card */}
+      {membership ? (
+        <View style={[styles.franchiseCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.franchiseTop}>
+            <View style={[styles.rolePill, { backgroundColor: roleColor + "25", borderColor: roleColor }]}>
+              <Feather name={roleIcon as any} size={12} color={roleColor} />
+              <Text style={[styles.rolePillText, { color: roleColor }]}>{role}</Text>
+            </View>
+            <Text style={[styles.franchiseName, { color: colors.foreground }]} numberOfLines={1}>{membership.franchiseName}</Text>
+            <Text style={[styles.displayName, { color: colors.mutedForeground }]}>{membership.displayName}</Text>
+          </View>
+          {/* Join code */}
+          <TouchableOpacity
+            onPress={copyJoinCode}
+            style={[styles.joinCodeRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+          >
+            <Feather name="hash" size={14} color={colors.nflGold} />
+            <Text style={[styles.joinCodeLabel, { color: colors.mutedForeground }]}>Invite Code</Text>
+            <Text style={[styles.joinCode, { color: colors.nflGold }]}>{membership.joinCode}</Text>
+            <Feather name={codeCopied ? "check" : "copy"} size={14} color={codeCopied ? colors.success : colors.mutedForeground} />
+            {codeCopied && <Text style={[styles.copiedText, { color: colors.success }]}>Copied!</Text>}
+          </TouchableOpacity>
+          <Text style={[styles.inviteHint, { color: colors.mutedForeground }]}>
+            Share this code with friends to join as GM, Coach, or Scout
+          </Text>
+        </View>
+      ) : (
+        <TouchableOpacity
+          onPress={() => router.push("/franchise")}
+          style={[styles.franchiseCard, { backgroundColor: colors.nflBlue + "15", borderColor: colors.nflBlue + "50" }]}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <Feather name="users" size={20} color={colors.nflBlue} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.franchiseName, { color: colors.nflBlue }]}>Playing Offline</Text>
+              <Text style={[styles.displayName, { color: colors.mutedForeground }]}>Tap to set up Co-GM multiplayer →</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+      )}
 
-      {/* Team Card */}
+      {/* Team card */}
       {team && (
         <View style={[styles.teamCard, { backgroundColor: team.primaryColor + "18", borderColor: team.primaryColor + "55" }]}>
           <View style={styles.teamCardTop}>
@@ -91,50 +169,55 @@ export default function HomeScreen() {
               </View>
             </View>
           </View>
-
           <View style={[styles.teamStats, { borderTopColor: team.primaryColor + "30" }]}>
-            <StatChip label="Rank" value={`#${myRank}`} color={myRank <= 3 ? colors.nflGold : colors.mutedForeground} />
-            <StatChip label="Pts For" value={`${team.pointsFor}`} color={colors.success} />
-            <StatChip label="Pts Against" value={`${team.pointsAgainst}`} color={colors.danger} />
-            <StatChip label="Cap Space" value={`$${team.capSpace}M`} color={colors.nflGold} />
+            <StatChip label="Conf Rank" value={`#${myRank}`} color={myRank <= 4 ? colors.nflGold : colors.mutedForeground} />
+            <StatChip label="Pts For"   value={`${team.pointsFor}`}     color={colors.success} />
+            <StatChip label="Pts Agst"  value={`${team.pointsAgainst}`} color={colors.danger} />
+            <StatChip label="Cap Space" value={`$${team.capSpace}M`}    color={colors.nflGold} />
           </View>
         </View>
       )}
 
-      {/* Role-specific quick info */}
-      {activeRole === "GM" ? (
-        <View style={[styles.roleCard, { backgroundColor: colors.nflBlue + "18", borderColor: colors.nflBlue + "40" }]}>
+      {/* Role-specific panel */}
+      {role !== "Scout" && (
+        <View style={[styles.roleCard, { backgroundColor: roleColor + "15", borderColor: roleColor + "40" }]}>
           <View style={styles.roleCardHeader}>
-            <Feather name="briefcase" size={16} color={colors.nflBlue} />
-            <Text style={[styles.roleCardTitle, { color: colors.nflBlue }]}>GM Dashboard</Text>
+            <Feather name={roleIcon as any} size={16} color={roleColor} />
+            <Text style={[styles.roleCardTitle, { color: roleColor }]}>
+              {role === "GM" ? "GM Dashboard" : "Coaching Staff"}
+            </Text>
           </View>
-          <View style={styles.roleStats}>
-            <RoleStat label="Roster" value={`${team?.roster.length ?? 0} players`} />
-            <RoleStat label="Cap Used" value={`$${capUsed}M`} />
-            <RoleStat label="Cap Space" value={`$${team?.capSpace ?? 0}M`} />
-            <RoleStat label="Draft Picks" value={`${team?.draftPicks.length ?? 0}`} />
-          </View>
+          {role === "GM" ? (
+            <View style={styles.roleStats}>
+              <RoleStat label="Roster"   value={`${team?.roster.length ?? 0}`} />
+              <RoleStat label="Cap Used" value={`$${team?.roster.reduce((s,p)=>s+p.salary,0).toFixed(0)}M`} />
+              <RoleStat label="Cap Left" value={`$${team?.capSpace ?? 0}M`} />
+              <RoleStat label="Picks"    value={`${team?.draftPicks.length ?? 0}`} />
+            </View>
+          ) : (
+            <View style={styles.roleStats}>
+              <RoleStat label="Scheme"    value={team?.offenseScheme ?? "—"} />
+              <RoleStat label="Formation" value={team?.defenseFormation ?? "—"} />
+              <RoleStat label="Game Plan" value={team?.gamePlan ?? "—"} />
+              <RoleStat label="Week"      value={`${season?.currentWeek ?? 1}`} />
+            </View>
+          )}
           <View style={styles.quickActions}>
-            <QuickActionBtn label="Manage Roster" icon="users" color={colors.nflBlue} onPress={() => router.push("/(tabs)/roster")} />
-            <QuickActionBtn label="Free Agency" icon="user-plus" color={colors.success} onPress={() => router.push("/(tabs)/roster")} />
+            <QuickBtn label={role === "GM" ? "Roster" : "Depth Chart"} icon="users"  color={roleColor} onPress={() => router.push("/(tabs)/roster")} />
+            <QuickBtn label={role === "GM" ? "Free Agents" : "Game Plan"} icon={role === "GM" ? "user-plus" : "sliders"} color={colors.success} onPress={() => router.push("/(tabs)/roster")} />
           </View>
         </View>
-      ) : (
-        <View style={[styles.roleCard, { backgroundColor: colors.nflRed + "18", borderColor: colors.nflRed + "40" }]}>
+      )}
+
+      {role === "Scout" && (
+        <View style={[styles.roleCard, { backgroundColor: colors.nflGold + "10", borderColor: colors.nflGold + "40" }]}>
           <View style={styles.roleCardHeader}>
-            <Feather name="target" size={16} color={colors.nflRed} />
-            <Text style={[styles.roleCardTitle, { color: colors.nflRed }]}>Coaching Staff</Text>
+            <Feather name="search" size={16} color={colors.nflGold} />
+            <Text style={[styles.roleCardTitle, { color: colors.nflGold }]}>Scout View</Text>
           </View>
-          <View style={styles.roleStats}>
-            <RoleStat label="Offense" value={team?.offenseScheme ?? "Pro-Set"} />
-            <RoleStat label="Defense" value={team?.defenseFormation ?? "4-3"} />
-            <RoleStat label="Game Plan" value={team?.gamePlan ?? "Balanced"} />
-            <RoleStat label="Next Opp" value={myGame ? "Scheduled" : "BYE"} />
-          </View>
-          <View style={styles.quickActions}>
-            <QuickActionBtn label="Depth Chart" icon="list" color={colors.nflRed} onPress={() => router.push("/(tabs)/roster")} />
-            <QuickActionBtn label="Game Plan" icon="sliders" color={colors.warning} onPress={() => router.push("/(tabs)/roster")} />
-          </View>
+          <Text style={[styles.scoutDesc, { color: colors.mutedForeground }]}>
+            You can view all franchise data and game results. Contact your GM or Coach to make roster and game plan decisions.
+          </Text>
         </View>
       )}
 
@@ -145,8 +228,6 @@ export default function HomeScreen() {
           {(() => {
             const home = season!.teams.find(t => t.id === myGame.homeTeamId)!;
             const away = season!.teams.find(t => t.id === myGame.awayTeamId)!;
-            const isHome = myGame.homeTeamId === season?.playerTeamId;
-            const opp = isHome ? away : home;
             return (
               <TouchableOpacity
                 onPress={() => router.push({ pathname: "/game/[id]", params: { id: myGame.id } })}
@@ -159,14 +240,9 @@ export default function HomeScreen() {
                     <Text style={[styles.gameTeamName, { color: colors.foreground }]} numberOfLines={1}>{home.name}</Text>
                   </View>
                   <View style={styles.gameCenterCol}>
-                    {myGame.status === "final" ? (
-                      <Text style={[styles.gameScore, { color: colors.foreground }]}>{myGame.homeScore} – {myGame.awayScore}</Text>
-                    ) : (
-                      <>
-                        <Text style={[styles.gameVs, { color: colors.mutedForeground }]}>vs</Text>
-                        <Text style={[styles.gameWeek, { color: colors.mutedForeground }]}>Week {myGame.week}</Text>
-                      </>
-                    )}
+                    {myGame.status === "final"
+                      ? <Text style={[styles.gameScore, { color: colors.foreground }]}>{myGame.homeScore}–{myGame.awayScore}</Text>
+                      : <><Text style={[styles.gameVs, { color: colors.mutedForeground }]}>vs</Text><Text style={[styles.gameWeekLabel, { color: colors.mutedForeground }]}>Week {myGame.week}</Text></>}
                     <Text style={[styles.gameStatus, { color: myGame.status === "final" ? colors.success : colors.warning }]}>
                       {myGame.status === "final" ? "FINAL" : "UPCOMING"}
                     </Text>
@@ -179,7 +255,7 @@ export default function HomeScreen() {
                 <View style={[styles.simulateHint, { borderTopColor: colors.border }]}>
                   <Feather name={myGame.status === "final" ? "eye" : "play-circle"} size={14} color={colors.nflRed} />
                   <Text style={[styles.simulateHintText, { color: colors.nflRed }]}>
-                    {myGame.status === "final" ? "View Play-by-Play" : "Simulate & Watch"}
+                    {myGame.status === "final" ? "View Play-by-Play" : "Watch Play-by-Play"}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -188,31 +264,29 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* Simulate Week Button */}
+      {/* Sim Week */}
       {season && season.currentWeek <= season.totalWeeks && weekGames.some(g => g.status === "upcoming") && (
         <TouchableOpacity
           onPress={handleSimulateWeek}
-          disabled={simulating}
+          disabled={simulating || role === "Scout"}
           activeOpacity={0.8}
-          style={[styles.simWeekBtn, { backgroundColor: simulating ? colors.secondary : colors.nflRed }]}
+          style={[styles.simWeekBtn, { backgroundColor: simulating ? colors.secondary : role === "Scout" ? colors.secondary : colors.nflRed }]}
         >
-          {simulating ? (
-            <ActivityIndicator color={colors.mutedForeground} size="small" />
-          ) : (
-            <Feather name="fast-forward" size={18} color="#fff" />
-          )}
-          <Text style={[styles.simWeekText, { color: simulating ? colors.mutedForeground : "#fff" }]}>
-            {simulating ? "Simulating Week..." : `Sim All Week ${season.currentWeek} Games`}
+          {simulating
+            ? <ActivityIndicator color={colors.mutedForeground} size="small" />
+            : <Feather name="fast-forward" size={18} color={role === "Scout" ? colors.mutedForeground : "#fff"} />}
+          <Text style={[styles.simWeekText, { color: simulating || role === "Scout" ? colors.mutedForeground : "#fff" }]}>
+            {simulating ? "Simulating Week..." : role === "Scout" ? `Sim Week ${season.currentWeek} (GM/Coach only)` : `Sim All Week ${season.currentWeek} Games`}
           </Text>
         </TouchableOpacity>
       )}
 
-      {/* Conference Snapshot */}
+      {/* Conference Standings Snapshot */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{team?.conference ?? "AFC"} Standings</Text>
-        {standings.slice(0, 5).map((t, idx) => (
-          <View key={t.id} style={[styles.standingRow, { borderBottomColor: colors.border, backgroundColor: t.id === season?.playerTeamId ? t.primaryColor + "18" : "transparent" }]}>
-            <Text style={[styles.standingPos, { color: idx === 0 ? colors.nflGold : colors.mutedForeground }]}>{idx + 1}</Text>
+        {standings.slice(0, 6).map((t, idx) => (
+          <View key={t.id} style={[styles.standingRow, { borderBottomColor: colors.border, backgroundColor: t.id === season?.playerTeamId ? t.primaryColor + "15" : "transparent" }]}>
+            <Text style={[styles.standingPos, { color: idx < 3 ? colors.nflGold : colors.mutedForeground }]}>{idx + 1}</Text>
             <NFLTeamBadge abbreviation={t.abbreviation} primaryColor={t.primaryColor} size="xs" />
             <Text style={[styles.standingName, { color: t.id === season?.playerTeamId ? t.primaryColor : colors.foreground }]} numberOfLines={1}>{t.city} {t.name}</Text>
             <Text style={[styles.standingRecord, { color: colors.mutedForeground }]}>{t.wins}-{t.losses}</Text>
@@ -243,63 +317,75 @@ function RoleStat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function QuickActionBtn({ label, icon, color, onPress }: { label: string; icon: any; color: string; onPress: () => void }) {
-  const colors = useColors();
+function QuickBtn({ label, icon, color, onPress }: { label: string; icon: any; color: string; onPress: () => void }) {
   return (
-    <TouchableOpacity onPress={onPress} style={[qaStyles.btn, { backgroundColor: color + "20", borderColor: color + "50" }]}>
+    <TouchableOpacity onPress={onPress} style={[qbStyles.btn, { backgroundColor: color + "20", borderColor: color + "50" }]}>
       <Feather name={icon} size={14} color={color} />
-      <Text style={[qaStyles.label, { color }]}>{label}</Text>
+      <Text style={[qbStyles.label, { color }]}>{label}</Text>
     </TouchableOpacity>
   );
 }
-
-const qaStyles = StyleSheet.create({
-  btn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, flex: 1 },
+const qbStyles = StyleSheet.create({
+  btn:   { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, flex: 1 },
   label: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
 });
 
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
-  loadingText: { fontSize: 14, fontFamily: "Inter_400Regular" },
-  content: { paddingHorizontal: 18 },
-  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
-  season: { fontSize: 11, fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 1 },
-  week: { fontSize: 28, fontFamily: "Inter_700Bold", letterSpacing: -0.5 },
-  weekPill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
-  weekPillText: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#fff" },
-  roleRow: { marginBottom: 14 },
-  teamCard: { borderRadius: 16, padding: 16, borderWidth: 1.5, marginBottom: 14 },
-  teamCardTop: { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 14 },
-  teamMeta: { flex: 1 },
-  teamCity: { fontSize: 12, fontFamily: "Inter_500Medium" },
-  teamName: { fontSize: 22, fontFamily: "Inter_700Bold", letterSpacing: -0.3 },
-  recordRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 3 },
-  record: { fontSize: 15, fontFamily: "Inter_700Bold" },
-  confBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  confText: { fontSize: 10, fontFamily: "Inter_500Medium" },
-  teamStats: { flexDirection: "row", paddingTop: 12, borderTopWidth: 1 },
-  roleCard: { borderRadius: 14, padding: 14, borderWidth: 1, marginBottom: 14 },
-  roleCardHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 },
+  center:        { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
+  loadingText:   { fontSize: 14, fontFamily: "Inter_400Regular" },
+  content:       { paddingHorizontal: 18 },
+  headerRow:     { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
+  headerRight:   { flexDirection: "row", alignItems: "center", gap: 8 },
+  season:        { fontSize: 11, fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 1 },
+  week:          { fontSize: 28, fontFamily: "Inter_700Bold", letterSpacing: -0.5 },
+  syncBadge:     { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
+  syncText:      { fontSize: 10, fontFamily: "Inter_600SemiBold" },
+  liveDot:       { width: 6, height: 6, borderRadius: 3 },
+  avatarBtn:     { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: 1.5 },
+  franchiseCard: { borderRadius: 14, padding: 14, borderWidth: 1.5, marginBottom: 14 },
+  franchiseTop:  { marginBottom: 10 },
+  rolePill:      { flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, marginBottom: 6 },
+  rolePillText:  { fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
+  franchiseName: { fontSize: 18, fontFamily: "Inter_700Bold", letterSpacing: -0.2 },
+  displayName:   { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
+  joinCodeRow:   { flexDirection: "row", alignItems: "center", gap: 8, padding: 10, borderRadius: 10, borderWidth: 1, marginTop: 4 },
+  joinCodeLabel: { fontSize: 11, fontFamily: "Inter_400Regular" },
+  joinCode:      { fontSize: 18, fontFamily: "Inter_700Bold", letterSpacing: 4, flex: 1 },
+  copiedText:    { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  inviteHint:    { fontSize: 10, fontFamily: "Inter_400Regular", marginTop: 6 },
+  teamCard:      { borderRadius: 16, padding: 16, borderWidth: 1.5, marginBottom: 14 },
+  teamCardTop:   { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 14 },
+  teamMeta:      { flex: 1 },
+  teamCity:      { fontSize: 12, fontFamily: "Inter_500Medium" },
+  teamName:      { fontSize: 22, fontFamily: "Inter_700Bold", letterSpacing: -0.3 },
+  recordRow:     { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 3 },
+  record:        { fontSize: 15, fontFamily: "Inter_700Bold" },
+  confBadge:     { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  confText:      { fontSize: 10, fontFamily: "Inter_500Medium" },
+  teamStats:     { flexDirection: "row", paddingTop: 12, borderTopWidth: 1 },
+  roleCard:      { borderRadius: 14, padding: 14, borderWidth: 1, marginBottom: 14 },
+  roleCardHeader:{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 },
   roleCardTitle: { fontSize: 14, fontFamily: "Inter_700Bold", letterSpacing: 0.3 },
-  roleStats: { flexDirection: "row", marginBottom: 12 },
-  quickActions: { flexDirection: "row", gap: 8 },
-  section: { marginBottom: 20 },
-  sectionTitle: { fontSize: 17, fontFamily: "Inter_700Bold", marginBottom: 10, letterSpacing: -0.2 },
-  gameCard: { borderRadius: 14, borderWidth: 1, overflow: "hidden" },
+  roleStats:     { flexDirection: "row", marginBottom: 12 },
+  quickActions:  { flexDirection: "row", gap: 8 },
+  scoutDesc:     { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
+  section:       { marginBottom: 20 },
+  sectionTitle:  { fontSize: 17, fontFamily: "Inter_700Bold", marginBottom: 10, letterSpacing: -0.2 },
+  gameCard:      { borderRadius: 14, borderWidth: 1, overflow: "hidden" },
   gameCardInner: { flexDirection: "row", alignItems: "center", padding: 14 },
-  gameTeamSide: { flex: 1, alignItems: "flex-start", gap: 6 },
-  gameTeamName: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  gameTeamSide:  { flex: 1, alignItems: "flex-start", gap: 6 },
+  gameTeamName:  { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   gameCenterCol: { alignItems: "center", paddingHorizontal: 12 },
-  gameScore: { fontSize: 24, fontFamily: "Inter_700Bold" },
-  gameVs: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
-  gameWeek: { fontSize: 11, fontFamily: "Inter_400Regular" },
-  gameStatus: { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 1, marginTop: 2 },
-  simulateHint: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, padding: 10, borderTopWidth: 1 },
+  gameScore:     { fontSize: 24, fontFamily: "Inter_700Bold" },
+  gameVs:        { fontSize: 16, fontFamily: "Inter_600SemiBold" },
+  gameWeekLabel: { fontSize: 11, fontFamily: "Inter_400Regular" },
+  gameStatus:    { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 1, marginTop: 2 },
+  simulateHint:  { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, padding: 10, borderTopWidth: 1 },
   simulateHintText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  simWeekBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 15, borderRadius: 14, marginBottom: 20 },
-  simWeekText: { fontSize: 15, fontFamily: "Inter_700Bold" },
-  standingRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, paddingHorizontal: 4, borderBottomWidth: 1 },
-  standingPos: { fontSize: 14, fontFamily: "Inter_700Bold", width: 20 },
-  standingName: { flex: 1, fontSize: 13, fontFamily: "Inter_500Medium" },
-  standingRecord: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  simWeekBtn:    { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 15, borderRadius: 14, marginBottom: 20 },
+  simWeekText:   { fontSize: 15, fontFamily: "Inter_700Bold" },
+  standingRow:   { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, paddingHorizontal: 4, borderBottomWidth: 1 },
+  standingPos:   { fontSize: 14, fontFamily: "Inter_700Bold", width: 22 },
+  standingName:  { flex: 1, fontSize: 13, fontFamily: "Inter_500Medium" },
+  standingRecord:{ fontSize: 13, fontFamily: "Inter_600SemiBold" },
 });

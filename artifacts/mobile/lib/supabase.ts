@@ -1,0 +1,77 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { Platform } from "react-native";
+
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
+
+// Whether Supabase is configured — if not, app runs in offline/local mode
+export const SUPABASE_ENABLED =
+  supabaseUrl.startsWith("https://") && supabaseAnonKey.length > 0;
+
+let _client: SupabaseClient | null = null;
+
+function getClient(): SupabaseClient {
+  if (_client) return _client;
+  if (!SUPABASE_ENABLED) {
+    throw new Error("Supabase is not configured. Run in offline mode.");
+  }
+  _client = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      storage: Platform.OS === "web" ? undefined : AsyncStorage,
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false,
+    },
+  });
+  return _client;
+}
+
+// Proxy object — lazily initializes, throws helpful error if not configured
+export const supabase = new Proxy({} as SupabaseClient, {
+  get(_target, prop) {
+    const client = getClient();
+    const value = (client as any)[prop];
+    if (typeof value === "function") return value.bind(client);
+    return value;
+  },
+});
+
+export type Database = {
+  public: {
+    Tables: {
+      franchises: {
+        Row: {
+          id: string;
+          name: string;
+          team_id: string;
+          join_code: string;
+          created_at: string;
+          created_by: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["franchises"]["Row"], "id" | "created_at">;
+      };
+      franchise_members: {
+        Row: {
+          id: string;
+          franchise_id: string;
+          user_id: string;
+          display_name: string;
+          role: "GM" | "Coach" | "Scout";
+          joined_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["franchise_members"]["Row"], "id" | "joined_at">;
+      };
+      franchise_state: {
+        Row: {
+          id: string;
+          franchise_id: string;
+          state_json: any;
+          updated_at: string;
+          updated_by: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["franchise_state"]["Row"], "id" | "updated_at">;
+      };
+    };
+  };
+};
