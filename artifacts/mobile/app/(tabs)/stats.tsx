@@ -145,7 +145,7 @@ export default function StatsScreen() {
     );
   }, [season]);
 
-  const gamesPlayed = season?.games.filter(g => g.played).length ?? 0;
+  const gamesPlayed = season?.games.filter(g => g.status === "final").length ?? 0;
 
   const passing = useMemo(() =>
     allPlayers.filter(p => p.position === "QB" && (p.stats.attempts > 0 || p.stats.passingYards > 0))

@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { supabase, SUPABASE_ENABLED } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
-import { simulateFullGame } from "./SimEngine";
+import { simulateFullGame, mergePlayerStats } from "./SimEngine";
 import { generateDraftClass, initDraftState, simulateAIPick } from "./DraftEngine";
 import type {
   Season, NFLTeam, Player, DraftProspect, DraftPick, NFLGame, NewsItem,
@@ -966,6 +966,22 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
         });
       }
       current.games = current.games.map(g => g.id === game.id ? { ...g, ...result, id: g.id, week: g.week } : g);
+
+      // Merge per-player game stats into each team's roster season totals
+      if (result.playerStats) {
+        const ps = result.playerStats;
+        current.teams = current.teams.map(t => {
+          if (t.id !== homeTeam.id && t.id !== awayTeam.id) return t;
+          return {
+            ...t,
+            roster: t.roster.map(p => {
+              const gameLine = ps[p.id];
+              if (!gameLine) return p;
+              return { ...p, stats: mergePlayerStats(p.stats, gameLine) };
+            }),
+          };
+        });
+      }
     }
 
     const nextWeek = current.currentWeek + 1;

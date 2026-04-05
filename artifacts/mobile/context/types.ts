@@ -365,6 +365,7 @@ export interface NFLGame {
   drives: DriveEntry[];
   phase: GamePhase;
   stats: { home: TeamGameStats; away: TeamGameStats };
+  playerStats?: Record<string, PlayerSeasonStats>;
   weather: GameWeather;
   location: string;
   isPlayoffGame?: boolean;
