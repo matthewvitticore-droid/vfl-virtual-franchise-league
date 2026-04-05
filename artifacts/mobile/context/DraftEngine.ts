@@ -300,16 +300,33 @@ function combineAthlScore(pos: NFLPosition, c: CombineMeasurables): number {
   }
 }
 
-// Adjust the raw grade by ±12 pts based on how a prospect's combine
-// measurables compare to an "average" athletic profile (score ≈ 70).
+// Blend tape/skill seed with position-weighted combine athleticism score.
+// Speed positions (CB/WR/RB/S): 70% athleticism so elite 40 times always
+// produce elite grades regardless of where the player was seeded.
 function adjustGradeForCombine(
   pos: NFLPosition, rawGrade: number, combine: CombineMeasurables,
 ): number {
   if (combine.didNotParticipate) return rawGrade;
   const score = combineAthlScore(pos, combine);
-  // Each point above/below 70 shifts the grade by 0.4 pts (max ±12)
-  const adj = Math.round((score - 70) * 0.4);
-  return clamp(rawGrade + adj, 35, 99);
+
+  // For speed positions athleticism IS the grade — combine score drives 70%.
+  // The "skill/tape" seed is only 30% so a 4.28 CB always grades elite.
+  // For other positions skill/experience weighs more.
+  let skillW: number;
+  switch (pos) {
+    case "RB": case "WR": case "CB": case "S":
+      skillW = 0.30; break; // speed kills — 70% athleticism
+    case "DE": case "TE": case "LB":
+      skillW = 0.50; break; // even split
+    case "DT": case "OL":
+      skillW = 0.40; break; // strength-driven, 60% athleticism
+    case "QB":
+      skillW = 0.55; break; // arm + IQ matter, 45% athleticism
+    default:
+      skillW = 0.80; break; // K/P: mostly skill/leg
+  }
+  const athW = 1 - skillW;
+  return clamp(Math.round(rawGrade * skillW + score * athW), 35, 99);
 }
 
 // ─── Grade → Round Projection ─────────────────────────────────────────────────
