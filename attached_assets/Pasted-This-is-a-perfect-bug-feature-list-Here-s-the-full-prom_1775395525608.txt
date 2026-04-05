@@ -1,0 +1,12 @@
+This is a perfect bug/feature list. Here’s the full prompt to paste into the Agent:
+
+“Make the following improvements to VFL:
+PLAYER CARDS: Every player card must show full in-depth ratings specific to their position — QBs get throw power, throw accuracy short/mid/deep, awareness, mobility, throw on the run. WRs get speed, acceleration, catching, route running, catch in traffic, release. RBs get speed, acceleration, agility, ball carrier vision, break tackle, catching. OL gets pass block, run block, strength, awareness. DL gets power moves, finesse moves, block shedding, tackle, pursuit. LBs get tackle, pursuit, zone coverage, man coverage, hit power. DBs get man coverage, zone coverage, speed, acceleration, press, catching. Each rating is color coded — 90+ gold, 80-89 green, 70-79 white, below 70 red.
+PLAYER CARD GRAPHICS: Simple 2D illustration of a football player wearing full team uniform — helmet with realistic face mask, and a diverse ethnically varied face visible beneath the facemask. Build a pool of diverse player face types representing Black, White, Hispanic, Polynesian, and mixed ethnicities randomly assigned to players.
+DRAFT PROSPECT CARDS: Each prospect card shows name, position, college, height, weight, overall rating, development trait (Superstar, Star, Starter, Backup), college stats specific to their position, combine measurables, and any accolades like All-American, Biletnikoff Award, Heisman etc.
+COMBINE: Make the full combine board sortable by any column — 40 yard dash fastest to slowest, bench press reps, vertical jump, broad jump, three cone, shuttle. Sortable both ascending and descending.
+RATINGS BY POSITION: Every player’s ratings must be fully specific to their position with no irrelevant attributes shown.
+STATS: Build a full stats system including live season stats updated after every simmed game, career stats for every player, all time single season records for every major stat category, all time career records. Stats should mirror real NFL categories — passing yards, TDs, INTs, completion percentage, passer rating, rushing yards, yards per carry, receiving yards, catches, targets, yards per reception, sacks, tackles, interceptions, forced fumbles.
+UNIFORM CUSTOMIZER: Add a working Save and Update button to the uniform customization screen that properly saves all changes including home, away and alternate uniform sets.”
+
+That’s your biggest upgrade yet. Paste it and let it build. VFL is about to feel very real. 🏈​​​​​​​​​​​​​​​​

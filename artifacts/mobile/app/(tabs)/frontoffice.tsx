@@ -24,6 +24,12 @@ const POS_COLOR: Record<NFLPosition, string> = {
 const GRADE_COLORS: Record<string, string> = {
   "1st":"#FFD700","2nd":"#FF6B35","3rd":"#3FB950","4th":"#00B5E2","5th":"#8B949E","6th":"#795548","7th":"#525252","UDFA":"#333"
 };
+const DEV_COLORS: Record<string, string> = {
+  "X-Factor":"#FFD700", Superstar:"#FF6B35", Star:"#3FB950", Normal:"#8B949E", "Late Bloomer":"#00B5E2",
+};
+const DEV_ICONS: Record<string, string> = {
+  "X-Factor":"zap", Superstar:"star", Star:"award", Normal:"user", "Late Bloomer":"trending-up",
+};
 
 export default function FrontOfficeScreen() {
   const colors = useColors();
@@ -504,9 +510,16 @@ function ProspectCard({ p, rank, expanded, teamColor, colors, isGM, isUserTurn, 
           <Text style={[st.gradePillText, { color: gc }]}>{p.grade}</Text>
         </View>
         {p.scoutingUnlocked && (
-          <View style={[st.ovrBadge, { backgroundColor: POS_COLOR[p.position]+"22", borderColor: POS_COLOR[p.position]+"55", marginLeft: 6 }]}>
-            <Text style={[st.ovrText, { color: POS_COLOR[p.position] }]}>{p.overallGrade}</Text>
-          </View>
+          <>
+            <View style={[st.ovrBadge, { backgroundColor: POS_COLOR[p.position]+"22", borderColor: POS_COLOR[p.position]+"55", marginLeft: 6 }]}>
+              <Text style={[st.ovrText, { color: POS_COLOR[p.position] }]}>{p.overallGrade}</Text>
+            </View>
+            {p.developmentTrait && p.developmentTrait !== "Normal" && (
+              <View style={[st.devTraitPill, { backgroundColor: DEV_COLORS[p.developmentTrait]+"22", borderColor: DEV_COLORS[p.developmentTrait]+"55" }]}>
+                <Feather name={DEV_ICONS[p.developmentTrait] as any} size={9} color={DEV_COLORS[p.developmentTrait]} />
+              </View>
+            )}
+          </>
         )}
       </View>
       {expanded && (
@@ -524,6 +537,21 @@ function ProspectCard({ p, rank, expanded, teamColor, colors, isGM, isUserTurn, 
             </View>
           ) : (
             <View style={{ gap:10 }}>
+              {/* Dev trait + accolades row */}
+              <View style={{ flexDirection:"row", alignItems:"center", flexWrap:"wrap", gap:6 }}>
+                {p.developmentTrait && (
+                  <View style={[st.devTraitChip, { backgroundColor: DEV_COLORS[p.developmentTrait]+"20", borderColor: DEV_COLORS[p.developmentTrait]+"50" }]}>
+                    <Feather name={DEV_ICONS[p.developmentTrait] as any} size={10} color={DEV_COLORS[p.developmentTrait]} />
+                    <Text style={[st.devTraitChipText, { color: DEV_COLORS[p.developmentTrait] }]}>{p.developmentTrait}</Text>
+                  </View>
+                )}
+                {(p.accolades ?? []).map((a, i) => (
+                  <View key={i} style={[st.accoladePill, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                    <Feather name="award" size={9} color="#D97706" />
+                    <Text style={[st.accoladePillText, { color: colors.foreground }]}>{a}</Text>
+                  </View>
+                ))}
+              </View>
               {/* College stats */}
               <CollegeStatsBlock p={p} colors={colors} />
               {/* Combine quick */}
@@ -686,6 +714,11 @@ const st = StyleSheet.create({
   prospectRank:     { width:28, fontSize:13, fontFamily:"Inter_700Bold" },
   gradePill:        { paddingHorizontal:8, paddingVertical:3, borderRadius:6, borderWidth:1 },
   gradePillText:    { fontSize:11, fontFamily:"Inter_700Bold" },
+  devTraitPill:     { width:22, height:22, borderRadius:11, alignItems:"center", justifyContent:"center", borderWidth:1.5 },
+  devTraitChip:     { flexDirection:"row", alignItems:"center", gap:4, paddingHorizontal:8, paddingVertical:4, borderRadius:8, borderWidth:1 },
+  devTraitChipText: { fontSize:11, fontFamily:"Inter_700Bold" },
+  accoladePill:     { flexDirection:"row", alignItems:"center", gap:4, paddingHorizontal:7, paddingVertical:3, borderRadius:6, borderWidth:1 },
+  accoladePillText: { fontSize:10, fontFamily:"Inter_500Medium" },
   combineQuick:     { flexDirection:"row", borderRadius:10, padding:10 },
   scoutBtn:         { flexDirection:"row", alignItems:"center", gap:5, paddingHorizontal:14, paddingVertical:8, borderRadius:8, borderWidth:1.5 },
   scoutBtnText:     { fontSize:13, fontFamily:"Inter_600SemiBold" },

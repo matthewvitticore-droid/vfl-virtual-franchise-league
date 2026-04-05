@@ -8,14 +8,17 @@ import type {
   Season, NFLTeam, Player, DraftProspect, DraftPick, NFLGame, NewsItem,
   TradeOffer, NFLContextValue, NFLPosition, ContractStatus, GamePlan, Formation,
   OffenseScheme, Conference, Division, PlayerSeasonStats, DevelopmentTrait,
-  DraftState, CompletedDraftPick, TeamCustomization,
+  DraftState, CompletedDraftPick, TeamCustomization, PosRatings,
+  EthnicityCode, FaceVariant,
 } from "./types";
 
 export type { Season, NFLTeam, Player, DraftProspect, DraftPick, NFLGame, NewsItem,
   TradeOffer, NFLContextValue, NFLPosition, ContractStatus, GamePlan, Formation,
   OffenseScheme, Conference, Division, PlayerSeasonStats, DevelopmentTrait,
   TeamCustomization, UniformSet, TeamLogo, JerseyStyle, NumberFont, PantStripeStyle,
-  HelmetLogoPlacement, LogoType, AnimalMascot, ShieldStyle, LogoFontStyle } from "./types";
+  HelmetLogoPlacement, LogoType, AnimalMascot, ShieldStyle, LogoFontStyle,
+  PosRatings, EthnicityCode, FaceVariant } from "./types";
+export { POS_RATING_KEYS, POS_RATING_LABELS } from "./types";
 
 const CACHE_KEY   = "vfl_season_v1";
 const CUSTOM_KEY  = "vfl_customization_v1";
@@ -93,12 +96,62 @@ function genDevTrait(overall: number, age: number): DevelopmentTrait {
   return "Normal";
 }
 
-function emptyStats(): PlayerSeasonStats {
+function emptyStats(season?: number): PlayerSeasonStats {
   return {
-    gamesPlayed:0, passingYards:0, passingTDs:0, interceptions:0, completions:0, attempts:0, qbRating:0,
+    season, gamesPlayed:0, passingYards:0, passingTDs:0, interceptions:0, completions:0, attempts:0, qbRating:0,
     rushingYards:0, rushingTDs:0, carries:0, receivingYards:0, receivingTDs:0, receptions:0, targets:0,
-    tackles:0, sacks:0, forcedFumbles:0, defensiveINTs:0, fieldGoalsMade:0, fieldGoalsAttempted:0, puntsAverage:0,
+    tackles:0, sacks:0, forcedFumbles:0, defensiveINTs:0, passDeflections:0,
+    yardsPerCarry:0, yardsPerCatch:0,
+    fieldGoalsMade:0, fieldGoalsAttempted:0, puntsAverage:0,
   };
+}
+
+// ─── Position-specific rating generator ───────────────────────────────────────
+
+function genPosRatings(pos: NFLPosition, overall: number, isStarter: boolean, isElite: boolean): PosRatings {
+  const g = (base: number, boost = 0) => clamp(gaussian(base + boost, 5), 45, 99);
+  const hi = overall + 2;
+  const lo = overall - 8;
+  const mid = overall - 2;
+  return {
+    throwPower:      pos === "QB"                        ? g(hi)  : g(lo - 8),
+    throwAccShort:   pos === "QB"                        ? g(hi)  : g(lo - 8),
+    throwAccMid:     pos === "QB"                        ? g(mid) : g(lo - 12),
+    throwAccDeep:    pos === "QB"                        ? g(lo)  : g(lo - 15),
+    throwOnRun:      pos === "QB"                        ? g(lo)  : g(lo - 10),
+    mobility:        pos === "QB"                        ? g(lo)  : ["WR","CB","RB","S"].includes(pos) ? g(mid) : g(lo - 5),
+    agility:         ["WR","CB","RB","S"].includes(pos)  ? g(hi)  : ["QB","TE","LB"].includes(pos) ? g(mid) : g(lo),
+    acceleration:    ["WR","CB","RB"].includes(pos)      ? g(hi)  : ["QB","S","DE"].includes(pos)  ? g(mid) : g(lo),
+    ballCarrierVision: pos === "RB"                      ? g(hi)  : g(lo - 5),
+    breakTackle:     pos === "RB"                        ? g(hi)  : pos === "FB" ? g(mid) : g(lo - 5),
+    catching:        ["WR","TE"].includes(pos)           ? g(hi)  : pos === "RB" ? g(mid) : g(lo - 10),
+    routeRunning:    ["WR","TE"].includes(pos)           ? g(hi)  : pos === "RB" ? g(lo)  : g(lo - 10),
+    catchInTraffic:  ["WR","TE"].includes(pos)           ? g(mid) : g(lo - 8),
+    release:         ["WR","TE"].includes(pos)           ? g(hi)  : g(lo - 8),
+    passBlock:       pos === "OL"                        ? g(hi)  : ["TE"].includes(pos) ? g(lo) : g(lo - 8),
+    runBlock:        ["OL","TE"].includes(pos)           ? g(hi)  : g(lo - 8),
+    powerMoves:      ["DE","DT","LB","OL"].includes(pos) ? g(hi)  : g(lo - 8),
+    finesseMoves:    ["DE","DT"].includes(pos)           ? g(hi)  : ["LB"].includes(pos) ? g(mid) : g(lo - 8),
+    blockShedding:   ["DE","DT","LB"].includes(pos)      ? g(hi)  : ["OL"].includes(pos) ? g(lo) : g(lo - 8),
+    tackle:          ["LB","S","CB","DE","DT"].includes(pos) ? g(hi) : ["OL"].includes(pos) ? g(lo) : g(lo - 5),
+    pursuit:         ["DE","DT","LB","CB","S"].includes(pos) ? g(hi) : g(lo - 5),
+    manCoverage:     ["CB"].includes(pos)                ? g(hi)  : ["S","LB"].includes(pos) ? g(mid) : g(lo - 10),
+    zoneCoverage:    ["S","CB"].includes(pos)            ? g(hi)  : ["LB"].includes(pos) ? g(mid) : g(lo - 10),
+    press:           pos === "CB"                        ? g(hi)  : pos === "S" ? g(mid) : g(lo - 8),
+    kickPower:       ["K","P"].includes(pos)             ? g(hi)  : g(lo - 15),
+    kickAccuracy:    ["K","P"].includes(pos)             ? g(hi)  : g(lo - 15),
+  };
+}
+
+// ─── Ethnicity code generator ─────────────────────────────────────────────────
+// Distribution: ~55% Black, 27% White, 12% Hispanic, 4% Polynesian, 2% Mixed
+function genEthnicity(): EthnicityCode {
+  const r = Math.random();
+  if (r < 0.55) return 0;
+  if (r < 0.82) return 1;
+  if (r < 0.94) return 2;
+  if (r < 0.98) return 3;
+  return 4;
 }
 
 const COLLEGES = [
@@ -175,6 +228,9 @@ function generateRoster(teamOverall: number): Player[] {
       strength: genRating(teamOverall + (["OL","DE","DT"].includes(pos) ? 3 : -2), isStarter, false),
       awareness: genRating(teamOverall + (["QB","S","LB"].includes(pos) ? 3 : -2), isStarter, false),
       specific: genRating(teamOverall + 2, isStarter, isElite),
+      posRatings: genPosRatings(pos, overall, isStarter, isElite),
+      ethnicityCode: genEthnicity(),
+      faceVariant: irng(0, 3) as 0|1|2|3,
       yearsExperience: exp,
       contractYears: irng(1, 4),
       salary,
@@ -184,6 +240,7 @@ function generateRoster(teamOverall: number): Player[] {
       status: isStarter ? "Starter" : slot.depth === 3 ? "Practice Squad" : "Backup",
       depthOrder: slot.depth,
       stats: emptyStats(),
+      careerStats: [],
       fatigue: 0,
       morale: irng(60, 95),
       faInterestLevel: irng(1, 5),
@@ -204,17 +261,21 @@ function generateFreeAgents(count = 60): Player[] {
     const exp = irng(1, 10);
     const salary = genSalary(overall, pos);
     const interest = irng(1, 5);
+    const age = 22 + exp + irng(0, 4);
     return {
       id: uid(),
       name: rn(),
       position: pos,
-      age: 22 + exp + irng(0, 4),
+      age,
       overall,
       potential: Math.min(99, overall + irng(0, 8)),
       speed: gaussian(overall, 8),
       strength: gaussian(overall, 8),
       awareness: gaussian(overall, 8),
       specific: gaussian(overall + 2, 5),
+      posRatings: genPosRatings(pos, overall, false, false),
+      ethnicityCode: genEthnicity(),
+      faceVariant: irng(0, 3) as 0|1|2|3,
       yearsExperience: exp,
       contractYears: irng(1, 2),
       salary,
@@ -224,10 +285,11 @@ function generateFreeAgents(count = 60): Player[] {
       status: "Free Agent" as ContractStatus,
       depthOrder: 3,
       stats: emptyStats(),
+      careerStats: [],
       fatigue: 0,
       morale: irng(50, 85),
       faInterestLevel: interest,
-      developmentTrait: genDevTrait(overall, 22 + exp),
+      developmentTrait: genDevTrait(overall, age),
       college: pick(COLLEGES),
       jerseyNumber: genJerseyNumber(pos, irng(0, 99)),
     };
@@ -760,17 +822,21 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
     };
 
     // Convert prospect to player
+    const rookieOvr = Math.round(prospect.overallGrade * 0.85 + irng(-3, 3));
     const newPlayer: Player = {
       id: uid(),
       name: prospect.name,
       position: prospect.position,
       age: 21 + irng(0, 2),
-      overall: Math.round(prospect.overallGrade * 0.85 + irng(-3, 3)),
+      overall: rookieOvr,
       potential: prospect.potential,
       speed: gaussian(prospect.overallGrade - 5, 6),
       strength: gaussian(prospect.overallGrade - 5, 6),
       awareness: gaussian(prospect.overallGrade - 10, 6),
       specific: gaussian(prospect.overallGrade - 3, 5),
+      posRatings: genPosRatings(prospect.position, rookieOvr, false, false),
+      ethnicityCode: genEthnicity(),
+      faceVariant: irng(0, 3) as 0|1|2|3,
       yearsExperience: 0,
       contractYears: 4,
       salary: draftState.currentRound === 1 ? rng2(2.5, 8) : rng2(0.9, 3),
@@ -780,10 +846,11 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       status: "Backup",
       depthOrder: 3,
       stats: emptyStats(),
+      careerStats: [],
       fatigue: 0,
       morale: 90,
       faInterestLevel: 5,
-      developmentTrait: genDevTrait(Math.round(prospect.overallGrade * 0.85), 21),
+      developmentTrait: genDevTrait(rookieOvr, 21),
       college: prospect.college,
       jerseyNumber: genJerseyNumber(prospect.position, irng(0, 99)),
     };

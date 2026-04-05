@@ -4,6 +4,7 @@ import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { PlayerFigure } from "@/components/PlayerFigure";
 import { useNFL } from "@/context/NFLContext";
+import { POS_RATING_KEYS, POS_RATING_LABELS } from "@/context/types";
 import type { NFLPosition, Player, UniformSet } from "@/context/types";
 
 // ─── Position meta ────────────────────────────────────────────────────────────
@@ -12,12 +13,6 @@ export const POS_COLOR: Record<NFLPosition, string> = {
   QB: "#E31837", RB: "#FB4F14", WR: "#FFC20E", TE: "#00B5E2",
   OL: "#8B949E", DE: "#3FB950", DT: "#26A69A", LB: "#1F6FEB",
   CB: "#6E40C9", S:  "#9C27B0", K:  "#FF7043", P:  "#795548",
-};
-
-const POS_SPECIFIC_LABEL: Record<NFLPosition, string> = {
-  QB: "THP", RB: "BTK", WR: "CTH", TE: "CTH",
-  OL: "RBK", DE: "FSN", DT: "BTK", LB: "TAK",
-  CB: "MAN", S:  "ZON", K:  "KPW", P:  "KPW",
 };
 
 const DEV_COLOR: Record<string, string> = {
@@ -121,7 +116,6 @@ export function PlayerCard({
   const secDk      = darken(secondary, -40);
 
   const posColor = POS_COLOR[player.position];
-  const posLabel = POS_SPECIFIC_LABEL[player.position];
   const devColor = DEV_COLOR[player.developmentTrait] ?? "#8B949E";
   const devIcon  = DEV_ICON[player.developmentTrait]  ?? "user";
   const ovrC     = ovrColor(player.overall);
@@ -191,6 +185,8 @@ export function PlayerCard({
               playerName={player.name}
               width={figW}
               height={figH}
+              ethnicityCode={player.ethnicityCode ?? 0}
+              faceVariant={player.faceVariant ?? 0}
             />
           </View>
         </View>
@@ -249,12 +245,17 @@ export function PlayerCard({
             </View>
           )}
 
-          {/* Rating bars */}
+          {/* Position-specific rating bars */}
           <View style={card.bars}>
-            <RatingBar label="SPD" value={player.speed}    fill={primary} />
-            <RatingBar label="STR" value={player.strength} fill={primary} />
-            <RatingBar label="AWR" value={player.awareness} fill={primary} />
-            <RatingBar label={posLabel} value={player.specific} fill={ovrC} />
+            {POS_RATING_KEYS[player.position]?.map((key, i) => {
+              const val = player.posRatings?.[key] ?? player.specific;
+              const label = POS_RATING_LABELS[key];
+              const isLast = i === (POS_RATING_KEYS[player.position].length - 1);
+              return (
+                <RatingBar key={key} label={label} value={val}
+                  fill={isLast ? ovrC : primary} />
+              );
+            })}
           </View>
 
           {/* Contract chips */}

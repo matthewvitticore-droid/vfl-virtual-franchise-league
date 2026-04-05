@@ -1,6 +1,42 @@
 import {
-  DraftProspect, CombineMeasurables, ProspectCollegeStats, NFLPosition, DraftState,
+  DraftProspect, CombineMeasurables, ProspectCollegeStats, NFLPosition, DraftState, DevelopmentTrait,
 } from "./types";
+
+// ─── Accolades pool by position ───────────────────────────────────────────────
+
+const ACCOLADES_POOL: Partial<Record<NFLPosition, string[]>> = {
+  QB:  ["Heisman Winner","Maxwell Award","Davey O'Brien Award","All-American","Conference POTY","Johnny Unitas Award","Rose Bowl MVP"],
+  RB:  ["Doak Walker Award","All-American","Conference POTY","Cotton Bowl MVP","Orange Bowl MVP","Rushing Title"],
+  WR:  ["Biletnikoff Award","All-American","Conference POTY","Receiving Title","Touchdown Leader","Senior Bowl Standout"],
+  TE:  ["Mackey Award","All-American","Conference POTY","Senior Bowl Standout","Blocking Award"],
+  OL:  ["Outland Trophy","Rimington Trophy","Lombardi Award","All-American","Conference Offensive Lineman of Year"],
+  DE:  ["Butkus Award","Bednarik Award","All-American","Conference Defensive POTY","Sack Leader","Senior Bowl Standout"],
+  DT:  ["Outland Trophy","Lombardi Award","Bednarik Award","All-American","Conference Defensive Lineman of Year"],
+  LB:  ["Butkus Award","Bednarik Award","All-American","Conference Defensive POTY","Forced Fumble Leader"],
+  CB:  ["Thorpe Award","Bednarik Award","All-American","Conference Defensive POTY","Interception Leader"],
+  S:   ["Thorpe Award","Bednarik Award","All-American","Conference Defensive POTY","Interception Leader"],
+  K:   ["Lou Groza Award","All-American","Conference Special Teams POTY"],
+  P:   ["Ray Guy Award","All-American","Conference Special Teams POTY"],
+};
+
+const GENERAL_ACCOLADES = ["Senior Bowl Invite","East–West Shrine Game","3-year Starter","Team Captain","Academic All-American"];
+
+function genAccolades(pos: NFLPosition, grade: number): string[] {
+  const pool = [...(ACCOLADES_POOL[pos] ?? []), ...GENERAL_ACCOLADES];
+  const max = grade >= 90 ? 3 : grade >= 80 ? 2 : grade >= 70 ? 1 : 0;
+  if (max === 0 && Math.random() > 0.3) return [];
+  const count = Math.min(max + (Math.random() < 0.2 ? 1 : 0), pool.length, 3);
+  const shuffled = [...pool].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
+}
+
+function genProspectDevTrait(grade: number): DevelopmentTrait {
+  if (grade >= 90) return Math.random() < 0.5 ? "X-Factor" : "Superstar";
+  if (grade >= 82) return Math.random() < 0.5 ? "Superstar" : "Star";
+  if (grade >= 72) return Math.random() < 0.45 ? "Star" : "Normal";
+  if (grade >= 60 && Math.random() < 0.15) return "Late Bloomer";
+  return "Normal";
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -295,12 +331,14 @@ export function generateDraftClass(year: number, count = 252): DraftProspect[] {
       projectedPick: projPick,
       grade: gradeLabel(projRound),
       archetype: pick(ARCHETYPES[pos] ?? ["Prospect"]),
+      developmentTrait: genProspectDevTrait(grade),
       combine: generateCombine(pos, grade, dnp),
       collegeStats: generateCollegeStats(pos, grade),
+      accolades: genAccolades(pos, grade),
       strengths: picks(strPool, numStrengths),
       weaknesses: picks(wkPool, numWeaknesses),
       isPickedUp: false,
-      scoutingUnlocked: grade >= 80, // elite prospects auto-scouted
+      scoutingUnlocked: grade >= 80,
     });
   }
 

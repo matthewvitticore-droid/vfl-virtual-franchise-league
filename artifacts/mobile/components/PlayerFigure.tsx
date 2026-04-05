@@ -4,7 +4,7 @@ import Svg, {
   Path, Rect, Ellipse, Line,
   Text as SvgText, G,
 } from "react-native-svg";
-import type { NFLPosition, UniformSet } from "@/context/types";
+import type { NFLPosition, UniformSet, EthnicityCode, FaceVariant } from "@/context/types";
 
 // ─── Body type by position ────────────────────────────────────────────────────
 
@@ -54,7 +54,19 @@ interface Props {
   playerName?: string;
   width?: number;
   height?: number;
+  ethnicityCode?: EthnicityCode;
+  faceVariant?: FaceVariant;
 }
+
+// ─── Skin & face data by ethnicity ────────────────────────────────────────────
+
+const SKIN_TONES: Record<EthnicityCode, { skin: string; skinDk: string; eyeColor: string; eyeHighlight: string }> = {
+  0: { skin: "#7B4A2D", skinDk: "#5A3320", eyeColor: "#2C1810", eyeHighlight: "#8B5E3C" },  // Black
+  1: { skin: "#F0C9A0", skinDk: "#D4A57A", eyeColor: "#4A7DA8", eyeHighlight: "#7AABCE" },  // White
+  2: { skin: "#C18A50", skinDk: "#9A6A35", eyeColor: "#3D2014", eyeHighlight: "#7A4F26" },  // Hispanic
+  3: { skin: "#8B5E3C", skinDk: "#6A4228", eyeColor: "#1A0E07", eyeHighlight: "#5A3820" },  // Polynesian
+  4: { skin: "#B07840", skinDk: "#8A5A28", eyeColor: "#3A2010", eyeHighlight: "#7A5030" },  // Mixed
+};
 
 // viewBox: 0 0 120 300
 const VB_W = 120;
@@ -67,6 +79,8 @@ export function PlayerFigure({
   playerName,
   width = 120,
   height = 280,
+  ethnicityCode = 0,
+  faceVariant = 0,
 }: Props) {
   const cls   = bodyClass(position);
   const sw    = scaleW(cls);
@@ -90,8 +104,14 @@ export function PlayerFigure({
   const sockAcc   = uniform.sockAccentColor    || jerseyC;
   const maskC     = "#B0BEC5";
   const maskDk    = "#78909C";
-  const skinC     = "#C9956A";
-  const skinDk    = darken(skinC, -20);
+  const faceData  = SKIN_TONES[ethnicityCode];
+  const skinC     = faceData.skin;
+  const skinDk    = faceData.skinDk;
+  const eyeC      = faceData.eyeColor;
+  const eyeHi     = faceData.eyeHighlight;
+  // Face variant-based offsets (0–3): vary brow thickness, nose width
+  const browsThick = 1.8 + (faceVariant % 2) * 0.7;
+  const noseW     = 3.5 + (faceVariant % 3) * 0.8;
   const cleatC    = "#1A1A2E";
   const cleatSole = "#2D2D40";
   const gloveC    = darken(jerseyC, -45);
@@ -556,9 +576,53 @@ export function PlayerFigure({
             A 14 20 0 0 1 ${cx+24} ${helmetBrim-18}
             L ${cx+22} ${helmetBrim+3}
             L ${cx-22} ${helmetBrim+3} Z`}
-        fill="#070710"
+        fill={darken(skinDk, -25)}
         fillOpacity={0.92}
       />
+      {/* ── FACE (visible under facemask) ───────────────────── */}
+      {/* Skin fill — lower face visible */}
+      <Path
+        d={`M ${cx-18} ${helmetBrim-12}
+            Q ${cx} ${helmetBrim-16} ${cx+18} ${helmetBrim-12}
+            L ${cx+16} ${helmetBrim+2}
+            Q ${cx} ${helmetBrim+5} ${cx-16} ${helmetBrim+2} Z`}
+        fill={skinC}
+      />
+      {/* Cheek shading */}
+      <Ellipse cx={cx-10} cy={helmetBrim-5} rx={6} ry={5} fill={skinDk} fillOpacity={0.35} />
+      <Ellipse cx={cx+10} cy={helmetBrim-5} rx={6} ry={5} fill={skinDk} fillOpacity={0.35} />
+      {/* Eyebrows */}
+      <Path
+        d={`M ${cx-15} ${helmetBrim-11} Q ${cx-10} ${helmetBrim-13} ${cx-4} ${helmetBrim-11}`}
+        stroke={darken(skinDk, -15)} strokeWidth={browsThick} fill="none" strokeLinecap="round"
+      />
+      <Path
+        d={`M ${cx+4} ${helmetBrim-11} Q ${cx+10} ${helmetBrim-13} ${cx+15} ${helmetBrim-11}`}
+        stroke={darken(skinDk, -15)} strokeWidth={browsThick} fill="none" strokeLinecap="round"
+      />
+      {/* Eyes — left */}
+      <Ellipse cx={cx-9} cy={helmetBrim-8} rx={5} ry={3.5} fill="#111" />
+      <Ellipse cx={cx-9} cy={helmetBrim-8} rx={3.5} ry={2.5} fill={eyeC} />
+      <Ellipse cx={cx-7} cy={helmetBrim-9} rx={1.5} ry={1.5} fill="#fff" fillOpacity={0.7} />
+      <Ellipse cx={cx-9} cy={helmetBrim-8} rx={1.2} ry={1.2} fill="#000" />
+      {/* Eyes — right */}
+      <Ellipse cx={cx+9} cy={helmetBrim-8} rx={5} ry={3.5} fill="#111" />
+      <Ellipse cx={cx+9} cy={helmetBrim-8} rx={3.5} ry={2.5} fill={eyeC} />
+      <Ellipse cx={cx+11} cy={helmetBrim-9} rx={1.5} ry={1.5} fill="#fff" fillOpacity={0.7} />
+      <Ellipse cx={cx+9} cy={helmetBrim-8} rx={1.2} ry={1.2} fill="#000" />
+      {/* Nose */}
+      <Path
+        d={`M ${cx} ${helmetBrim-7} Q ${cx-noseW} ${helmetBrim-2} ${cx-noseW+1} ${helmetBrim-1}
+            Q ${cx} ${helmetBrim} ${cx+noseW-1} ${helmetBrim-1}
+            Q ${cx+noseW} ${helmetBrim-2} ${cx} ${helmetBrim-7}`}
+        stroke={skinDk} strokeWidth={1.2} fill="none" strokeLinecap="round"
+      />
+      {/* Mouth line — subtle */}
+      <Path
+        d={`M ${cx-5} ${helmetBrim+1} Q ${cx} ${helmetBrim+3} ${cx+5} ${helmetBrim+1}`}
+        stroke={skinDk} strokeWidth={1.5} fill="none" strokeLinecap="round" strokeOpacity={0.6}
+      />
+
       {/* Visor tint */}
       <Path
         d={`M ${cx-21} ${helmetBrim-16}
@@ -566,7 +630,7 @@ export function PlayerFigure({
             L ${cx+19} ${helmetBrim+1}
             L ${cx-19} ${helmetBrim+1} Z`}
         fill={jerseyC}
-        fillOpacity={0.20}
+        fillOpacity={0.15}
       />
 
       {/* ══════════════ FACEMASK (cage) ══════════════════════════ */}
