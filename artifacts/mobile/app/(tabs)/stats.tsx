@@ -181,18 +181,18 @@ function TableHeader({
   );
 }
 
-// Fixed column widths — shared between header and rows
-const COL_W = { primary: 62, ctx: 46 };
+// Fixed column widths — keep tight so player name always has room
+const COL_W = { primary: 46, ctx: 36 };
 
 const th = StyleSheet.create({
-  row:        { flexDirection:"row", alignItems:"center", paddingHorizontal:12, paddingVertical:8, gap:6 },
-  rank:       { width:22, fontSize:9, fontFamily:"Inter_700Bold", textAlign:"center", color:"#fff" },
+  row:        { flexDirection:"row", alignItems:"center", paddingHorizontal:10, paddingVertical:7, gap:5 },
+  rank:       { width:20, fontSize:9, fontFamily:"Inter_700Bold", textAlign:"center" },
   player:     { flex:1,  fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.3 },
-  team:       { width:36, fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.3 },
-  primary:    { flexDirection:"row", alignItems:"center", justifyContent:"flex-end", gap:2 },
+  team:       { width:30, fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.3 },
+  primary:    { width:COL_W.primary, flexDirection:"row", alignItems:"center", justifyContent:"flex-end", gap:2 },
   primaryText:{ fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.3 },
-  ctx:        { fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.3, textAlign:"right" },
-  chip:       { paddingHorizontal:8, paddingVertical:4, borderRadius:6, borderWidth:1 },
+  ctx:        { width:COL_W.ctx, fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.3, textAlign:"right" },
+  chip:       { paddingHorizontal:7, paddingVertical:3, borderRadius:6, borderWidth:1 },
   chipText:   { fontSize:9, fontFamily:"Inter_600SemiBold" },
 });
 
@@ -253,16 +253,16 @@ function StatRow({
   );
 }
 const sr = StyleSheet.create({
-  row:        { flexDirection:"row", alignItems:"center", paddingHorizontal:12,
-                paddingVertical:11, borderBottomWidth:0.5, gap:6 },
-  rank:       { width:22, fontSize:12, textAlign:"center" },
-  playerCell: { flex:1, flexDirection:"row", alignItems:"center", gap:5, minWidth:0 },
-  badge:      { paddingHorizontal:5, paddingVertical:3, borderRadius:5, borderWidth:1, flexShrink:0 },
-  badgeText:  { fontSize:8, fontFamily:"Inter_700Bold", letterSpacing:0.5 },
+  row:        { flexDirection:"row", alignItems:"center", paddingHorizontal:10,
+                paddingVertical:10, borderBottomWidth:0.5, gap:5 },
+  rank:       { width:20, fontSize:11, textAlign:"center" },
+  playerCell: { flex:1, flexDirection:"row", alignItems:"center", gap:4, minWidth:0 },
+  badge:      { paddingHorizontal:4, paddingVertical:2, borderRadius:4, borderWidth:1, flexShrink:0 },
+  badgeText:  { fontSize:8, fontFamily:"Inter_700Bold", letterSpacing:0.4 },
   name:       { flex:1, fontSize:13, fontFamily:"Inter_600SemiBold", letterSpacing:-0.2 },
-  team:       { width:36, fontSize:11, fontFamily:"Inter_500Medium" },
-  primary:    { fontSize:15, fontFamily:"Inter_700Bold", textAlign:"right" },
-  ctx:        { fontSize:12, fontFamily:"Inter_500Medium", textAlign:"right" },
+  team:       { width:30, fontSize:10, fontFamily:"Inter_500Medium" },
+  primary:    { width:COL_W.primary, fontSize:13, fontFamily:"Inter_700Bold", textAlign:"right" },
+  ctx:        { width:COL_W.ctx, fontSize:11, fontFamily:"Inter_500Medium", textAlign:"right" },
 });
 
 // Team filter pill row
@@ -540,19 +540,18 @@ export default function StatsScreen() {
     tab==="receiving" ? receiving : tab==="defense" ? defense : specTeams;
   const currentSortKey = sortKey[tab];
 
-  // Context (secondary) columns per tab — always show these 2 regardless of sort
+  // Context (secondary) columns per tab — show 3 alongside the primary sorted col
   const CTX_KEYS: Record<StatTab, string[]> = {
-    passing:   ["cmpPct",     "passingTDs"],
-    rushing:   ["ypc",        "rushingTDs"],
-    receiving: ["receptions", "receivingTDs"],
-    defense:   ["sacks",      "defensiveINTs"],
-    specTeams: ["fgPct",      "puntsAverage"],
+    passing:   ["cmpPct",     "passingTDs",   "interceptions"],
+    rushing:   ["carries",    "ypc",           "rushingTDs"],
+    receiving: ["receptions",  "ypr",          "receivingTDs"],
+    defense:   ["sacks",      "defensiveINTs", "passDeflections"],
+    specTeams: ["fieldGoalsAttempted", "fgPct","puntsAverage"],
     records:   [],
   };
-  // Primary = the sorted col; ctx = the 2 fixed context cols (de-dupe if primary overlaps)
+  // Primary = the sorted col; ctx = up to 3 fixed context cols, excluding whichever is primary
   const primaryCol: ColDef = currentCols.find(c => c.key === currentSortKey) ?? currentCols[0];
-  const ctxKeys = CTX_KEYS[tab].filter(k => k !== primaryCol.key).slice(0, 2);
-  // If sorting by a ctx col already, show the other context + the first "extra" col
+  const ctxKeys = CTX_KEYS[tab].filter(k => k !== primaryCol.key).slice(0, 3);
   const ctxCols: ColDef[] = ctxKeys.map(k => currentCols.find(c => c.key === k)).filter((c): c is ColDef => !!c);
 
   return (
