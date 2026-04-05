@@ -569,7 +569,7 @@ function advancePlayoffRound(s: Season): Season {
 
   let nextRound: PlayoffRound;
   let newGames: NFLGame[] = [];
-  const nextWeek = s.currentWeek + 1;
+  const nextWeek = s.currentWeek;
   let newsText = "";
 
   if (playoffRound === "wildCard" && wcGames.length === 6) {

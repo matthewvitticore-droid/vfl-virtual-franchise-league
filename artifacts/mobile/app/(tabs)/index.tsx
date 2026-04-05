@@ -316,60 +316,100 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Phase banner for non-regular phases */}
-        {season && currentPhase !== "regular" && (
-          <View style={[st.phaseBanner, {
-            backgroundColor: isPlayoffsPhase ? colors.nflGold + "18" : colors.nflBlue + "18",
-            borderColor: isPlayoffsPhase ? colors.nflGold + "60" : colors.nflBlue + "50",
-          }]}>
-            <Feather name={isPlayoffsPhase ? "award" : "calendar"} size={14} color={isPlayoffsPhase ? colors.nflGold : colors.nflBlue} />
-            <Text style={[st.phaseLabel, { color: isPlayoffsPhase ? colors.nflGold : colors.nflBlue }]}>
-              {PHASE_LABELS[currentPhase]} — {season.year}
-            </Text>
-          </View>
-        )}
+        {/* ─── Season Command Center ─────────────────────────────────────── */}
+        {season && (() => {
+          const ROUND_NAME: Record<string, string> = {
+            wildCard: "Wild Card", divisional: "Divisional",
+            conference: "Conf. Championship", vflBowl: "VFL Bowl",
+          };
+          const OFFSEASON_SUB: Record<string, string> = {
+            offseason:  "Manage your roster before free agency opens.",
+            freeAgency: "Sign free agents & clear cap space.",
+            draft:      "Select your prospects in the VFL Draft.",
+            preseason:  "Final prep — kickoff is almost here!",
+          };
 
-        {/* VFL Bowl Champion banner */}
-        {vflChamp && (
-          <View style={[st.champBanner, { backgroundColor: colors.nflGold + "18", borderColor: colors.nflGold + "60" }]}>
-            <Text style={[st.champTitle, { color: colors.nflGold }]}>🏆 VFL BOWL CHAMPIONS</Text>
-            <Text style={[st.champName, { color: colors.foreground }]}>{vflChamp.city} {vflChamp.name}</Text>
-          </View>
-        )}
+          const canSim     = weekGames.some(g => g.status === "upcoming") && !isOffseasonPhase;
+          const canAdvance = isOffseasonPhase || allPlayoffGamesDone;
+          const isScout    = role === "Scout";
+          const busy       = canAdvance ? advancing : simulating;
+          const canPress   = !busy && !isScout && (canSim || canAdvance);
 
-        {/* Sim Week button */}
-        {season && season.currentWeek <= season.totalWeeks && weekGames.some(g => g.status === "upcoming") && (
-          <TouchableOpacity
-            onPress={handleSimulateWeek}
-            disabled={simulating || role === "Scout"}
-            activeOpacity={0.8}
-            style={[st.simBtn, { backgroundColor: simulating || role === "Scout" ? colors.secondary : teamColor }]}
-          >
-            {simulating
-              ? <ActivityIndicator color={colors.mutedForeground} size="small" />
-              : <Feather name="fast-forward" size={18} color={simulating || role === "Scout" ? colors.mutedForeground : "#fff"} />}
-            <Text style={[st.simBtnText, { color: simulating || role === "Scout" ? colors.mutedForeground : "#fff" }]}>
-              {simulating ? "Simulating Week..." : role === "Scout" ? "Sim Week (GM/Coach only)" : `Simulate Week ${season.currentWeek}`}
-            </Text>
-          </TouchableOpacity>
-        )}
+          const done  = weekGames.filter(g => g.status === "final").length;
+          const total = weekGames.length;
+          const remaining = total - done;
 
-        {/* Advance Phase button for offseason / post-VFL Bowl */}
-        {season && (isOffseasonPhase || allPlayoffGamesDone) && NEXT_PHASE_LABELS[currentPhase] && (
-          <TouchableOpacity
-            onPress={handleAdvancePhase}
-            disabled={advancing || role === "Scout"}
-            activeOpacity={0.8}
-            style={[st.advanceBtn, { backgroundColor: advancing ? colors.secondary : colors.nflBlue, borderColor: colors.nflBlue + "80" }]}
-          >
-            {advancing
-              ? <ActivityIndicator color={colors.mutedForeground} size="small" />
-              : <Feather name="chevrons-right" size={18} color={advancing ? colors.mutedForeground : "#fff"} />}
-            <Text style={[st.simBtnText, { color: advancing ? colors.mutedForeground : "#fff" }]}>
-              {advancing ? "Advancing..." : NEXT_PHASE_LABELS[currentPhase]}
-            </Text>
-          </TouchableOpacity>
-        )}
+          const playerInRound = weekGames.some(
+            g => g.homeTeamId === season.playerTeamId || g.awayTeamId === season.playerTeamId
+          );
+          const eliminated = isPlayoffsPhase && !allPlayoffGamesDone && !playerInRound && total > 0;
+
+          const roundName = ROUND_NAME[season.playoffRound ?? "wildCard"] ?? "";
+          const phaseTitle = isOffseasonPhase
+            ? (PHASE_LABELS[currentPhase] ?? currentPhase).toUpperCase()
+            : isPlayoffsPhase
+              ? `PLAYOFFS · ${roundName.toUpperCase()}`
+              : `REGULAR SEASON · WEEK ${season.currentWeek} OF 18`;
+
+          const sub = canAdvance && allPlayoffGamesDone && vflChamp
+            ? `${vflChamp.city} ${vflChamp.name} are your VFL Champions.`
+            : canAdvance
+              ? OFFSEASON_SUB[currentPhase] ?? ""
+              : eliminated
+                ? `Your season ended — ${remaining} game${remaining !== 1 ? "s" : ""} left to watch.`
+                : isPlayoffsPhase
+                  ? `${remaining} game${remaining !== 1 ? "s" : ""} remaining this round.`
+                  : `${total} game${total !== 1 ? "s" : ""} scheduled · ${done} complete.`;
+
+          const btnLabel = canAdvance
+            ? (advancing ? "Advancing…" : NEXT_PHASE_LABELS[currentPhase] ?? "Advance")
+            : simulating
+              ? "Simulating…"
+              : isPlayoffsPhase
+                ? `Simulate ${roundName}`
+                : `Simulate Week ${season.currentWeek}`;
+
+          const accentColor = canAdvance ? colors.nflBlue : teamColor;
+
+          return (
+            <View style={[st.cmdCard, { borderColor: accentColor + "55" }]}>
+              <View style={[st.cmdAccent, { backgroundColor: accentColor }]} />
+              <View style={st.cmdBody}>
+                {/* tags row */}
+                <View style={st.cmdTagRow}>
+                  {eliminated && (
+                    <View style={[st.cmdTag, { backgroundColor: colors.danger + "20" }]}>
+                      <Feather name="x-circle" size={10} color={colors.danger} />
+                      <Text style={[st.cmdTagTxt, { color: colors.danger }]}>ELIMINATED — SEASON CONTINUES</Text>
+                    </View>
+                  )}
+                  {allPlayoffGamesDone && vflChamp && (
+                    <View style={[st.cmdTag, { backgroundColor: colors.nflGold + "20" }]}>
+                      <Text style={[st.cmdTagTxt, { color: colors.nflGold }]}>🏆 VFL BOWL COMPLETE</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={[st.cmdPhase, { color: accentColor }]}>{phaseTitle}</Text>
+                {!!sub && <Text style={[st.cmdSub, { color: colors.mutedForeground }]}>{sub}</Text>}
+                {(canSim || canAdvance) && (
+                  <TouchableOpacity
+                    onPress={canAdvance ? handleAdvancePhase : handleSimulateWeek}
+                    disabled={!canPress}
+                    activeOpacity={0.82}
+                    style={[st.cmdBtn, { backgroundColor: canPress ? accentColor : colors.secondary }]}
+                  >
+                    {busy
+                      ? <ActivityIndicator color={canPress ? "#fff" : colors.mutedForeground} size="small" />
+                      : <Feather name={canAdvance ? "chevrons-right" : "fast-forward"} size={16} color={canPress ? "#fff" : colors.mutedForeground} />}
+                    <Text style={[st.cmdBtnTxt, { color: canPress ? "#fff" : colors.mutedForeground }]}>
+                      {isScout ? "GM / Coach Only" : btnLabel}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          );
+        })()}
 
         {/* Recent News */}
         {season?.news && season.news.length > 0 && (
@@ -550,15 +590,17 @@ const st = StyleSheet.create({
   gameTeamLabel:  { fontSize:10, fontFamily:"Inter_500Medium" },
   gameFooter:     { flexDirection:"row", alignItems:"center", justifyContent:"center", gap:6, padding:10, borderTopWidth:1 },
   gameFooterText: { fontSize:12, fontFamily:"Inter_600SemiBold" },
-  // Sim button
-  simBtn:         { flexDirection:"row", alignItems:"center", justifyContent:"center", gap:10, paddingVertical:14, borderRadius:14, marginBottom:12 },
-  simBtnText:     { fontSize:15, fontFamily:"Inter_700Bold" },
-  advanceBtn:     { flexDirection:"row", alignItems:"center", justifyContent:"center", gap:10, paddingVertical:14, borderRadius:14, marginBottom:18, borderWidth:1 },
-  phaseBanner:    { flexDirection:"row", alignItems:"center", gap:10, borderRadius:12, borderWidth:1, paddingHorizontal:16, paddingVertical:12, marginBottom:12 },
-  phaseLabel:     { fontSize:14, fontFamily:"Inter_700Bold", letterSpacing:0.3 },
-  champBanner:    { borderRadius:14, borderWidth:1, padding:16, marginBottom:14, alignItems:"center", gap:4 },
-  champTitle:     { fontSize:11, fontFamily:"Inter_700Bold", letterSpacing:1.5 },
-  champName:      { fontSize:22, fontFamily:"Inter_700Bold" },
+  // Season Command Center
+  cmdCard:        { borderRadius:16, borderWidth:1.5, marginBottom:16, overflow:"hidden", backgroundColor:"#0E0E1C" },
+  cmdAccent:      { height:3 },
+  cmdBody:        { padding:16, gap:8 },
+  cmdTagRow:      { flexDirection:"row", flexWrap:"wrap", gap:6 },
+  cmdTag:         { flexDirection:"row", alignItems:"center", gap:5, paddingHorizontal:8, paddingVertical:3, borderRadius:6 },
+  cmdTagTxt:      { fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.8 },
+  cmdPhase:       { fontSize:13, fontFamily:"Inter_700Bold", letterSpacing:1.2 },
+  cmdSub:         { fontSize:12, fontFamily:"Inter_400Regular", lineHeight:17 },
+  cmdBtn:         { flexDirection:"row", alignItems:"center", justifyContent:"center", gap:9, paddingVertical:13, borderRadius:12, marginTop:4 },
+  cmdBtnTxt:      { fontSize:15, fontFamily:"Inter_700Bold" },
   // News
   newsItem:       { borderRadius:12, borderWidth:1, padding:12, marginBottom:8 },
   newsCat:        { alignSelf:"flex-start", paddingHorizontal:7, paddingVertical:2, borderRadius:5, marginBottom:5 },
