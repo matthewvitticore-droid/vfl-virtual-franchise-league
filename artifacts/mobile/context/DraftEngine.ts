@@ -136,7 +136,8 @@ function computeArchetype(pos: NFLPosition, grade: number, combine: CombineMeasu
 
   if (pos === "WR") {
     const h = combine.height, w = combine.weight;
-    if (grade >= 88 && h >= 72 && w >= 200 && spd >= 80 && cth >= 80) return "All-Pro Potential";
+    // ALL PRO = deep threat speed + possession hands + elite measurables — does it all
+    if (grade >= 88 && h >= 72 && w >= 200 && spd >= 95 && cth >= 80) return "All-Pro Potential";
     if (spd >= 95)              return "Deep Threat";
     if (cth >= 80 && car >= 72) return "Possession Receiver";
     return "Balanced Receiver";
