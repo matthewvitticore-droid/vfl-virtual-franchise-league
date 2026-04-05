@@ -199,6 +199,7 @@ function genPosRatings(pos: NFLPosition, overall: number, isStarter: boolean, is
     acceleration:    ["WR","CB","RB"].includes(pos)      ? g(hi)  : ["QB","S","DE"].includes(pos)  ? g(mid) : g(lo),
     ballCarrierVision: pos === "RB"                      ? g(hi)  : g(lo - 5),
     breakTackle:     pos === "RB"                        ? g(hi)  : pos === "FB" ? g(mid) : g(lo - 5),
+    carryRating:     pos === "RB"                        ? g(hi)  : pos === "QB" ? g(lo)  : pos === "WR" ? g(lo) : g(lo - 15),
     catching:        ["WR","TE"].includes(pos)           ? g(hi)  : pos === "RB" ? g(mid) : g(lo - 10),
     routeRunning:    ["WR","TE"].includes(pos)           ? g(hi)  : pos === "RB" ? g(lo)  : g(lo - 10),
     catchInTraffic:  ["WR","TE"].includes(pos)           ? g(mid) : g(lo - 8),

@@ -95,6 +95,7 @@ export interface PosRatings {
   acceleration: number;
   ballCarrierVision: number;
   breakTackle: number;
+  carryRating: number;  // ball security when running (RB/QB/WR)
   catching: number;
   routeRunning: number;
   catchInTraffic: number;
@@ -120,9 +121,9 @@ export interface PosRatings {
 
 // Which ratings to display per position (ordered)
 export const POS_RATING_KEYS: Record<NFLPosition, (keyof PosRatings)[]> = {
-  QB:  ["throwPower","throwAccShort","throwAccMid","throwAccDeep","throwOnRun","mobility"],
-  RB:  ["acceleration","agility","ballCarrierVision","breakTackle","catching","routeRunning"],
-  WR:  ["acceleration","catching","routeRunning","catchInTraffic","release","agility"],
+  QB:  ["throwPower","throwAccShort","throwAccMid","throwAccDeep","mobility","carryRating"],
+  RB:  ["acceleration","agility","ballCarrierVision","breakTackle","catching","carryRating"],
+  WR:  ["acceleration","catching","routeRunning","catchInTraffic","release","carryRating"],
   TE:  ["catching","catchInTraffic","runBlock","release","routeRunning","blockShedding"],
   OL:  ["passBlock","runBlock","blockShedding","tackle","powerMoves","agility"],
   DE:  ["powerMoves","finesseMoves","blockShedding","tackle","pursuit","agility"],
@@ -137,11 +138,11 @@ export const POS_RATING_KEYS: Record<NFLPosition, (keyof PosRatings)[]> = {
 export const POS_RATING_LABELS: Record<keyof PosRatings, string> = {
   throwPower: "THP", throwAccShort: "TAS", throwAccMid: "TAM", throwAccDeep: "TAD",
   throwOnRun: "TOR", agility: "AGI", acceleration: "ACC", ballCarrierVision: "BCV",
-  breakTackle: "BTK", catching: "CTH", routeRunning: "RTE", catchInTraffic: "CIT",
-  release: "REL", passBlock: "PBK", runBlock: "RBK", powerMoves: "PMV",
-  finesseMoves: "FMV", blockShedding: "BSH", tackle: "TAK", pursuit: "PUR",
-  manCoverage: "MCV", zoneCoverage: "ZCV", press: "PRE", mobility: "MOB",
-  kickPower: "KPW", kickAccuracy: "KAC",
+  breakTackle: "BTK", carryRating: "CAR", catching: "CTH", routeRunning: "RTE",
+  catchInTraffic: "CIT", release: "REL", passBlock: "PBK", runBlock: "RBK",
+  powerMoves: "PMV", finesseMoves: "FMV", blockShedding: "BSH", tackle: "TAK",
+  pursuit: "PUR", manCoverage: "MCV", zoneCoverage: "ZCV", press: "PRE",
+  mobility: "MOB", kickPower: "KPW", kickAccuracy: "KAC",
 };
 
 // ─── Player face / ethnicity ──────────────────────────────────────────────────

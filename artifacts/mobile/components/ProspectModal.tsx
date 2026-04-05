@@ -127,6 +127,7 @@ function deriveCombineRatings(pos: NFLPosition, c: CombineMeasurables, grade: nu
       // Ball carrier
       case "ballCarrierVision": ratings[key] = base;                             break;
       case "breakTackle":       ratings[key] = str;                              break;
+      case "carryRating":       ratings[key] = Math.round(str * 0.40 + base * 0.35 + agi * 0.25); break;
       // Receiving — CTH now driven by hand size + grade
       case "catching":          ratings[key] = cth;                              break;
       case "routeRunning":      ratings[key] = Math.round((base + agi) / 2);    break;

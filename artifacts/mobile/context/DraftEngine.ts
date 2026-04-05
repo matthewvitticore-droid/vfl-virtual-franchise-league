@@ -102,10 +102,51 @@ const COLLEGES = [
 
 // ─── Archetypes by Position ───────────────────────────────────────────────────
 
+// Rating-based archetype computer for RB / QB / WR
+function computeArchetype(pos: NFLPosition, grade: number, combine: CombineMeasurables): string {
+  const dnp = combine.didNotParticipate;
+  const spd   = dnp ? 70 : clamp(99 - (combine.fortyYardDash - 4.3) * 65, 40, 99);
+  const coneR = dnp ? 70 : clamp(99 - (combine.threeCone - 6.5) * 18, 40, 99);
+  const shutR = dnp ? 70 : clamp(99 - (combine.shuttleRun - 4.0) * 58, 40, 99);
+  const agi   = (shutR + coneR) / 2;
+  const str   = dnp ? 70 : clamp(combine.benchPress * 1.6 + 22, 40, 99);
+  const handR = dnp ? 70 : clamp(40 + (combine.handSize - 8.5) * 19.67, 40, 99);
+  const base  = clamp(50 + (grade / 100) * 45, 40, 99);
+  const cth   = dnp ? 70 : clamp(handR * 0.30 + base * 0.45 + agi * 0.25, 40, 99);
+  // Break-tackle proxy
+  const btk   = clamp(str * 0.60 + base * 0.40, 40, 99);
+  // CAR (carry / ball security) proxy
+  const car   = clamp(str * 0.40 + base * 0.35 + agi * 0.25, 40, 99);
+
+  if (pos === "RB") {
+    if (btk >= 80)                    return "Power Back";
+    if (spd >= 82 && cth >= 76)       return "Receiving Back";
+    if (spd >= 80 && agi >= 78)       return "Elusive Back";
+    return "Balanced Back";
+  }
+
+  if (pos === "QB") {
+    const multiElite = [str, base, spd].filter(v => v >= 88).length;
+    if (grade >= 88 && multiElite >= 2 && str >= 88) return "Face of Franchise";
+    if (spd >= 82)                                    return "Scrambler";
+    if (str >= 84)                                    return "Strong Arm";
+    if (base >= 82)                                   return "Accurate";
+    return "Pocket Passer";
+  }
+
+  if (pos === "WR") {
+    const h = combine.height, w = combine.weight;
+    if (grade >= 88 && h >= 72 && w >= 200 && spd >= 80 && cth >= 80) return "All-Pro Potential";
+    if (spd >= 85)              return "Deep Threat";
+    if (cth >= 80 && car >= 72) return "Possession Receiver";
+    return "Balanced Receiver";
+  }
+
+  return "Prospect"; // fallback (never reached for RB/QB/WR)
+}
+
 const ARCHETYPES: Partial<Record<NFLPosition, string[]>> = {
-  QB:  ["Pocket Passer","Dual-Threat","Game Manager","Gunslinger","Mobile QB","System QB"],
-  RB:  ["Workhorse Back","Receiving Back","Power Runner","Change of Pace","Bruiser","Elusive Scooter"],
-  WR:  ["Slot Receiver","Deep Threat","Route Runner","Red Zone Target","Physical WR","Possession Receiver"],
+  // RB / QB / WR are computed dynamically by computeArchetype — no pool needed
   TE:  ["Receiving TE","Blocking TE","H-Back","Red Zone Threat","Move Tight End","In-Line Blocker"],
   OL:  ["Mauler Guard","Pass Protector","Athletic Tackle","Run Blocker","Zone Blocker","Power Lineman"],
   DE:  ["Speed Rusher","Power Rusher","Hybrid OLB","Run Stopper DE","Pass Rush Specialist","Versatile Edge"],
@@ -482,7 +523,9 @@ export function generateDraftClass(year: number, count = 252): DraftProspect[] {
       projectedRound: projRound,
       projectedPick: projPick,
       grade: gradeLabel(projRound),
-      archetype: pick(ARCHETYPES[pos] ?? ["Prospect"]),
+      archetype: (pos === "RB" || pos === "QB" || pos === "WR")
+        ? computeArchetype(pos, adjustedGrade, combine)
+        : pick(ARCHETYPES[pos] ?? ["Prospect"]),
       developmentTrait: devTrait,
       combine,
       collegeStats: generateCollegeStats(pos, adjustedGrade),
