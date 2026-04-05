@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
 import {
-  Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  Alert, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
@@ -58,6 +58,7 @@ export default function RosterScreen() {
   const [tab, setTab] = useState<MainTab>(isCoach ? "gamePlan" : "depth");
   const [posFilter, setPosFilter] = useState<NFLPosition | "ALL">("ALL");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
   const roster = useMemo(() => {
@@ -141,7 +142,8 @@ export default function RosterScreen() {
                     <Text style={[st.posCount, { color: colors.mutedForeground }]}>{byPos.length} players</Text>
                   </View>
                   {byPos.map((p, idx) => (
-                    <View key={p.id} style={[st.depthRow, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+                    <TouchableOpacity key={p.id} onPress={() => setSelectedPlayer(p)} activeOpacity={0.75}
+                      style={[st.depthRow, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
                       <View style={[st.depthNum, { backgroundColor: idx === 0 ? pc + "25" : colors.secondary }]}>
                         <Text style={[st.depthNumText, { color: idx === 0 ? pc : colors.mutedForeground }]}>{idx + 1}</Text>
                       </View>
@@ -164,7 +166,8 @@ export default function RosterScreen() {
                         <Text style={[st.depthMeta, { color: colors.mutedForeground }]}>Age {p.age} · {p.yearsExperience}yr exp · ${p.salary}M/yr · {p.contractYears}yr left</Text>
                       </View>
                       <OvrBadge value={p.overall} color={pc} />
-                    </View>
+                      <Feather name="chevron-right" size={14} color={colors.mutedForeground} style={{ opacity: 0.5 }} />
+                    </TouchableOpacity>
                   ))}
                 </View>
               );
@@ -277,6 +280,30 @@ export default function RosterScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* ── Player Detail Modal ── */}
+      <Modal visible={!!selectedPlayer} animationType="slide" transparent onRequestClose={() => setSelectedPlayer(null)}>
+        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.72)" }}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setSelectedPlayer(null)} />
+          <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "90%", paddingTop: 12 }}>
+            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: "center", marginBottom: 6 }} />
+            <TouchableOpacity onPress={() => setSelectedPlayer(null)} style={{ position: "absolute", right: 16, top: 14, zIndex: 10 }}>
+              <Feather name="x" size={20} color={colors.mutedForeground} />
+            </TouchableOpacity>
+            {selectedPlayer && (
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
+                <PlayerCard
+                  player={selectedPlayer}
+                  teamPrimaryColor={teamColor}
+                  teamSecondaryColor={team?.secondaryColor}
+                  expanded
+                  showInjury
+                />
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

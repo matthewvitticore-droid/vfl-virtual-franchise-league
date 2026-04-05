@@ -48,6 +48,10 @@ export default function TabLayout() {
         options={{ title: "Front Office", tabBarIcon: ({ color, size }) => <Feather name="briefcase" size={size} color={color} /> }}
       />
       <Tabs.Screen
+        name="stats"
+        options={{ title: "Stats", tabBarIcon: ({ color, size }) => <Feather name="trending-up" size={size} color={color} /> }}
+      />
+      <Tabs.Screen
         name="schedule"
         options={{ title: "Schedule", tabBarIcon: ({ color, size }) => <Feather name="calendar" size={size} color={color} /> }}
       />

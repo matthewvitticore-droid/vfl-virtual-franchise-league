@@ -118,12 +118,12 @@ export function PlayerFigure({
 
   // ── Geometry ─────────────────────────────────────────────────────────────
   // Key x-coords (all scaled by sw from center)
-  const sL   = cx - 42 * sw;  // shoulder tip left
-  const sR   = cx + 42 * sw;  // shoulder tip right
-  const tL   = cx - 22 * sw;  // torso/chest left
-  const tR   = cx + 22 * sw;  // torso/chest right
-  const wL   = cx - 20 * sw;  // waist left
-  const wR   = cx + 20 * sw;  // waist right
+  const sL   = cx - 44 * sw;  // shoulder tip left (slightly wider)
+  const sR   = cx + 44 * sw;  // shoulder tip right (slightly wider)
+  const tL   = cx - 24 * sw;  // torso/chest left
+  const tR   = cx + 24 * sw;  // torso/chest right
+  const wL   = cx - 18 * sw;  // waist left (narrower for V-taper)
+  const wR   = cx + 18 * sw;  // waist right (narrower for V-taper)
   const hL   = cx - 26 * sw;  // hip left
   const hR   = cx + 26 * sw;  // hip right
 
@@ -313,39 +313,59 @@ export function PlayerFigure({
       <Line x1={rHandX+4} y1={rHandY+2} x2={rHandX-6} y2={rHandY+2} stroke={darken(gloveC,15)} strokeWidth={1} />
 
       {/* ══════════════ SHOULDER PADS ═══════════════════════════ */}
-      {/* Back pad drop shadow */}
+      {/* Drop shadow */}
       <Path
-        d={`M ${sL+4} ${padTop+4} L ${sR-4} ${padTop+4} L ${tR+4} ${padBot+4} L ${tL-4} ${padBot+4} Z`}
-        fill={darken(jerseyC, -50)} fillOpacity={0.5}
+        d={`M ${sL+4} ${padTop+8} Q ${cx} ${padTop-3} ${sR-4} ${padTop+8} L ${tR+4} ${padBot+4} L ${tL-4} ${padBot+4} Z`}
+        fill={darken(jerseyC, -50)} fillOpacity={0.45}
       />
-      {/* Main pad trapezoid */}
+      {/* Main pad — arched top for realistic shoulder pad shape */}
       <Path
-        d={`M ${sL} ${padTop} L ${sR} ${padTop} L ${tR+2} ${padBot} L ${tL-2} ${padBot} Z`}
+        d={`M ${sL} ${padTop+7} Q ${cx} ${padTop-12} ${sR} ${padTop+7} L ${tR+2} ${padBot} L ${tL-2} ${padBot} Z`}
         fill="url(#spGrad)"
       />
-      {/* Shoulder pad collar ridge */}
+      {/* Shoulder cap epaulettes — left */}
       <Path
-        d={`M ${sL+6} ${padTop} L ${tL+4} ${padBot}
-            L ${tL+10} ${padBot} L ${sL+14} ${padTop} Z`}
-        fill={darken(jerseyC, -40)}
+        d={`M ${sL} ${padTop+7} Q ${sL-4} ${padTop+16} ${sL+2} ${padTop+24}
+            L ${tL+2} ${padBot} L ${tL-6} ${padBot}
+            Q ${sL-10} ${padTop+20} ${sL-6} ${padTop+8} Z`}
+        fill={lighten(jerseyC, 12)} fillOpacity={0.85}
+      />
+      {/* Shoulder cap epaulettes — right */}
+      <Path
+        d={`M ${sR} ${padTop+7} Q ${sR+4} ${padTop+16} ${sR-2} ${padTop+24}
+            L ${tR-2} ${padBot} L ${tR+6} ${padBot}
+            Q ${sR+10} ${padTop+20} ${sR+6} ${padTop+8} Z`}
+        fill={lighten(jerseyC, 12)} fillOpacity={0.85}
+      />
+      {/* Shoulder pad collar ridge lines */}
+      <Path
+        d={`M ${sL+8} ${padTop+5} L ${tL+5} ${padBot}
+            L ${tL+11} ${padBot} L ${sL+16} ${padTop+7} Z`}
+        fill={darken(jerseyC, -45)}
       />
       <Path
-        d={`M ${sR-6} ${padTop} L ${tR-4} ${padBot}
-            L ${tR-10} ${padBot} L ${sR-14} ${padTop} Z`}
-        fill={darken(jerseyC, -40)}
+        d={`M ${sR-8} ${padTop+5} L ${tR-5} ${padBot}
+            L ${tR-11} ${padBot} L ${sR-16} ${padTop+7} Z`}
+        fill={darken(jerseyC, -45)}
       />
       {/* Accent color shoulder stripes */}
       <Path
-        d={`M ${sL+14} ${padTop} L ${sL+24} ${padTop} L ${tL+12} ${padBot} L ${tL+4} ${padBot} Z`}
-        fill={accentC} fillOpacity={0.55}
+        d={`M ${sL+16} ${padTop+5} L ${sL+26} ${padTop+7} L ${tL+13} ${padBot} L ${tL+5} ${padBot} Z`}
+        fill={accentC} fillOpacity={0.6}
       />
       <Path
-        d={`M ${sR-14} ${padTop} L ${sR-24} ${padTop} L ${tR-12} ${padBot} L ${tR-4} ${padBot} Z`}
-        fill={accentC} fillOpacity={0.55}
+        d={`M ${sR-16} ${padTop+5} L ${sR-26} ${padTop+7} L ${tR-13} ${padBot} L ${tR-5} ${padBot} Z`}
+        fill={accentC} fillOpacity={0.6}
       />
-      {/* Pad bump / bolt */}
-      <Ellipse cx={cx - 18*sw} cy={padTop + 8} rx={3.5} ry={3} fill={lighten(jerseyC,35)} fillOpacity={0.7} />
-      <Ellipse cx={cx + 18*sw} cy={padTop + 8} rx={3.5} ry={3} fill={lighten(jerseyC,35)} fillOpacity={0.7} />
+      {/* Arch highlight (sheen at top) */}
+      <Path
+        d={`M ${cx-28*sw} ${padTop+4} Q ${cx} ${padTop-8} ${cx+28*sw} ${padTop+4}
+            Q ${cx} ${padTop-2} ${cx-28*sw} ${padTop+4} Z`}
+        fill="#ffffff" fillOpacity={0.18}
+      />
+      {/* Pad bolts */}
+      <Ellipse cx={cx - 20*sw} cy={padTop + 10} rx={3} ry={2.5} fill={lighten(jerseyC,40)} fillOpacity={0.8} />
+      <Ellipse cx={cx + 20*sw} cy={padTop + 10} rx={3} ry={2.5} fill={lighten(jerseyC,40)} fillOpacity={0.8} />
 
       {/* ══════════════ JERSEY BODY ═════════════════════════════ */}
       <Path

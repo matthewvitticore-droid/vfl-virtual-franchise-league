@@ -22,10 +22,15 @@ An original football franchise simulator built in Expo React Native. 32 fully fi
 
 ### Tab Screens
 - `artifacts/mobile/app/(tabs)/index.tsx` — ESPN-style home: animated news ticker, team hero card (cap bar, stat chips), quick-action grid, weather game card, conference standings, recent news feed
-- `artifacts/mobile/app/(tabs)/roster.tsx` — Depth chart by position + dev trait badges (X-Factor/Superstar/etc.), injury indicators, contract details, game plan / formation / scheme selectors, FA signing panel
-- `artifacts/mobile/app/(tabs)/frontoffice.tsx` — Free Agency (interest meter, 1/2/3yr offers), Draft (Board/Combine/War Room sub-views, sortable combine table, scouting lock), Trades (player chip builder, AI value meter, incoming offer accept/decline)
+- `artifacts/mobile/app/(tabs)/roster.tsx` — Depth chart by position + dev trait badges (X-Factor/Superstar/etc.), injury indicators, contract details, game plan / formation / scheme selectors, FA signing panel; depth chart rows tap to open full PlayerCard modal
+- `artifacts/mobile/app/(tabs)/frontoffice.tsx` — Free Agency (interest meter, 1/2/3yr offers), Draft (Board/Combine/War Room sub-views, sortable combine table, scouting lock); tapping any prospect opens ProspectModal with combine bars + derived ratings; Trades (player chip builder, AI value meter, incoming offer accept/decline)
+- `artifacts/mobile/app/(tabs)/stats.tsx` — League stats leaderboards: Passing, Rushing, Receiving, Defense (sortable), Special Teams, All-Time Records; tapping any player opens PlayerCard + season/career stats panel
 - `artifacts/mobile/app/(tabs)/schedule.tsx` — Season schedule with week selector
 - `artifacts/mobile/app/(tabs)/standings.tsx` — Full NFL standings by conference/division
+
+### Components
+- `artifacts/mobile/components/ProspectModal.tsx` — Full prospect detail sheet: hero header with grade/pos/OVR/dev trait/accolades, physical measurements, combine drill bars, position ratings (derived from combine), college stats, strengths/weaknesses, draft button
+- `artifacts/mobile/components/PlayerFigure.tsx` — Athletic SVG player illustration: arched shoulder pads with epaulettes, V-taper body (wider shoulders, narrower waist), multi-bar facemask, position-based body class
 
 ### Game Screen
 - `artifacts/mobile/app/game/[id].tsx` — Four tabs: Play-by-Play (live feed), Box Score, Drive Chart (field bar), Stats Sheet; weather banner; down/distance bar; momentum meter; injury callouts; speed control

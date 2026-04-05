@@ -9,6 +9,7 @@ import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
 import { DraftProspect, NFLPosition, Player, TradeOffer, useNFL } from "@/context/NFLContext";
 import { PlayerCard } from "@/components/PlayerCard";
+import { ProspectModal } from "@/components/ProspectModal";
 import { CombineMeasurables } from "@/context/types";
 
 type Tab = "freeAgency" | "draft" | "trades";
@@ -42,6 +43,7 @@ export default function FrontOfficeScreen() {
   const [sortKey, setSortKey] = useState<SortKey>("grade");
   const [sortAsc, setSortAsc] = useState(false);
   const [expandedProspect, setExpandedProspect] = useState<string | null>(null);
+  const [selectedProspect, setSelectedProspect] = useState<DraftProspect | null>(null);
   const [expandedFA, setExpandedFA] = useState<string | null>(null);
   const [tradeMode, setTradeMode] = useState<"browse"|"build">("browse");
   const [offeringPlayerIds, setOfferingPlayerIds] = useState<string[]>([]);
@@ -222,7 +224,10 @@ export default function FrontOfficeScreen() {
               {prospects.slice(0, 80).map((p, idx) => (
                 <ProspectCard key={p.id} p={p} rank={idx + 1} expanded={expandedProspect === p.id} teamColor={teamColor} colors={colors}
                   isGM={isGM} isUserTurn={ds?.isUserTurn ?? false}
-                  onToggle={() => setExpandedProspect(expandedProspect === p.id ? null : p.id)}
+                  onToggle={() => {
+                    setExpandedProspect(expandedProspect === p.id ? null : p.id);
+                    setSelectedProspect(p);
+                  }}
                   onScout={() => unlockScouting(p.id)}
                   onDraft={() => {
                     Alert.alert(`Draft ${p.name}?`, `${p.position} · ${p.college} · Grade: ${p.grade} · Overall: ${p.overallGrade}`, [
@@ -254,6 +259,7 @@ export default function FrontOfficeScreen() {
                   {prospects.slice(0, 60).map((p, idx) => (
                     <CombineRow key={p.id} p={p} rank={idx+1} colors={colors} teamColor={teamColor}
                       isUserTurn={ds?.isUserTurn ?? false} isGM={isGM}
+                      onTap={() => setSelectedProspect(p)}
                       onDraft={() => {
                         Alert.alert(`Draft ${p.name}?`, `${p.position} · ${p.college} · Grade: ${p.grade}`, [
                           { text:"Cancel" },
@@ -443,6 +449,22 @@ export default function FrontOfficeScreen() {
           </View>
         </ScrollView>
       )}
+
+      {/* ── Prospect Full Detail Modal ─── */}
+      <ProspectModal
+        prospect={selectedProspect}
+        visible={!!selectedProspect}
+        onClose={() => setSelectedProspect(null)}
+        teamColor={teamColor}
+        isGM={isGM}
+        isUserTurn={ds?.isUserTurn ?? false}
+        onDraft={selectedProspect ? () => {
+          Alert.alert(`Draft ${selectedProspect.name}?`, `${selectedProspect.position} · ${selectedProspect.college}`, [
+            { text: "Cancel" },
+            { text: "Select Player", onPress: () => { userDraftPick(selectedProspect.id); setSelectedProspect(null); } },
+          ]);
+        } : undefined}
+      />
     </View>
   );
 }
@@ -636,13 +658,14 @@ function CombineStat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function CombineRow({ p, rank, colors, teamColor, isUserTurn, isGM, onDraft }: {
-  p: DraftProspect; rank: number; colors: any; teamColor: string; isUserTurn: boolean; isGM: boolean; onDraft: () => void;
+function CombineRow({ p, rank, colors, teamColor, isUserTurn, isGM, onDraft, onTap }: {
+  p: DraftProspect; rank: number; colors: any; teamColor: string; isUserTurn: boolean; isGM: boolean; onDraft: () => void; onTap?: () => void;
 }) {
   const c = p.combine;
   const dnp = c.didNotParticipate;
   return (
-    <View style={[st.combineRowContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+    <TouchableOpacity onPress={onTap} activeOpacity={onTap ? 0.7 : 1}
+      style={[st.combineRowContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
       <Text style={[st.colFix2, { color: colors.mutedForeground }]}>{rank}. {p.name.split(" ")[1]}</Text>
       <ColCell value={`${p.overallGrade}`}    color={colors.nflGold} />
       <ColCell value={dnp ? "—" : `${c.fortyYardDash}`} color={!dnp && c.fortyYardDash < 4.4 ? colors.success : colors.foreground} />
@@ -652,11 +675,11 @@ function CombineRow({ p, rank, colors, teamColor, isUserTurn, isGM, onDraft }: {
       <ColCell value={dnp ? "—" : `${c.shuttleRun}"`}    color={!dnp && c.shuttleRun < 4.1 ? colors.success : colors.foreground} />
       <ColCell value={dnp ? "—" : `${c.threeCone}"`}     color={!dnp && c.threeCone < 6.8 ? colors.success : colors.foreground} />
       {isGM && isUserTurn && (
-        <TouchableOpacity onPress={onDraft} style={[st.draftBtnSm, { backgroundColor: teamColor }]}>
+        <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); onDraft(); }} style={[st.draftBtnSm, { backgroundColor: teamColor }]}>
           <Text style={st.draftBtnSmText}>Draft</Text>
         </TouchableOpacity>
       )}
-    </View>
+    </TouchableOpacity>
   );
 }
 

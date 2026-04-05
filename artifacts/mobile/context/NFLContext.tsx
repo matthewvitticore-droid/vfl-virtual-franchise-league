@@ -106,6 +106,82 @@ function emptyStats(season?: number): PlayerSeasonStats {
   };
 }
 
+// ─── Career stats seeder ──────────────────────────────────────────────────────
+
+function genCareerStats(pos: NFLPosition, overall: number, yearsExp: number): PlayerSeasonStats[] {
+  if (yearsExp === 0) return [];
+  const q = overall / 100;
+  return Array.from({ length: Math.min(yearsExp, 10) }, (_, yr) => {
+    const seasonYear = 2024 - yearsExp + yr + 1;
+    const gp = irng(8, 17);
+    const peakFactor = Math.max(0.55, 1 - Math.abs(yr - yearsExp * 0.45) * 0.07);
+    const qp = clamp(q * peakFactor, 0.3, 1.0);
+    const s = emptyStats(seasonYear);
+    s.gamesPlayed = gp;
+    if (pos === "QB") {
+      s.attempts = Math.round(gp * irng(28, 36));
+      s.completions = Math.round(s.attempts * (0.56 + qp * 0.14));
+      s.passingYards = Math.round(s.completions * (6.5 + qp * 2.8));
+      s.passingTDs = Math.round(gp * (1.1 + qp * 1.9));
+      s.interceptions = Math.max(0, Math.round(gp * (0.5 + (1 - qp) * 0.8)));
+      s.rushingYards = Math.round(gp * irng(5, 40));
+      s.rushingTDs = Math.round(qp * 4);
+      s.qbRating = Math.round(65 + qp * 37);
+    } else if (pos === "RB") {
+      s.carries = Math.round(gp * (7 + qp * 12));
+      s.rushingYards = Math.round(s.carries * (3.3 + qp * 2.2));
+      s.yardsPerCarry = Math.round((s.rushingYards / Math.max(1, s.carries)) * 10) / 10;
+      s.rushingTDs = Math.round(gp * (0.3 + qp * 0.8));
+      s.receptions = Math.round(gp * (1.5 + qp * 2.5));
+      s.receivingYards = Math.round(s.receptions * (6 + qp * 4));
+      s.receivingTDs = Math.round(qp * 4);
+    } else if (pos === "WR") {
+      s.targets = Math.round(gp * (4 + qp * 6));
+      s.receptions = Math.round(s.targets * (0.56 + qp * 0.2));
+      s.receivingYards = Math.round(s.receptions * (9 + qp * 7));
+      s.receivingTDs = Math.round(gp * (0.25 + qp * 0.65));
+      s.yardsPerCatch = Math.round((s.receivingYards / Math.max(1, s.receptions)) * 10) / 10;
+    } else if (pos === "TE") {
+      s.targets = Math.round(gp * (3 + qp * 4));
+      s.receptions = Math.round(s.targets * (0.58 + qp * 0.2));
+      s.receivingYards = Math.round(s.receptions * (7 + qp * 5));
+      s.receivingTDs = Math.round(gp * (0.15 + qp * 0.6));
+      s.yardsPerCatch = Math.round((s.receivingYards / Math.max(1, s.receptions)) * 10) / 10;
+    } else if (pos === "DE") {
+      s.sacks = Math.round(gp * (0.35 + qp * 0.7) * 10) / 10;
+      s.tackles = Math.round(gp * (1.5 + qp * 2));
+      s.forcedFumbles = Math.round(gp * 0.15 * qp);
+      s.passDeflections = Math.round(gp * 0.2 * qp);
+    } else if (pos === "DT") {
+      s.sacks = Math.round(gp * (0.2 + qp * 0.5) * 10) / 10;
+      s.tackles = Math.round(gp * (1.8 + qp * 2.2));
+      s.forcedFumbles = Math.round(gp * 0.1 * qp);
+    } else if (pos === "LB") {
+      s.tackles = Math.round(gp * (3.5 + qp * 4));
+      s.sacks = Math.round(gp * (0.1 + qp * 0.55) * 10) / 10;
+      s.defensiveINTs = Math.round(qp * 3);
+      s.forcedFumbles = Math.round(gp * 0.1 * qp);
+      s.passDeflections = Math.round(gp * 0.35 * qp);
+    } else if (pos === "CB") {
+      s.tackles = Math.round(gp * (2 + qp * 2.5));
+      s.defensiveINTs = Math.round(qp * 5);
+      s.passDeflections = Math.round(gp * (0.5 + qp * 0.9));
+      s.forcedFumbles = Math.round(gp * 0.08 * qp);
+    } else if (pos === "S") {
+      s.tackles = Math.round(gp * (2.5 + qp * 3));
+      s.defensiveINTs = Math.round(qp * 4);
+      s.passDeflections = Math.round(gp * (0.3 + qp * 0.7));
+      s.forcedFumbles = Math.round(gp * 0.07 * qp);
+    } else if (pos === "K") {
+      s.fieldGoalsMade = Math.round(gp * (1.2 + qp * 0.8));
+      s.fieldGoalsAttempted = Math.round(s.fieldGoalsMade / (0.7 + qp * 0.2));
+    } else if (pos === "P") {
+      s.puntsAverage = Math.round((40 + qp * 8) * 10) / 10;
+    }
+    return s;
+  });
+}
+
 // ─── Position-specific rating generator ───────────────────────────────────────
 
 function genPosRatings(pos: NFLPosition, overall: number, isStarter: boolean, isElite: boolean): PosRatings {
@@ -239,8 +315,8 @@ function generateRoster(teamOverall: number): Player[] {
       deadCap: sigBonus * 0.5,
       status: isStarter ? "Starter" : slot.depth === 3 ? "Practice Squad" : "Backup",
       depthOrder: slot.depth,
-      stats: emptyStats(),
-      careerStats: [],
+      stats: emptyStats(2025),
+      careerStats: genCareerStats(pos, overall, exp),
       fatigue: 0,
       morale: irng(60, 95),
       faInterestLevel: irng(1, 5),
