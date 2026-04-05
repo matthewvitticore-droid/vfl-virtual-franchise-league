@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useMemo, useState } from "react";
 import {
   Alert, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View,
@@ -49,13 +50,20 @@ export default function RosterScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { membership } = useAuth();
-  const { season, getPlayerTeam, signFreeAgent, releasePlayer, restructureContract, updateDepthOrder, updateGamePlan, updateFormation, updateOffenseScheme } = useNFL();
+  const { season, teamCustomization, getPlayerTeam, signFreeAgent, releasePlayer, restructureContract, updateDepthOrder, updateGamePlan, updateFormation, updateOffenseScheme } = useNFL();
 
   const role = membership?.role ?? "GM";
   const isGM    = role === "GM";
   const isCoach = role === "Coach";
   const team = getPlayerTeam();
   const teamColor = team?.primaryColor ?? "#013369";
+
+  // Featured uniform background
+  const featuredKey = teamCustomization?.featuredUniformSet ?? "home";
+  const featuredUniform = teamCustomization?.uniforms?.[featuredKey];
+  const uniformBgColor = featuredUniform?.jerseyColor ?? teamColor;
+  const uniformHelmetColor = featuredUniform?.helmetColor ?? teamColor;
+
   const [tab, setTab] = useState<MainTab>(isCoach ? "gamePlan" : "depth");
   const [posFilter, setPosFilter] = useState<NFLPosition | "ALL">("ALL");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -126,6 +134,15 @@ export default function RosterScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {/* Uniform background gradient */}
+      {featuredUniform && (
+        <LinearGradient
+          colors={[uniformHelmetColor + "26", uniformBgColor + "14", "transparent"]}
+          locations={[0, 0.4, 1]}
+          style={{ position: "absolute", top: 0, left: 0, right: 0, height: 380, zIndex: 0 }}
+          pointerEvents="none"
+        />
+      )}
       {/* Header */}
       <View style={[st.header, { paddingTop: topPad + 8, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <View style={st.headerTop}>

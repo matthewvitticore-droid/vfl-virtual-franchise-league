@@ -85,12 +85,17 @@ export default function UniformScreen() {
   const [saving, setSaving] = useState(false);
 
   const u = custom.uniforms[activeTab];
+  const featuredSet = custom.featuredUniformSet ?? "home";
 
   const updateUniform = (key: keyof UniformSet, value: any) => {
     setCustom(c => ({
       ...c,
       uniforms: { ...c.uniforms, [activeTab]: { ...c.uniforms[activeTab], [key]: value } },
     }));
+  };
+
+  const setFeaturedUniform = (tab: UniformKey) => {
+    setCustom(c => ({ ...c, featuredUniformSet: tab }));
   };
 
   const handleSave = async () => {
@@ -125,9 +130,14 @@ export default function UniformScreen() {
             onPress={() => setActiveTab(tab)}
             style={[st.tab, activeTab === tab && { borderBottomColor: colors.nflBlue, borderBottomWidth: 2 }]}
           >
-            <Text style={[st.tabText, { color: activeTab === tab ? colors.nflBlue : colors.mutedForeground }]}>
-              {tab.toUpperCase()}
-            </Text>
+            <View style={st.tabInner}>
+              {featuredSet === tab && (
+                <Feather name="star" size={9} color="#D97706" style={{ marginRight: 4 }} />
+              )}
+              <Text style={[st.tabText, { color: activeTab === tab ? colors.nflBlue : colors.mutedForeground }]}>
+                {tab.toUpperCase()}
+              </Text>
+            </View>
           </TouchableOpacity>
         ))}
       </View>
@@ -137,6 +147,27 @@ export default function UniformScreen() {
         {/* Live Preview */}
         <View style={[st.previewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <UniformPreview uniform={u} abbreviation={abbr} number="00" width={180} height={288} />
+          {/* Background toggle */}
+          <TouchableOpacity
+            onPress={() => setFeaturedUniform(activeTab)}
+            style={[
+              st.bgToggleBtn,
+              {
+                backgroundColor: featuredSet === activeTab ? "#D97706" + "22" : colors.background,
+                borderColor:     featuredSet === activeTab ? "#D97706" : colors.border,
+              },
+            ]}
+            activeOpacity={0.75}
+          >
+            <Feather
+              name="star"
+              size={14}
+              color={featuredSet === activeTab ? "#D97706" : colors.mutedForeground}
+            />
+            <Text style={[st.bgToggleText, { color: featuredSet === activeTab ? "#D97706" : colors.mutedForeground }]}>
+              {featuredSet === activeTab ? "Used as Page Background" : "Set as Page Background"}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* ── HELMET ── */}
@@ -289,9 +320,12 @@ const st = StyleSheet.create({
   saveBtnText:   { fontSize: 13, fontFamily: "Inter_700Bold", color: "#fff" },
   tabs:          { flexDirection: "row", borderBottomWidth: 1 },
   tab:           { flex: 1, alignItems: "center", paddingVertical: 12 },
+  tabInner:      { flexDirection: "row", alignItems: "center" },
   tabText:       { fontSize: 12, fontFamily: "Inter_700Bold", letterSpacing: 0.8 },
   content:       { padding: 14, gap: 6 },
-  previewCard:   { alignItems: "center", borderRadius: 18, borderWidth: 1, paddingVertical: 20, marginBottom: 6 },
+  previewCard:   { alignItems: "center", borderRadius: 18, borderWidth: 1, paddingVertical: 20, marginBottom: 6, gap: 14 },
+  bgToggleBtn:   { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 16, paddingVertical: 9, borderRadius: 10, borderWidth: 1.5, marginHorizontal: 16 },
+  bgToggleText:  { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   sectionRow:    { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 12, marginBottom: 4, marginLeft: 4 },
   sectionTitle:  { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 1.5 },
   optCard:       { borderRadius: 14, borderWidth: 1, overflow: "hidden" },

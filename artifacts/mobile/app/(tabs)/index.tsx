@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -26,7 +27,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { membership, signOut } = useAuth();
-  const { season, isLoading, isSyncing, syncError, getPlayerTeam, getWeekGames, simulateWeek, getStandings, toggleCoGMMode, advancePhase } = useNFL();
+  const { season, isLoading, isSyncing, syncError, teamCustomization, getPlayerTeam, getWeekGames, simulateWeek, getStandings, toggleCoGMMode, advancePhase } = useNFL();
   const [simulating, setSimulating] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [advancing, setAdvancing] = useState(false);
@@ -42,6 +43,12 @@ export default function HomeScreen() {
   const role = membership?.role ?? "GM";
   const teamColor = team?.primaryColor ?? colors.nflBlue;
   const topPad = Platform.OS === "web" ? 67 : insets.top;
+
+  // Featured uniform background
+  const featuredKey = teamCustomization?.featuredUniformSet ?? "home";
+  const featuredUniform = teamCustomization?.uniforms?.[featuredKey];
+  const uniformBgColor = featuredUniform?.jerseyColor ?? teamColor;
+  const uniformHelmetColor = featuredUniform?.helmetColor ?? teamColor;
 
   // News ticker animation
   useEffect(() => {
@@ -111,6 +118,15 @@ export default function HomeScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {/* Uniform background gradient */}
+      {featuredUniform && (
+        <LinearGradient
+          colors={[uniformHelmetColor + "26", uniformBgColor + "14", "transparent"]}
+          locations={[0, 0.4, 1]}
+          style={{ position: "absolute", top: 0, left: 0, right: 0, height: 380, zIndex: 0 }}
+          pointerEvents="none"
+        />
+      )}
       {/* News Ticker */}
       {season?.news && season.news.length > 0 && (
         <View style={[st.ticker, { backgroundColor: teamColor, top: topPad }]}>

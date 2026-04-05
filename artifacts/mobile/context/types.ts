@@ -478,6 +478,7 @@ export interface TeamCustomization {
     away: UniformSet;
     alternate: UniformSet;
   };
+  featuredUniformSet?: "home" | "away" | "alternate";
 }
 
 // ─── Context Value ────────────────────────────────────────────────────────────
