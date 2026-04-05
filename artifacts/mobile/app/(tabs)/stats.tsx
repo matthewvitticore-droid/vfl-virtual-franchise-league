@@ -135,7 +135,7 @@ function EmptyMsg({ message }: { message: string }) {
   );
 }
 
-// Sticky sortable column header
+// Sticky sortable column header — mirrors RecordList's colRow
 function TableHeader({
   cols, sortKey, sortDir, onSort, accentColor,
 }: {
@@ -144,8 +144,10 @@ function TableHeader({
   const colors = useColors();
   return (
     <View style={[th.row, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-      <Text style={[th.rank, { color: colors.mutedForeground }]}>#</Text>
-      <Text style={[th.playerCol, { color: colors.mutedForeground }]}>PLAYER</Text>
+      <Text style={[th.rank,   { color: colors.mutedForeground }]}>#</Text>
+      <Text style={[th.pos,    { color: colors.mutedForeground }]}>POS</Text>
+      <Text style={[th.player, { color: colors.mutedForeground }]}>PLAYER</Text>
+      <Text style={[th.team,   { color: colors.mutedForeground }]}>TEAM</Text>
       {cols.map(c => {
         const active = c.key === sortKey;
         return (
@@ -164,26 +166,28 @@ function TableHeader({
   );
 }
 const th = StyleSheet.create({
-  row:       { flexDirection:"row", alignItems:"center", paddingHorizontal:12, paddingVertical:7,
-                borderBottomWidth:1 },
-  rank:      { width:24, fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.3 },
-  playerCol: { flex:1, fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.3 },
-  col:       { flexDirection:"row", alignItems:"center", justifyContent:"flex-end", gap:1 },
-  colText:   { fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.3 },
+  row:    { flexDirection:"row", alignItems:"center", gap:6, paddingHorizontal:12, paddingVertical:7,
+            borderBottomWidth:1 },
+  rank:   { width:22, fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.3, textAlign:"center" },
+  pos:    { width:36, fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.3 },
+  player: { flex:1,  fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.3 },
+  team:   { width:34, fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.3 },
+  col:    { flexDirection:"row", alignItems:"center", justifyContent:"flex-end", gap:1 },
+  colText:{ fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.3 },
 });
 
-// One player stat row
+// One player stat row — matches RecordRow layout exactly
 function StatRow({
   rank, player, cols, sortKey, accentColor, onPress,
 }: {
   rank:number; player:PlayerWithTeam; cols:ColDef[];
   sortKey:string; accentColor:string; onPress:()=>void;
 }) {
-  const colors = useColors();
-  const pc     = POS_COLOR[player.position];
-  const medals = ["#FFD700","#C0C0C0","#CD7F32"];
-  const rankClr = rank <= 3 ? medals[rank-1] : colors.mutedForeground;
-  const isOdd  = rank % 2 === 0;
+  const colors  = useColors();
+  const pc      = POS_COLOR[player.position];
+  const medals  = ["🥇","🥈","🥉"];
+  const medalClr = ["#FFD700","#C0C0C0","#CD7F32"];
+  const isOdd   = rank % 2 === 0;
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.75}
@@ -192,34 +196,34 @@ function StatRow({
         borderBottomColor: colors.border,
       }]}>
 
-      {/* Rank */}
-      <Text style={[sr.rank, { color: rankClr, fontFamily: rank<=3?"Inter_700Bold":"Inter_500Medium" }]}>
-        {rank <= 3 ? ["🥇","🥈","🥉"][rank-1] : rank}
+      {/* Rank — same as RecordRow */}
+      <Text style={[sr.rank, { color: rank<=3 ? medalClr[rank-1] : colors.mutedForeground,
+        fontFamily: rank<=3 ? "Inter_700Bold" : "Inter_500Medium" }]}>
+        {rank <= 3 ? medals[rank-1] : rank}
       </Text>
 
-      {/* Pos badge + Player name + Team */}
-      <View style={sr.playerCol}>
-        <View style={[sr.posBadge, { backgroundColor: pc+"22", borderColor: pc+"55" }]}>
-          <Text style={[sr.posText, { color: pc }]}>{player.position}</Text>
-        </View>
-        <View style={sr.playerInfo}>
-          <Text style={[sr.name, { color: colors.foreground }]} numberOfLines={1}>
-            {shortName(player.name)}
-          </Text>
-          <Text style={[sr.team, { color: colors.mutedForeground }]}>
-            {player.teamAbbr}{player.jerseyNumber ? ` · #${player.jerseyNumber}` : ""}
-          </Text>
-        </View>
+      {/* Position badge — identical to RecordRow posBadge */}
+      <View style={[sr.posBadge, { backgroundColor: pc+"22", borderColor: pc+"55" }]}>
+        <Text style={[sr.posText, { color: pc }]}>{player.position}</Text>
       </View>
 
-      {/* Stat columns */}
+      {/* Player name — flex:1, same as RecordRow player */}
+      <Text style={[sr.name, { color: colors.foreground }]} numberOfLines={1}>
+        {shortName(player.name)}
+      </Text>
+
+      {/* Team — fixed column, same as RecordRow team */}
+      <Text style={[sr.teamCol, { color: colors.mutedForeground }]}>{player.teamAbbr}</Text>
+
+      {/* Stat columns — primary (sorted) large + accent, rest smaller + muted */}
       {cols.map(c => {
         const isSorted = c.key === sortKey;
         const val = c.fmt(player.stats, player);
         return (
           <Text key={c.key} style={[sr.stat, {
             width: c.width,
-            color: isSorted ? accentColor : (val === "—" ? colors.border : colors.foreground),
+            fontSize:   isSorted ? 14 : 12,
+            color:      isSorted ? accentColor : (val === "—" ? colors.border : colors.mutedForeground),
             fontFamily: isSorted ? "Inter_700Bold" : "Inter_500Medium",
           }]}>
             {val}
@@ -230,16 +234,15 @@ function StatRow({
   );
 }
 const sr = StyleSheet.create({
-  row:        { flexDirection:"row", alignItems:"center", paddingHorizontal:12, paddingVertical:9,
-                borderBottomWidth:0.5 },
-  rank:       { width:24, fontSize:12, textAlign:"center" },
-  playerCol:  { flex:1, flexDirection:"row", alignItems:"center", gap:6, minWidth:0, paddingRight:4 },
-  posBadge:   { paddingHorizontal:5, paddingVertical:2, borderRadius:5, borderWidth:1, flexShrink:0 },
-  posText:    { fontSize:8.5, fontFamily:"Inter_700Bold", letterSpacing:0.4 },
-  playerInfo: { flex:1, minWidth:0 },
-  name:       { fontSize:13, fontFamily:"Inter_600SemiBold", letterSpacing:-0.2 },
-  team:       { fontSize:9.5, fontFamily:"Inter_400Regular" },
-  stat:       { textAlign:"right", fontSize:13 },
+  row:     { flexDirection:"row", alignItems:"center", paddingHorizontal:12, paddingVertical:10,
+             borderBottomWidth:0.5, gap:6 },
+  rank:    { width:22, fontSize:12, textAlign:"center" },
+  posBadge:{ width:36, paddingVertical:3, borderRadius:5, borderWidth:1,
+             alignItems:"center", justifyContent:"center", flexShrink:0 },
+  posText: { fontSize:8, fontFamily:"Inter_700Bold", letterSpacing:0.5 },
+  name:    { flex:1, fontSize:13, fontFamily:"Inter_600SemiBold", letterSpacing:-0.2 },
+  teamCol: { width:34, fontSize:11, fontFamily:"Inter_500Medium" },
+  stat:    { textAlign:"right" },
 });
 
 // Team filter pill row
