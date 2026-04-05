@@ -66,7 +66,7 @@ const ROLES: { value: FranchiseMemberRole; label: string; desc: string; icon: st
   { value: "Scout", label: "Scout",           desc: "View everything, suggest draft prospects. Read-only.",      icon: "search"    },
 ];
 
-type Screen = "choose" | "create" | "join";
+type Screen = "choose" | "create" | "join" | "success";
 
 export default function FranchiseLobbyScreen() {
   const colors = useColors();
@@ -99,7 +99,7 @@ export default function FranchiseLobbyScreen() {
     const err = await createFranchise(franchiseName.trim(), selectedTeamId, createRole, displayName.trim());
     setLoading(false);
     if (err) { setError(err); return; }
-    router.replace("/(tabs)");
+    setScreen("success");
   };
 
   const handleJoin = async () => {
@@ -131,7 +131,7 @@ export default function FranchiseLobbyScreen() {
           )}
           <View style={{ flex: 1 }}>
             <Text style={[styles.heading, { color: colors.foreground }]}>
-              {screen === "choose" ? "Your Franchise" : screen === "create" ? "Create Franchise" : "Join Franchise"}
+              {screen === "choose" ? "Your Franchise" : screen === "create" ? "Create Franchise" : screen === "join" ? "Join Franchise" : "Franchise Created!"}
             </Text>
             <Text style={[styles.userEmail, { color: colors.mutedForeground }]}>Signed in as {user?.email}</Text>
           </View>
@@ -140,6 +140,36 @@ export default function FranchiseLobbyScreen() {
             <Text style={[styles.signOutText, { color: colors.mutedForeground }]}>Sign out</Text>
           </TouchableOpacity>
         </View>
+
+        {/* ── SUCCESS ────────────────────────────────────────────────────── */}
+        {screen === "success" && (
+          <View style={styles.successContainer}>
+            <View style={[styles.successIcon, { backgroundColor: colors.nflBlue + "20", borderColor: colors.nflBlue }]}>
+              <Text style={{ fontSize: 54 }}>🏆</Text>
+            </View>
+            <Text style={[styles.successTitle, { color: colors.foreground }]}>
+              You're a GM!
+            </Text>
+            <Text style={[styles.successSub, { color: colors.mutedForeground }]}>
+              Your franchise is ready. Customize your team's identity, logo, and uniforms — or jump right in.
+            </Text>
+            <TouchableOpacity
+              onPress={() => router.replace("/customize")}
+              style={[styles.successBtnPrimary, { backgroundColor: colors.nflBlue }]}
+            >
+              <Feather name="edit-2" size={16} color="#fff" />
+              <Text style={styles.successBtnText}>Customize Team →</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.replace("/(tabs)")}
+              style={[styles.successBtnSecondary, { borderColor: colors.border }]}
+            >
+              <Text style={[styles.successBtnSecondaryText, { color: colors.mutedForeground }]}>
+                Skip for Now
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* ── CHOOSE ─────────────────────────────────────────────────────── */}
         {screen === "choose" && (
@@ -356,4 +386,12 @@ const styles = StyleSheet.create({
   submitText: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#fff" },
   errorBox: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 10, borderWidth: 1 },
   errorText: { fontSize: 13, fontFamily: "Inter_400Regular", flex: 1 },
+  successContainer: { alignItems: "center", gap: 16, paddingTop: 24 },
+  successIcon: { width: 100, height: 100, borderRadius: 28, alignItems: "center", justifyContent: "center", borderWidth: 2, marginBottom: 8 },
+  successTitle: { fontSize: 28, fontFamily: "Inter_700Bold", letterSpacing: -0.5, textAlign: "center" },
+  successSub: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 22, maxWidth: 300 },
+  successBtnPrimary: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 28, paddingVertical: 15, borderRadius: 14, width: "100%" as any, justifyContent: "center", marginTop: 8 },
+  successBtnText: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#fff" },
+  successBtnSecondary: { paddingVertical: 14, borderRadius: 14, borderWidth: 1, width: "100%" as any, alignItems: "center" },
+  successBtnSecondaryText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
 });

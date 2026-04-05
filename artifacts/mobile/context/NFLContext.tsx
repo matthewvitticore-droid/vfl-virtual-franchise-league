@@ -8,14 +8,17 @@ import type {
   Season, NFLTeam, Player, DraftProspect, DraftPick, NFLGame, NewsItem,
   TradeOffer, NFLContextValue, NFLPosition, ContractStatus, GamePlan, Formation,
   OffenseScheme, Conference, Division, PlayerSeasonStats, DevelopmentTrait,
-  DraftState, CompletedDraftPick,
+  DraftState, CompletedDraftPick, TeamCustomization,
 } from "./types";
 
 export type { Season, NFLTeam, Player, DraftProspect, DraftPick, NFLGame, NewsItem,
   TradeOffer, NFLContextValue, NFLPosition, ContractStatus, GamePlan, Formation,
-  OffenseScheme, Conference, Division, PlayerSeasonStats, DevelopmentTrait } from "./types";
+  OffenseScheme, Conference, Division, PlayerSeasonStats, DevelopmentTrait,
+  TeamCustomization, UniformSet, TeamLogo, JerseyStyle, NumberFont, PantStripeStyle,
+  HelmetLogoPlacement, LogoType, AnimalMascot, ShieldStyle, LogoFontStyle } from "./types";
 
-const CACHE_KEY = "vfl_season_v1";
+const CACHE_KEY   = "vfl_season_v1";
+const CUSTOM_KEY  = "vfl_customization_v1";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -378,12 +381,13 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [teamCustomization, setTeamCustomization] = useState<TeamCustomization | null>(null);
   const saveDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const realtimeSub = useRef<any>(null);
 
   // ── Load on mount ──────────────────────────────────────────────────────────
 
-  useEffect(() => { loadSeason(); }, [membership?.franchiseId]);
+  useEffect(() => { loadSeason(); loadCustomization(); }, [membership?.franchiseId]);
 
   // ── Realtime sync subscription ─────────────────────────────────────────────
 
@@ -401,6 +405,43 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       .subscribe();
     return () => { if (realtimeSub.current) realtimeSub.current.unsubscribe(); };
   }, [membership?.franchiseId]);
+
+  // ── Customization storage ──────────────────────────────────────────────────
+
+  async function loadCustomization() {
+    try {
+      const raw = await AsyncStorage.getItem(CUSTOM_KEY);
+      if (raw) setTeamCustomization(JSON.parse(raw));
+    } catch {}
+  }
+
+  const saveCustomization = useCallback(async (data: TeamCustomization) => {
+    try {
+      await AsyncStorage.setItem(CUSTOM_KEY, JSON.stringify(data));
+      setTeamCustomization(data);
+      // Reflect name/color changes back into the season's team object
+      setSeason(s => {
+        if (!s) return s;
+        return {
+          ...s,
+          teams: s.teams.map(t =>
+            t.id === data.teamId
+              ? { ...t, city: data.city, name: data.name, abbreviation: data.abbreviation, primaryColor: data.primaryColor, secondaryColor: data.secondaryColor }
+              : t
+          ),
+        };
+      });
+    } catch (e) { console.warn("saveCustomization error", e); }
+  }, []);
+
+  const setGameDayUniform = useCallback(async (gameId: string, uniform: "home" | "away" | "alternate") => {
+    setSeason(s => {
+      if (!s) return s;
+      const updated = { ...s, games: s.games.map(g => g.id === gameId ? { ...g, gameDayUniform: uniform } : g) };
+      AsyncStorage.setItem(CACHE_KEY, JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
+  }, []);
 
   // ── Storage ────────────────────────────────────────────────────────────────
 
@@ -892,6 +933,7 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       userDraftPick, simulateDraftPick, unlockScouting,
       proposeTrade, respondToTrade,
       advancePhase, addNews, resetSeason,
+      teamCustomization, saveCustomization, setGameDayUniform,
     }}>
       {children}
     </NFLContext.Provider>

@@ -190,6 +190,7 @@ export default function HomeScreen() {
           <QuickTile icon="user-plus" label="Free Agency" sub={`${season?.freeAgents.length ?? 0} available`} color={colors.success} onPress={() => router.push("/(tabs)/frontoffice")} />
           <QuickTile icon="git-merge" label="Trades"      sub="Build an offer"      color={colors.nflRed}     onPress={() => router.push("/(tabs)/frontoffice")} />
           <QuickTile icon="award"   label="Draft Room"   sub={`${season?.draftProspects.filter(p=>!p.isPickedUp).length ?? 0} prospects`} color={colors.nflGold} onPress={() => router.push("/(tabs)/frontoffice")} />
+          <QuickTile icon="edit-2"  label="Customize"   sub="Team identity & kits"  color={colors.nflBlue}    onPress={() => router.push("/customize")} />
         </View>
 
         {/* Next game */}

@@ -270,6 +270,7 @@ export interface NFLGame {
   homeScore: number;
   awayScore: number;
   status: "upcoming" | "simulating" | "final";
+  gameDayUniform?: "home" | "away" | "alternate";
   plays: PlayByPlayEvent[];
   drives: DriveEntry[];
   phase: GamePhase;
@@ -324,6 +325,61 @@ export interface Season {
   tradeOffers: TradeOffer[];
 }
 
+// ─── Uniform & Customization ──────────────────────────────────────────────────
+
+export type JerseyStyle         = "traditional" | "modern" | "retro" | "sleek";
+export type NumberFont          = "block" | "serif" | "collegiate" | "futuristic" | "slab";
+export type PantStripeStyle     = "none" | "single" | "double" | "triple" | "lightning";
+export type HelmetLogoPlacement = "both" | "left" | "none";
+export type LogoType            = "shield" | "animal" | "lettermark" | "helmet";
+export type AnimalMascot        = "eagle" | "wolf" | "bear" | "bull" | "hawk" | "fox" | "raven" | "stallion" | "lion" | "tiger";
+export type ShieldStyle         = 1 | 2 | 3 | 4;
+export type LogoFontStyle       = "block" | "serif" | "script" | "stencil";
+
+export interface UniformSet {
+  helmetColor: string;
+  helmetLogoPlacement: HelmetLogoPlacement;
+  jerseyStyle: JerseyStyle;
+  jerseyColor: string;
+  jerseyAccentColor: string;
+  numberFont: NumberFont;
+  numberColor: string;
+  numberOutlineColor: string;
+  pantColor: string;
+  pantStripeStyle: PantStripeStyle;
+  pantStripeColor: string;
+  sockColor: string;
+  sockAccentColor: string;
+}
+
+export interface TeamLogo {
+  type: LogoType;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  mascot?: AnimalMascot;
+  mascotVariant?: number;
+  letter?: string;
+  fontStyle?: LogoFontStyle;
+  shieldStyle?: ShieldStyle;
+}
+
+export interface TeamCustomization {
+  teamId: string;
+  city: string;
+  name: string;
+  abbreviation: string;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  logo: TeamLogo;
+  uniforms: {
+    home: UniformSet;
+    away: UniformSet;
+    alternate: UniformSet;
+  };
+}
+
 // ─── Context Value ────────────────────────────────────────────────────────────
 
 export interface NFLContextValue {
@@ -359,4 +415,8 @@ export interface NFLContextValue {
   advancePhase: () => Promise<void>;
   addNews: (item: Omit<NewsItem, "id" | "timestamp">) => void;
   resetSeason: () => Promise<void>;
+  // Customization
+  teamCustomization: TeamCustomization | null;
+  saveCustomization: (data: TeamCustomization) => Promise<void>;
+  setGameDayUniform: (gameId: string, uniform: "home" | "away" | "alternate") => Promise<void>;
 }
