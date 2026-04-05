@@ -385,10 +385,21 @@ export function generateDraftClass(year: number, count = 252): DraftProspect[] {
     // Adjust grade ±12 pts based on position-specific combine athleticism
     const finalGrade = adjustGradeForCombine(pos, grade, combine);
 
-    // QB dev-trait bonus: Superstar/X-Factor QBs get a slight grade bump
+    // Dev-trait bonus (X-Factor/Superstar QBs especially)
     const devTrait = genProspectDevTrait(finalGrade);
     const devBonus = (devTrait === "X-Factor" ? 3 : devTrait === "Superstar" ? 2 : devTrait === "Star" ? 1 : 0);
-    const adjustedGrade = clamp(finalGrade + devBonus, 35, 99);
+    let adjustedGrade = clamp(finalGrade + devBonus, 35, 99);
+
+    // CTH bonus: elite hands (75+ catching) raise draft grade for skill/DB positions
+    if (!dnp && (pos === "WR" || pos === "RB" || pos === "CB" || pos === "S" || pos === "TE")) {
+      const handRtg  = clamp(40 + (combine.handSize - 8.5) * 19.67, 40, 99);
+      const baseForCTH = clamp(50 + (adjustedGrade / 100) * 45, 40, 99);
+      const shutR2 = clamp(99 - (combine.shuttleRun - 4.0) * 58, 40, 99);
+      const coneR2 = clamp(99 - (combine.threeCone - 6.5) * 18, 40, 99);
+      const agiForCTH = (shutR2 + coneR2) / 2;
+      const cth = clamp(Math.round(handRtg * 0.30 + baseForCTH * 0.45 + agiForCTH * 0.25), 40, 99);
+      if (cth >= 75) adjustedGrade = clamp(adjustedGrade + 3, 35, 99);
+    }
 
     const projRound = gradeToRound(adjustedGrade);
     const projPick = irng(1, 32);

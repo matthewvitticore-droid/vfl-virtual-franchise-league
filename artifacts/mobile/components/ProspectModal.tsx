@@ -88,38 +88,70 @@ function CollegeStat({ label, value }: { label: string; value: string | number }
 function deriveCombineRatings(pos: NFLPosition, c: CombineMeasurables, grade: number): Record<string, number> {
   if (c.didNotParticipate) return {};
   const q = grade / 100;
-  const speed = Math.round(Math.max(40, Math.min(99, 115 - c.fortyYardDash * 18)));
-  const explosion = Math.round(Math.max(40, Math.min(99, (c.verticalJump - 25) * 2.5 + 50)));
-  const strength = Math.round(Math.max(40, Math.min(99, c.benchPress * 1.8 + 20)));
-  const agility = Math.round(Math.max(40, Math.min(99, 160 - c.threeCone * 18)));
-  const quickness = Math.round(Math.max(40, Math.min(99, 120 - c.shuttleRun * 22)));
-  const base = Math.round(50 + q * 40);
+  // Tape/IQ component — same player quality scale used everywhere
+  const base = Math.round(Math.max(40, Math.min(99, 50 + q * 45)));
+
+  // ── Exact same formulas as the combine table ──────────────────────────────
+  // SPD: 40-yard dash, 4.30s = 99
+  const spd = Math.round(Math.max(40, Math.min(99, 99 - (c.fortyYardDash - 4.3) * 65)));
+  // ACC: 3-cone, ≤6.50s = 99, <7.00s = 90s
+  const acc = Math.round(Math.max(40, Math.min(99, 99 - (c.threeCone - 6.5) * 18)));
+  // AGI: shuttle + 3-cone average, shuttle <4.0 = 99
+  const shutRtg = Math.max(40, Math.min(99, 99 - (c.shuttleRun - 4.0) * 58));
+  const coneRtg = Math.max(40, Math.min(99, 99 - (c.threeCone - 6.5) * 18));
+  const agi = Math.round((shutRtg + coneRtg) / 2);
+  // EXP: vert + broad, 40" vert = 99, 120" broad = 99
+  const vertRtg  = Math.max(40, Math.min(99, 40 + (c.verticalJump - 22) * 3.278));
+  const broadRtg = Math.max(40, Math.min(99, 40 + (c.broadJump - 90) * 1.967));
+  const exp = Math.round((vertRtg + broadRtg) / 2);
+  // STR: bench press reps
+  const str = Math.round(Math.max(40, Math.min(99, c.benchPress * 1.6 + 22)));
+  // HANDS: larger hands = better catcher (8.5" = 40, 11.5" = 99)
+  const handRtg = Math.max(40, Math.min(99, 40 + (c.handSize - 8.5) * 19.67));
+  // CTH: 30% hands + 45% tape/IQ + 25% agility (independently variable)
+  const cth = Math.round(Math.max(40, Math.min(99, handRtg * 0.30 + base * 0.45 + agi * 0.25)));
+  // QCK: shuttle-only (for release quickness off the line)
+  const qck = Math.round(Math.max(40, Math.min(99, 99 - (c.shuttleRun - 4.0) * 58)));
 
   const ratings: Record<string, number> = {};
   const keys = POS_RATING_KEYS[pos] ?? [];
   keys.forEach(key => {
     switch (key) {
-      case "mobility": case "acceleration": ratings[key] = speed; break;
-      case "agility": ratings[key] = agility; break;
-      case "throwPower": ratings[key] = strength; break;
-      case "throwAccShort": case "throwAccMid": ratings[key] = base; break;
-      case "throwAccDeep": ratings[key] = Math.round((base + speed) / 2); break;
-      case "throwOnRun": ratings[key] = Math.round((base + agility) / 2); break;
-      case "breakTackle": ratings[key] = strength; break;
-      case "ballCarrierVision": ratings[key] = base; break;
-      case "catching": case "routeRunning": ratings[key] = Math.round((base + agility) / 2); break;
-      case "catchInTraffic": ratings[key] = Math.round((base + strength) / 2); break;
-      case "release": ratings[key] = quickness; break;
-      case "passBlock": case "runBlock": ratings[key] = strength; break;
-      case "powerMoves": ratings[key] = strength; break;
-      case "finesseMoves": ratings[key] = agility; break;
-      case "blockShedding": case "tackle": ratings[key] = Math.round((strength + agility) / 2); break;
-      case "pursuit": ratings[key] = speed; break;
-      case "manCoverage": case "zoneCoverage": ratings[key] = base; break;
-      case "press": ratings[key] = Math.round((strength + base) / 2); break;
-      case "kickPower": ratings[key] = Math.round((strength + explosion) / 2); break;
-      case "kickAccuracy": ratings[key] = base; break;
-      default: ratings[key] = base;
+      // QB
+      case "throwPower":        ratings[key] = str;                              break;
+      case "throwAccShort":
+      case "throwAccMid":       ratings[key] = base;                             break;
+      case "throwAccDeep":      ratings[key] = Math.round((base + spd) / 2);    break;
+      case "throwOnRun":        ratings[key] = Math.round((base + agi) / 2);    break;
+      case "mobility":          ratings[key] = spd;                              break;
+      // Ball carrier
+      case "ballCarrierVision": ratings[key] = base;                             break;
+      case "breakTackle":       ratings[key] = str;                              break;
+      // Receiving — CTH now driven by hand size + grade
+      case "catching":          ratings[key] = cth;                              break;
+      case "routeRunning":      ratings[key] = Math.round((base + agi) / 2);    break;
+      case "catchInTraffic":    ratings[key] = Math.round((cth + str) / 2);     break;
+      case "release":           ratings[key] = qck;                              break;
+      // Blocking
+      case "passBlock":
+      case "runBlock":          ratings[key] = str;                              break;
+      // D-Line
+      case "powerMoves":        ratings[key] = str;                              break;
+      case "finesseMoves":      ratings[key] = agi;                              break;
+      case "blockShedding":
+      case "tackle":            ratings[key] = Math.round((str + agi) / 2);     break;
+      case "pursuit":           ratings[key] = spd;                              break;
+      // Coverage
+      case "manCoverage":
+      case "zoneCoverage":      ratings[key] = base;                             break;
+      case "press":             ratings[key] = Math.round((str + base) / 2);    break;
+      // Athletic — now exactly matching combine table values
+      case "acceleration":      ratings[key] = acc;                              break;
+      case "agility":           ratings[key] = agi;                              break;
+      // K/P
+      case "kickPower":         ratings[key] = Math.round((str + exp) / 2);     break;
+      case "kickAccuracy":      ratings[key] = base;                             break;
+      default:                  ratings[key] = base;
     }
   });
   return ratings;
