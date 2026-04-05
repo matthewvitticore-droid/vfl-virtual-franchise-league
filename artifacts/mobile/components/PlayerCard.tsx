@@ -2,10 +2,8 @@ import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { PlayerFigure } from "@/components/PlayerFigure";
-import { useNFL } from "@/context/NFLContext";
 import { POS_RATING_KEYS, POS_RATING_LABELS } from "@/context/types";
-import type { NFLPosition, Player, UniformSet } from "@/context/types";
+import type { NFLPosition, Player, PosRatings } from "@/context/types";
 
 // ─── Position meta ────────────────────────────────────────────────────────────
 
@@ -24,18 +22,6 @@ const DEV_ICON: Record<string, any> = {
   Normal: "user", "Late Bloomer": "trending-up",
 };
 
-// ─── Color helpers ────────────────────────────────────────────────────────────
-
-function hexRgb(h: string): [number, number, number] {
-  const n = parseInt(h.replace("#", ""), 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-}
-function darken(h: string, amt: number): string {
-  const [r, g, b] = hexRgb(h);
-  const c = (v: number) => Math.max(0, Math.min(255, v + amt)).toString(16).padStart(2, "0");
-  return `#${c(r)}${c(g)}${c(b)}`;
-}
-
 // ─── OVR color ────────────────────────────────────────────────────────────────
 
 function ovrColor(ovr: number): string {
@@ -45,31 +31,36 @@ function ovrColor(ovr: number): string {
   return "#E31837";
 }
 
-// ─── Default uniform ─────────────────────────────────────────────────────────
+// ─── Role label (computed from ratings, no combine needed) ────────────────────
 
-function defaultUniform(primary: string, secondary: string): UniformSet {
-  return {
-    helmetColor: primary,
-    helmetLogoPlacement: "both",
-    jerseyStyle: "traditional",
-    jerseyColor: primary,
-    jerseyAccentColor: secondary,
-    numberFont: "block",
-    numberColor: "#ffffff",
-    numberOutlineColor: "#000000",
-    pantColor: primary,
-    pantStripeStyle: "single",
-    pantStripeColor: secondary,
-    sockColor: secondary,
-    sockAccentColor: primary,
-  };
+function computeRole(pos: NFLPosition, r: PosRatings, overall: number): string | null {
+  if (pos === "QB") {
+    if (overall >= 88 && r.throwPower >= 88 && r.throwAccShort >= 86) return "Face of Franchise";
+    if (r.mobility >= 80)       return "Scrambler";
+    if (r.throwPower >= 84)     return "Strong Arm";
+    if (r.throwAccShort >= 82)  return "Accurate";
+    return "Pocket Passer";
+  }
+  if (pos === "RB") {
+    if (r.breakTackle >= 82)                         return "Power Back";
+    if (r.acceleration >= 82 && r.catching >= 76)    return "Receiving Back";
+    if (r.acceleration >= 80 && r.agility >= 78)     return "Elusive Back";
+    return "Balanced Back";
+  }
+  if (pos === "WR") {
+    if (overall >= 88 && r.acceleration >= 90 && r.catching >= 80) return "All-Pro Potential";
+    if (r.acceleration >= 90)   return "Deep Threat";
+    if (r.catching >= 80)       return "Possession Receiver";
+    return "Balanced Receiver";
+  }
+  return null;
 }
 
 // ─── Rating bar ───────────────────────────────────────────────────────────────
 
 function RatingBar({ label, value, fill }: { label: string; value: number; fill: string }) {
   const pct = `${Math.min(100, Math.max(0, value))}%` as any;
-  const valColor = value >= 85 ? ovrColor(value) : "#E5E7EB";
+  const valColor = value >= 85 ? ovrColor(value) : "#CBD5E1";
   return (
     <View style={rb.row}>
       <Text style={rb.label}>{label}</Text>
@@ -105,137 +96,111 @@ export function PlayerCard({
   expanded = false,
   showInjury = true,
 }: Props) {
-  const { teamCustomization } = useNFL();
+  const primary   = teamPrimaryColor   ?? "#1E3A8A";
+  const secondary = teamSecondaryColor ?? "#C0A030";
 
-  const primary   = teamPrimaryColor   ?? teamCustomization?.primaryColor   ?? "#1E3A8A";
-  const secondary = teamSecondaryColor ?? teamCustomization?.secondaryColor ?? "#C0A030";
-  const uniform: UniformSet = teamCustomization?.uniforms?.home ?? defaultUniform(primary, secondary);
+  const darken = (h: string, amt: number) => {
+    const n = parseInt(h.replace("#",""), 16);
+    const c = (v: number) => Math.max(0, Math.min(255, ((n >> v) & 255) + amt)).toString(16).padStart(2,"0");
+    return `#${c(16)}${c(8)}${c(0)}`;
+  };
 
-  const primaryDk  = darken(primary,  -52);
-  const primaryMid = darken(primary,  -26);
+  const primaryDk  = darken(primary, -52);
+  const primaryMid = darken(primary, -26);
   const secDk      = darken(secondary, -40);
 
   const posColor = POS_COLOR[player.position];
   const devColor = DEV_COLOR[player.developmentTrait] ?? "#8B949E";
   const devIcon  = DEV_ICON[player.developmentTrait]  ?? "user";
   const ovrC     = ovrColor(player.overall);
-
-  const figW = expanded ? 116 : 104;
-  const figH = expanded ? 155 : 139;
+  const role     = computeRole(player.position, player.posRatings, player.overall);
 
   return (
-    // Outer chrome border container
     <View style={[card.chrome, { borderColor: secondary + "90" }]}>
-      {/* Foil border gradient overlay */}
+      {/* Foil border gradient */}
       <LinearGradient
         colors={[secondary + "CC", primary + "88", secDk + "AA", primaryDk + "CC"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         style={card.borderGlow}
       />
-      {/* Inner card surface */}
       <View style={card.inner}>
 
-        {/* ── Background: rich team-color atmosphere ──── */}
+        {/* ── Background atmosphere ── */}
         <LinearGradient
           colors={[primaryDk, primaryMid + "CC", "#08081A", "#08081A"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0.75 }}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0.75 }}
           style={StyleSheet.absoluteFill}
         />
-        {/* Secondary haze on far right */}
         <LinearGradient
-          colors={["transparent", secondary + "20"]}
-          start={{ x: 0.4, y: 0 }}
-          end={{ x: 1, y: 0 }}
+          colors={["transparent", secondary + "18"]}
+          start={{ x: 0.4, y: 0 }} end={{ x: 1, y: 0 }}
           style={StyleSheet.absoluteFill}
         />
 
-        {/* Decorative diagonal slash lines */}
-        <View style={[card.slash, { left: "34%", backgroundColor: secondary + "18" }]} />
-        <View style={[card.slash, { left: "55%", backgroundColor: primary   + "14" }]} />
+        {/* Decorative diagonal slashes */}
+        <View style={[card.slash, { left: "28%", backgroundColor: secondary + "14" }]} />
+        <View style={[card.slash, { left: "52%", backgroundColor: primary   + "10" }]} />
         <View style={[card.slash, { left: "72%", backgroundColor: secondary + "0C" }]} />
 
-        {/* ── Left: full-bleed player figure ─────────── */}
-        <View style={[card.figureCol, { width: figW + 4 }]}>
-          {/* Team-color spotlight column */}
+        {/* ── Left: OVR swatch ── */}
+        <View style={card.ovrCol}>
           <LinearGradient
-            colors={[primary + "50", primary + "20", "transparent"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
+            colors={[posColor + "50", posColor + "22", "transparent"]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={StyleSheet.absoluteFill}
           />
-          {/* Ground glow at player feet */}
-          <LinearGradient
-            colors={[primary + "60", "transparent"]}
-            start={{ x: 0.5, y: 0 }}
-            end={{ x: 0.5, y: 1 }}
-            style={card.footGlow}
-          />
-          {/* OVR watermark number behind figure */}
-          <View style={card.ovrWater}>
-            <Text style={[card.ovrWaterText, { color: primary + "38" }]}>{player.overall}</Text>
+          {/* Position color accent stripe */}
+          <View style={[card.posStripe, { backgroundColor: posColor }]} />
+          {/* OVR number */}
+          <View style={card.ovrBlock}>
+            <Text style={[card.ovrNum, { color: ovrC }]}>{player.overall}</Text>
+            <Text style={[card.ovrLbl, { color: ovrC + "AA" }]}>OVR</Text>
           </View>
-          {/* Player figure — overflows top intentionally */}
-          <View style={card.figureFrame}>
-            <PlayerFigure
-              uniform={uniform}
-              position={player.position}
-              number={player.jerseyNumber != null ? String(player.jerseyNumber) : "00"}
-              playerName={player.name}
-              width={figW}
-              height={figH}
-              ethnicityCode={player.ethnicityCode ?? 0}
-              faceVariant={player.faceVariant ?? 0}
-            />
+          {/* Position badge */}
+          <View style={[card.posBadge, { backgroundColor: posColor + "30", borderColor: posColor + "80" }]}>
+            <Text style={[card.posText, { color: posColor }]}>{player.position}</Text>
           </View>
         </View>
 
-        {/* Thin glowing separator */}
-        <LinearGradient
-          colors={["transparent", secondary + "55", secondary + "88", secondary + "55", "transparent"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
-          style={card.sep}
-        />
-
-        {/* ── Right: stats & info ────────────────────── */}
+        {/* ── Right: info ── */}
         <View style={card.infoCol}>
 
-          {/* Row 1: POS + OVR + DEV */}
+          {/* Dev trait + status row */}
           <View style={card.topRow}>
-            <View style={[card.posBadge, { backgroundColor: posColor + "22", borderColor: posColor + "70" }]}>
-              <Text style={[card.posText, { color: posColor }]}>{player.position}</Text>
-            </View>
-            {/* OVR badge */}
-            <View style={[card.ovrBadge, { borderColor: ovrC + "80", backgroundColor: ovrC + "18" }]}>
-              <Text style={[card.ovrNum, { color: ovrC }]}>{player.overall}</Text>
-              <Text style={[card.ovrLbl, { color: ovrC + "AA" }]}>OVR</Text>
-            </View>
             <View style={card.devRow}>
-              <Feather name={devIcon} size={8} color={devColor} />
+              <Feather name={devIcon} size={9} color={devColor} />
               <Text style={[card.devText, { color: devColor }]}>{player.developmentTrait}</Text>
+            </View>
+            <View style={[card.statusChip, {
+              backgroundColor:
+                player.status === "Starter"        ? "#3FB95022" :
+                player.status === "Practice Squad" ? "#FFC10722" : "#8B949E22",
+            }]}>
+              <Text style={[card.statusText, {
+                color:
+                  player.status === "Starter"        ? "#3FB950" :
+                  player.status === "Practice Squad" ? "#FFC107" : "#8B949E",
+              }]}>{player.status}</Text>
             </View>
           </View>
 
-          {/* Name */}
+          {/* Player name */}
           <Text style={card.playerName} numberOfLines={1}>{player.name.toUpperCase()}</Text>
 
           {/* Accent underline */}
           <LinearGradient
             colors={[secondary, primary, "transparent"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={card.nameBar}
           />
 
-          {/* Meta */}
+          {/* Role + meta */}
           <Text style={card.meta} numberOfLines={1}>
             {player.age}yo · {player.yearsExperience}yr
-            {player.college ? ` · ${player.college}` : ""}
+            {role ? ` · ${role}` : player.college ? ` · ${player.college}` : ""}
           </Text>
 
-          {/* Injury */}
+          {/* Injury banner */}
           {showInjury && player.injury && (
             <View style={card.injBanner}>
               <Feather name="alert-circle" size={8} color="#F87171" />
@@ -245,15 +210,14 @@ export function PlayerCard({
             </View>
           )}
 
-          {/* Position-specific rating bars */}
+          {/* Rating bars */}
           <View style={card.bars}>
             {POS_RATING_KEYS[player.position]?.map((key, i) => {
               const val = player.posRatings?.[key] ?? player.specific;
-              const label = POS_RATING_LABELS[key];
               const isLast = i === (POS_RATING_KEYS[player.position].length - 1);
               return (
-                <RatingBar key={key} label={label} value={val}
-                  fill={isLast ? ovrC : primary} />
+                <RatingBar key={key} label={POS_RATING_LABELS[key]} value={val}
+                  fill={isLast ? ovrC : posColor} />
               );
             })}
           </View>
@@ -274,22 +238,11 @@ export function PlayerCard({
                 <Text style={card.chipVal}>${player.guaranteedMoney.toFixed(1)}M</Text>
               </View>
             )}
-            <View style={[card.statusChip, {
-              backgroundColor:
-                player.status === "Starter"        ? "#3FB95022" :
-                player.status === "Practice Squad" ? "#FFC10722" : "#8B949E22",
-            }]}>
-              <Text style={[card.statusText, {
-                color:
-                  player.status === "Starter"        ? "#3FB950" :
-                  player.status === "Practice Squad" ? "#FFC107" : "#8B949E",
-              }]}>{player.status}</Text>
-            </View>
           </View>
 
         </View>
 
-        {/* ── Corner chrome brackets ─────────────────── */}
+        {/* Corner chrome brackets */}
         <View style={[card.corner, card.cTL, { borderColor: secondary + "99" }]} />
         <View style={[card.corner, card.cTR, { borderColor: secondary + "99" }]} />
         <View style={[card.corner, card.cBL, { borderColor: secondary + "99" }]} />
@@ -298,8 +251,7 @@ export function PlayerCard({
         {/* Top-left gloss sheen */}
         <LinearGradient
           colors={["rgba(255,255,255,0.10)", "transparent"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0.55, y: 0.55 }}
+          start={{ x: 0, y: 0 }} end={{ x: 0.55, y: 0.55 }}
           style={card.sheen}
         />
 
@@ -314,69 +266,65 @@ const CRN = 8;
 
 const card = StyleSheet.create({
   chrome: {
-    borderRadius: 17,
-    borderWidth: 1.5,
-    marginHorizontal: 12,
-    marginVertical: 5,
+    borderRadius: 17, borderWidth: 1.5,
+    marginHorizontal: 12, marginVertical: 5,
     overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.55,
-    shadowRadius: 12,
-    elevation: 10,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.55, shadowRadius: 12, elevation: 10,
     position: "relative",
   },
-  borderGlow: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 16,
-  },
+  borderGlow: { ...StyleSheet.absoluteFillObject, borderRadius: 16 },
   inner: {
-    borderRadius: 15.5,
-    overflow: "hidden",
-    flexDirection: "row",
-    minHeight: 160,
+    borderRadius: 15.5, overflow: "hidden",
+    flexDirection: "row", minHeight: 152,
     position: "relative",
   },
   slash: {
-    position: "absolute",
-    top: -40, bottom: -10,
-    width: 2,
-    transform: [{ rotate: "22deg" }],
+    position: "absolute", top: -40, bottom: -10,
+    width: 2, transform: [{ rotate: "22deg" }],
   },
-  figureCol: {
+
+  // ── Left OVR swatch ──────────────────────────────────────────────────────
+  ovrCol: {
+    width: 72,
     alignItems: "center",
-    justifyContent: "flex-end",
-    overflow: "hidden",
+    justifyContent: "center",
+    gap: 6,
     position: "relative",
+    overflow: "hidden",
   },
-  footGlow: {
+  posStripe: {
     position: "absolute",
-    bottom: 0,
-    left: 0, right: 0,
-    height: 80,
-    borderRadius: 999,
-    transform: [{ scaleX: 1.8 }],
+    left: 0, top: 0, bottom: 0,
+    width: 3,
   },
-  ovrWater: {
-    position: "absolute",
-    bottom: 0,
-    left: 0, right: 0,
+  ovrBlock: {
     alignItems: "center",
   },
-  ovrWaterText: {
-    fontSize: 74,
+  ovrNum: {
+    fontSize: 34,
     fontFamily: "Inter_700Bold",
-    letterSpacing: -4,
+    letterSpacing: -1,
+    lineHeight: 38,
   },
-  figureFrame: {
-    zIndex: 2,
-    marginBottom: -4,
-    marginTop: -20,
+  ovrLbl: {
+    fontSize: 8,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 1.2,
   },
-  sep: {
-    width: 1,
-    alignSelf: "stretch",
+  posBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
   },
+  posText: {
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.6,
+  },
+
+  // ── Right info ───────────────────────────────────────────────────────────
   infoCol: {
     flex: 1,
     paddingVertical: 10,
@@ -388,141 +336,73 @@ const card = StyleSheet.create({
   topRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    flexWrap: "wrap",
-    marginBottom: 1,
-  },
-  posBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 5,
-    borderWidth: 1,
-  },
-  posText: {
-    fontSize: 9.5,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.5,
-  },
-  ovrBadge: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 2,
-    borderWidth: 1.5,
-    borderRadius: 7,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  ovrNum: {
-    fontSize: 18,
-    fontFamily: "Inter_700Bold",
-    lineHeight: 21,
-  },
-  ovrLbl: {
-    fontSize: 7,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.8,
+    justifyContent: "space-between",
     marginBottom: 1,
   },
   devRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 3,
+    gap: 4,
   },
   devText: {
-    fontSize: 8,
-    fontFamily: "Inter_500Medium",
+    fontSize: 9,
+    fontFamily: "Inter_600SemiBold",
+  },
+  statusChip: {
+    paddingHorizontal: 6, paddingVertical: 3, borderRadius: 5,
+  },
+  statusText: {
+    fontSize: 7.5, fontFamily: "Inter_700Bold", letterSpacing: 0.3,
   },
   playerName: {
-    fontSize: 14,
-    fontFamily: "Inter_700Bold",
-    color: "#FFFFFF",
-    letterSpacing: -0.2,
-    lineHeight: 17,
+    fontSize: 14, fontFamily: "Inter_700Bold",
+    color: "#FFFFFF", letterSpacing: -0.2, lineHeight: 17,
   },
   nameBar: {
-    height: 1.5,
-    borderRadius: 1,
-    marginBottom: 1,
-    width: "80%",
+    height: 1.5, borderRadius: 1, marginBottom: 1, width: "80%",
   },
   meta: {
-    fontSize: 9,
-    fontFamily: "Inter_400Regular",
-    color: "rgba(255,255,255,0.42)",
-    marginBottom: 1,
+    fontSize: 9, fontFamily: "Inter_400Regular",
+    color: "rgba(255,255,255,0.42)", marginBottom: 1,
   },
   injBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
+    flexDirection: "row", alignItems: "center", gap: 4,
     backgroundColor: "rgba(248,113,113,0.12)",
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 4,
-    alignSelf: "flex-start",
-    borderWidth: 0.5,
-    borderColor: "rgba(248,113,113,0.3)",
+    paddingHorizontal: 5, paddingVertical: 2,
+    borderRadius: 4, alignSelf: "flex-start",
+    borderWidth: 0.5, borderColor: "rgba(248,113,113,0.3)",
   },
-  injText: {
-    fontSize: 8,
-    fontFamily: "Inter_600SemiBold",
-    color: "#F87171",
-  },
-  bars: {
-    marginTop: 1,
-  },
+  injText: { fontSize: 8, fontFamily: "Inter_600SemiBold", color: "#F87171" },
+  bars: { marginTop: 1 },
   chipRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    flexWrap: "wrap",
-    marginTop: 2,
+    flexDirection: "row", alignItems: "center",
+    gap: 4, flexWrap: "wrap", marginTop: 2,
   },
   chip: {
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.07)",
-    paddingHorizontal: 6,
-    paddingVertical: 2.5,
-    borderRadius: 5,
-    borderWidth: 0.5,
+    paddingHorizontal: 6, paddingVertical: 2.5,
+    borderRadius: 5, borderWidth: 0.5,
     borderColor: "rgba(255,255,255,0.12)",
   },
   chipLbl: {
-    fontSize: 6.5,
-    fontFamily: "Inter_700Bold",
-    color: "rgba(255,255,255,0.38)",
-    letterSpacing: 0.5,
+    fontSize: 6.5, fontFamily: "Inter_700Bold",
+    color: "rgba(255,255,255,0.38)", letterSpacing: 0.5,
   },
   chipVal: {
-    fontSize: 10,
-    fontFamily: "Inter_700Bold",
-    color: "#F9FAFB",
+    fontSize: 10, fontFamily: "Inter_700Bold", color: "#F9FAFB",
   },
-  statusChip: {
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    borderRadius: 5,
-  },
-  statusText: {
-    fontSize: 7.5,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.3,
-  },
-  // Corner chrome brackets
+
+  // ── Corner chrome brackets ────────────────────────────────────────────────
   corner: {
-    position: "absolute",
-    width: CRN,
-    height: CRN,
-    borderWidth: 1.5,
+    position: "absolute", width: CRN, height: CRN, borderWidth: 1.5,
   },
   cTL: { top: 5,    left: 5,  borderRightWidth: 0, borderBottomWidth: 0, borderTopLeftRadius: 3 },
   cTR: { top: 5,    right: 5, borderLeftWidth: 0,  borderBottomWidth: 0, borderTopRightRadius: 3 },
   cBL: { bottom: 5, left: 5,  borderRightWidth: 0, borderTopWidth: 0,    borderBottomLeftRadius: 3 },
   cBR: { bottom: 5, right: 5, borderLeftWidth: 0,  borderTopWidth: 0,    borderBottomRightRadius: 3 },
   sheen: {
-    position: "absolute",
-    top: 0, left: 0,
-    width: 80, height: 80,
-    borderBottomRightRadius: 80,
+    position: "absolute", top: 0, left: 0,
+    width: 80, height: 80, borderBottomRightRadius: 80,
   },
 });
