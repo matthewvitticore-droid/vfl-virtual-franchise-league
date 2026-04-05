@@ -1,9 +1,10 @@
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Keyboard, Modal, PanResponder, Platform, StyleSheet, Text,
+  Keyboard, Modal, PanResponder, Platform, ScrollView, StyleSheet, Text,
   TextInput, TouchableOpacity, TouchableWithoutFeedback, View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 
 // ─── Color math ───────────────────────────────────────────────────────────────
@@ -90,12 +91,7 @@ function HSLSlider({ value, max, gradientColors, onChange }: SliderProps) {
         end={{ x: 1, y: 0 }}
         style={st.sliderGradient}
       />
-      <View
-        style={[
-          st.sliderThumb,
-          { left: Math.max(0, Math.min(width - 24, thumbX - 12)) },
-        ]}
-      />
+      <View style={[st.sliderThumb, { left: Math.max(0, Math.min(width - 24, thumbX - 12)) }]} />
     </View>
   );
 }
@@ -112,6 +108,7 @@ interface Props {
 
 export function ColorPickerModal({ visible, color, title = "Pick a Color", onClose, onSelect }: Props) {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const [h, setH] = useState(220);
   const [s, setS] = useState(80);
   const [l, setL] = useState(40);
@@ -146,101 +143,127 @@ export function ColorPickerModal({ visible, color, title = "Pick a Color", onClo
     [h, s]
   );
 
+  const bottomPad = Platform.OS === "ios" ? insets.bottom : 16;
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      {/* Dim overlay — tap to cancel */}
       <TouchableWithoutFeedback onPress={() => { Keyboard.dismiss(); onClose(); }}>
         <View style={st.overlay} />
       </TouchableWithoutFeedback>
 
-      <View style={[st.sheet, { backgroundColor: colors.card }]}>
-        {/* Header */}
-        <View style={st.header}>
+      {/* Sheet — anchored to bottom, capped at 92% screen height */}
+      <View style={[st.sheet, { backgroundColor: colors.card, maxHeight: "92%" }]}>
+        {/* Drag handle */}
+        <View style={[st.handle, { backgroundColor: colors.border }]} />
+
+        {/* Fixed header */}
+        <View style={[st.header, { borderBottomColor: colors.border }]}>
           <Text style={[st.title, { color: colors.foreground }]}>{title}</Text>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
             <Text style={[st.closeBtn, { color: colors.mutedForeground }]}>✕</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Preview */}
-        <View style={st.previewRow}>
-          <View style={[st.previewSwatch, { backgroundColor: color }]} />
-          <Text style={[{ color: colors.mutedForeground, fontSize: 18, marginHorizontal: 8 }]}>→</Text>
-          <View style={[st.previewSwatch, { backgroundColor: currentHex }]} />
-          <TextInput
-            value={hexInput}
-            onChangeText={handleHex}
-            style={[st.hexInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
-            maxLength={7}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            spellCheck={false}
-            placeholder="#RRGGBB"
-            placeholderTextColor={colors.mutedForeground}
-          />
-        </View>
-
-        {/* Hue */}
-        <Text style={[st.label, { color: colors.mutedForeground }]}>HUE  {h}°</Text>
-        <HSLSlider
-          value={h} max={360}
-          gradientColors={["#ff0000","#ffff00","#00ff00","#00ffff","#0000ff","#ff00ff","#ff0000"]}
-          onChange={setH}
-        />
-
-        {/* Saturation */}
-        <Text style={[st.label, { color: colors.mutedForeground }]}>SATURATION  {s}%</Text>
-        <HSLSlider value={s} max={100} gradientColors={satGrad} onChange={setS} />
-
-        {/* Lightness */}
-        <Text style={[st.label, { color: colors.mutedForeground }]}>LIGHTNESS  {l}%</Text>
-        <HSLSlider value={l} max={100} gradientColors={lumGrad} onChange={setL} />
-
-        {/* Swatches */}
-        <View style={st.swatchGrid}>
-          {SWATCHES.map((sw) => (
-            <TouchableOpacity
-              key={sw}
-              onPress={() => {
-                const [nh, ns, nl] = hexToHsl(sw);
-                setH(nh); setS(ns); setL(nl);
-              }}
-              style={[
-                st.swatch,
-                { backgroundColor: sw, borderColor: sw === currentHex ? "#fff" : "transparent" },
-              ]}
-            />
-          ))}
-        </View>
-
-        {/* Confirm */}
-        <TouchableOpacity
-          onPress={() => { onSelect(currentHex); onClose(); }}
-          style={[st.confirmBtn, { backgroundColor: currentHex }]}
-          activeOpacity={0.85}
+        {/* Scrollable body — sliders + swatches */}
+        <ScrollView
+          contentContainerStyle={st.body}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          <Text style={st.confirmText}>USE THIS COLOR</Text>
-        </TouchableOpacity>
+          {/* Preview: before → after + hex input */}
+          <View style={st.previewRow}>
+            <View style={[st.previewSwatch, { backgroundColor: color }]} />
+            <Text style={{ color: colors.mutedForeground, fontSize: 18, marginHorizontal: 8 }}>→</Text>
+            <View style={[st.previewSwatch, { backgroundColor: currentHex }]} />
+            <TextInput
+              value={hexInput}
+              onChangeText={handleHex}
+              style={[st.hexInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+              maxLength={7}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              spellCheck={false}
+              placeholder="#RRGGBB"
+              placeholderTextColor={colors.mutedForeground}
+            />
+          </View>
+
+          {/* Hue */}
+          <Text style={[st.label, { color: colors.mutedForeground }]}>HUE  {h}°</Text>
+          <HSLSlider
+            value={h} max={360}
+            gradientColors={["#ff0000","#ffff00","#00ff00","#00ffff","#0000ff","#ff00ff","#ff0000"]}
+            onChange={setH}
+          />
+
+          {/* Saturation */}
+          <Text style={[st.label, { color: colors.mutedForeground }]}>SATURATION  {s}%</Text>
+          <HSLSlider value={s} max={100} gradientColors={satGrad} onChange={setS} />
+
+          {/* Lightness */}
+          <Text style={[st.label, { color: colors.mutedForeground }]}>LIGHTNESS  {l}%</Text>
+          <HSLSlider value={l} max={100} gradientColors={lumGrad} onChange={setL} />
+
+          {/* Presets */}
+          <Text style={[st.label, { color: colors.mutedForeground }]}>PRESETS</Text>
+          <View style={st.swatchGrid}>
+            {SWATCHES.map((sw) => (
+              <TouchableOpacity
+                key={sw}
+                onPress={() => { const [nh, ns, nl] = hexToHsl(sw); setH(nh); setS(ns); setL(nl); }}
+                style={[st.swatch, { backgroundColor: sw, borderColor: sw === currentHex ? "#fff" : "transparent" }]}
+              />
+            ))}
+          </View>
+        </ScrollView>
+
+        {/* ── Sticky confirm footer — always visible ── */}
+        <View style={[st.footer, { paddingBottom: bottomPad, borderTopColor: colors.border }]}>
+          <TouchableOpacity
+            onPress={() => { onSelect(currentHex); onClose(); }}
+            style={[st.confirmBtn, { backgroundColor: currentHex }]}
+            activeOpacity={0.85}
+          >
+            <View style={[st.confirmSwatch, { backgroundColor: currentHex, borderColor: "rgba(255,255,255,0.3)" }]} />
+            <Text style={st.confirmText}>USE  {currentHex.toUpperCase()}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </Modal>
   );
 }
 
 const st = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.65)" },
+  overlay:      { flex: 1, backgroundColor: "rgba(0,0,0,0.65)" },
   sheet: {
     borderTopLeftRadius: 26, borderTopRightRadius: 26,
-    paddingHorizontal: 20, paddingTop: 16, paddingBottom: Platform.OS === "ios" ? 40 : 24,
+    overflow: "hidden",
   },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
-  title: { fontSize: 17, fontFamily: "Inter_700Bold" },
+  handle: {
+    width: 36, height: 4, borderRadius: 2,
+    alignSelf: "center", marginTop: 10, marginBottom: 4,
+  },
+  header: {
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    paddingHorizontal: 20, paddingVertical: 14,
+    borderBottomWidth: 1,
+  },
+  title:    { fontSize: 17, fontFamily: "Inter_700Bold" },
   closeBtn: { fontSize: 20 },
-  previewRow: { flexDirection: "row", alignItems: "center", marginBottom: 20 },
+
+  body: {
+    paddingHorizontal: 20, paddingTop: 14, paddingBottom: 8,
+  },
+
+  previewRow:    { flexDirection: "row", alignItems: "center", marginBottom: 18 },
   previewSwatch: { width: 44, height: 44, borderRadius: 10, borderWidth: 1, borderColor: "rgba(255,255,255,0.12)" },
   hexInput: {
     flex: 1, height: 44, borderRadius: 10, borderWidth: 1,
     paddingHorizontal: 12, fontFamily: "Inter_600SemiBold", fontSize: 14, marginLeft: 8,
   },
-  label: { fontSize: 10, fontFamily: "Inter_600SemiBold", letterSpacing: 1.2, marginBottom: 8, marginTop: 4 },
+
+  label: { fontSize: 10, fontFamily: "Inter_600SemiBold", letterSpacing: 1.2, marginBottom: 8, marginTop: 6 },
   sliderTrack: { height: 26, borderRadius: 13, marginBottom: 4, position: "relative" },
   sliderGradient: { height: 26, borderRadius: 13 },
   sliderThumb: {
@@ -248,8 +271,22 @@ const st = StyleSheet.create({
     backgroundColor: "#fff", borderWidth: 2, borderColor: "rgba(0,0,0,0.25)",
     shadowColor: "#000", shadowOpacity: 0.4, shadowRadius: 4, elevation: 6,
   },
-  swatchGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginVertical: 14 },
-  swatch: { width: 34, height: 34, borderRadius: 8, borderWidth: 2.5 },
-  confirmBtn: { height: 52, borderRadius: 14, alignItems: "center", justifyContent: "center", marginTop: 2 },
-  confirmText: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#fff", letterSpacing: 1.2 },
+
+  swatchGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginVertical: 10 },
+  swatch:     { width: 34, height: 34, borderRadius: 8, borderWidth: 2.5 },
+
+  footer: {
+    paddingHorizontal: 20, paddingTop: 12,
+    borderTopWidth: 1,
+  },
+  confirmBtn: {
+    height: 54, borderRadius: 14, flexDirection: "row",
+    alignItems: "center", justifyContent: "center", gap: 10,
+  },
+  confirmSwatch: {
+    width: 22, height: 22, borderRadius: 6, borderWidth: 2,
+  },
+  confirmText: {
+    fontSize: 13, fontFamily: "Inter_700Bold", color: "#fff", letterSpacing: 1.5,
+  },
 });

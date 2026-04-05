@@ -163,7 +163,7 @@ export default function CustomizeIndexScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={[st.content, { paddingBottom: 100 }]} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[st.content, { paddingBottom: 120 }]} showsVerticalScrollIndicator={false}>
 
           {/* Logo preview + quick links */}
           <View style={[st.previewCard, { backgroundColor: custom.primaryColor + "18", borderColor: custom.primaryColor + "50" }]}>
@@ -289,6 +289,19 @@ export default function CustomizeIndexScreen() {
           </TouchableOpacity>
         </ScrollView>
 
+        {/* ── Sticky save footer ── */}
+        <View style={[st.stickyFooter, { borderTopColor: colors.border, paddingBottom: Platform.OS === "ios" ? insets.bottom + 8 : 16 }]}>
+          <TouchableOpacity
+            onPress={handleSave}
+            style={[st.stickySaveBtn, { backgroundColor: colors.nflBlue }]}
+            disabled={saving}
+            activeOpacity={0.85}
+          >
+            <Feather name="check" size={17} color="#fff" />
+            <Text style={st.stickySaveBtnText}>{saving ? "Saving…" : "Save Changes"}</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Color picker modal */}
         <ColorPickerModal
           visible={pickerFor !== null}
@@ -357,4 +370,7 @@ const st = StyleSheet.create({
   uniformBtnLeft:  { flexDirection: "row", alignItems: "center", gap: 14 },
   uniformBtnTitle: { fontSize: 15, fontFamily: "Inter_700Bold" },
   uniformBtnSub:   { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
+  stickyFooter:    { paddingHorizontal: 16, paddingTop: 12, borderTopWidth: 1 },
+  stickySaveBtn:   { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, height: 52, borderRadius: 14 },
+  stickySaveBtnText: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#fff" },
 });
