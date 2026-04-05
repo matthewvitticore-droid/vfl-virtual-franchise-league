@@ -1,35 +1,44 @@
 import { Feather } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
 import {
-  Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useNFL } from "@/context/NFLContext";
-import { PlayerCard } from "@/components/PlayerCard";
+import { PlayerStatsModal } from "@/components/PlayerStatsModal";
 import type { Player, NFLPosition, PlayerSeasonStats } from "@/context/types";
 
-type StatTab = "passing" | "rushing" | "receiving" | "defense" | "specTeams" | "records";
-type DefSort = "tackles" | "sacks" | "defensiveINTs" | "passDeflections" | "forcedFumbles";
+// ─── Types ─────────────────────────────────────────────────────────────────────
 
-const POS_COLOR: Record<NFLPosition, string> = {
-  QB:"#E31837", RB:"#FB4F14", WR:"#FFC20E", TE:"#00B5E2", OL:"#8B949E",
-  DE:"#3FB950", DT:"#26A69A", LB:"#1F6FEB", CB:"#6E40C9", S:"#9C27B0",
-  K:"#FF7043", P:"#795548",
-};
+type StatTab = "passing" | "rushing" | "receiving" | "defense" | "specTeams" | "records";
+type SortDir  = "desc" | "asc";
 
 interface PlayerWithTeam extends Player {
-  teamAbbr: string;
-  teamColor: string;
-  teamSecondary: string;
+  teamAbbr: string; teamColor: string; teamSecondary: string; teamId: string;
 }
 
-interface RecordEntry {
-  category: string;
-  value: string;
-  playerName: string;
-  team: string;
-  season?: number;
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+
+const POS_COLOR: Record<NFLPosition, string> = {
+  QB:"#E31837", RB:"#FB4F14", WR:"#FFC20E", TE:"#00B5E2",
+  OL:"#8B949E", DE:"#3FB950", DT:"#26A69A", LB:"#1F6FEB",
+  CB:"#6E40C9", S:"#9C27B0",  K:"#FF7043", P:"#795548",
+};
+
+function shortName(name: string): string {
+  const parts = name.trim().split(" ");
+  if (parts.length < 2) return name;
+  return `${parts[0][0]}. ${parts.slice(1).join(" ")}`;
+}
+
+function fmtStat(v: number, decimals = 0): string {
+  if (v === 0) return "—";
+  return decimals > 0 ? v.toFixed(decimals) : v.toLocaleString();
+}
+
+function pct(n: number, d: number): string {
+  return d === 0 ? "—" : `${((n / d) * 100).toFixed(1)}`;
 }
 
 function ovrColor(v: number) {
@@ -39,89 +48,311 @@ function ovrColor(v: number) {
   return "#E31837";
 }
 
+// ─── Column config ─────────────────────────────────────────────────────────────
+
+interface ColDef<K extends string = string> {
+  key: K; header: string; width: number;
+  get: (s: PlayerSeasonStats, p: PlayerWithTeam) => number;
+  fmt: (s: PlayerSeasonStats, p: PlayerWithTeam) => string;
+  accent?: boolean;
+}
+
+const PASSING_COLS: ColDef[] = [
+  { key:"passingYards",    header:"YDS",   width:52, accent:true,
+    get:(s)=>s.passingYards,    fmt:(s)=>fmtStat(s.passingYards) },
+  { key:"cmpPct",          header:"CMP%",  width:52,
+    get:(s)=>s.attempts>0?s.completions/s.attempts:0, fmt:(s)=>pct(s.completions,s.attempts) },
+  { key:"passingTDs",      header:"TD",    width:40,
+    get:(s)=>s.passingTDs,      fmt:(s)=>fmtStat(s.passingTDs) },
+  { key:"interceptions",   header:"INT",   width:40,
+    get:(s)=>-s.interceptions,  fmt:(s)=>fmtStat(s.interceptions) },
+  { key:"qbRating",        header:"RTG",   width:48,
+    get:(s)=>s.qbRating,        fmt:(s)=>s.qbRating>0?s.qbRating.toFixed(1):"—" },
+  { key:"attempts",        header:"ATT",   width:44,
+    get:(s)=>s.attempts,        fmt:(s)=>fmtStat(s.attempts) },
+  { key:"completions",     header:"CMP",   width:44,
+    get:(s)=>s.completions,     fmt:(s)=>fmtStat(s.completions) },
+];
+
+const RUSHING_COLS: ColDef[] = [
+  { key:"rushingYards",    header:"YDS",   width:52, accent:true,
+    get:(s)=>s.rushingYards,    fmt:(s)=>fmtStat(s.rushingYards) },
+  { key:"carries",         header:"CAR",   width:44,
+    get:(s)=>s.carries,         fmt:(s)=>fmtStat(s.carries) },
+  { key:"ypc",             header:"YPC",   width:44,
+    get:(s)=>s.carries>0?s.rushingYards/s.carries:0, fmt:(s)=>s.carries>0?(s.rushingYards/s.carries).toFixed(1):"—" },
+  { key:"rushingTDs",      header:"TD",    width:40,
+    get:(s)=>s.rushingTDs,      fmt:(s)=>fmtStat(s.rushingTDs) },
+];
+
+const RECEIVING_COLS: ColDef[] = [
+  { key:"receivingYards",  header:"YDS",   width:52, accent:true,
+    get:(s)=>s.receivingYards,  fmt:(s)=>fmtStat(s.receivingYards) },
+  { key:"receptions",      header:"REC",   width:44,
+    get:(s)=>s.receptions,      fmt:(s)=>fmtStat(s.receptions) },
+  { key:"targets",         header:"TGT",   width:44,
+    get:(s)=>s.targets,         fmt:(s)=>fmtStat(s.targets) },
+  { key:"ypr",             header:"YPR",   width:44,
+    get:(s)=>s.receptions>0?s.receivingYards/s.receptions:0, fmt:(s)=>s.receptions>0?(s.receivingYards/s.receptions).toFixed(1):"—" },
+  { key:"receivingTDs",    header:"TD",    width:40,
+    get:(s)=>s.receivingTDs,    fmt:(s)=>fmtStat(s.receivingTDs) },
+];
+
+const DEFENSE_COLS: ColDef[] = [
+  { key:"tackles",         header:"TCK",   width:48, accent:true,
+    get:(s)=>s.tackles,         fmt:(s)=>fmtStat(s.tackles) },
+  { key:"sacks",           header:"SACK",  width:48,
+    get:(s)=>s.sacks,           fmt:(s)=>s.sacks>0?s.sacks.toFixed(1):"—" },
+  { key:"defensiveINTs",   header:"INT",   width:40,
+    get:(s)=>s.defensiveINTs,   fmt:(s)=>fmtStat(s.defensiveINTs) },
+  { key:"passDeflections", header:"PD",    width:40,
+    get:(s)=>s.passDeflections, fmt:(s)=>fmtStat(s.passDeflections) },
+  { key:"forcedFumbles",   header:"FF",    width:40,
+    get:(s)=>s.forcedFumbles,   fmt:(s)=>fmtStat(s.forcedFumbles) },
+];
+
+const SPECTEAMS_COLS: ColDef[] = [
+  { key:"fieldGoalsMade",    header:"FGM",  width:44, accent:true,
+    get:(s)=>s.fieldGoalsMade,      fmt:(s)=>fmtStat(s.fieldGoalsMade) },
+  { key:"fieldGoalsAttempted",header:"FGA", width:44,
+    get:(s)=>s.fieldGoalsAttempted, fmt:(s)=>fmtStat(s.fieldGoalsAttempted) },
+  { key:"fgPct",              header:"FG%", width:48,
+    get:(s)=>s.fieldGoalsAttempted>0?s.fieldGoalsMade/s.fieldGoalsAttempted:0,
+    fmt:(s)=>s.fieldGoalsAttempted>0?pct(s.fieldGoalsMade,s.fieldGoalsAttempted)+"%":"—" },
+  { key:"puntsAverage",       header:"P.AVG",width:52,
+    get:(s)=>s.puntsAverage,        fmt:(s)=>s.puntsAverage>0?s.puntsAverage.toFixed(1):"—" },
+];
+
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
-function SectionLabel({ label, colors }: { label: string; colors: any }) {
+function EmptyMsg({ message }: { message: string }) {
+  const colors = useColors();
   return (
-    <View style={[st.sectionLabel, { backgroundColor: colors.secondary, borderBottomColor: colors.border }]}>
-      <Text style={[st.sectionLabelText, { color: colors.mutedForeground }]}>{label}</Text>
+    <View style={{ alignItems:"center", paddingVertical:48, gap:10 }}>
+      <Feather name="bar-chart-2" size={36} color={colors.border} />
+      <Text style={{ color:colors.mutedForeground, fontFamily:"Inter_600SemiBold", fontSize:14 }}>{message}</Text>
     </View>
   );
 }
 
-function LeaderRow({
-  rank, player, cols, colors, onPress,
+// Sticky sortable column header
+function TableHeader({
+  cols, sortKey, sortDir, onSort, accentColor,
 }: {
-  rank: number; player: PlayerWithTeam; cols: string[]; colors: any; onPress: () => void;
+  cols: ColDef[]; sortKey: string; sortDir: SortDir; onSort:(k:string)=>void; accentColor:string;
 }) {
-  const pc = POS_COLOR[player.position];
-  const isTop3 = rank <= 3;
-  const rankColor = rank === 1 ? "#FFD700" : rank === 2 ? "#C0C0C0" : rank === 3 ? "#CD7F32" : colors.mutedForeground;
+  const colors = useColors();
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.8}
-      style={[st.leaderRow, { backgroundColor: isTop3 ? player.teamColor + "0C" : colors.card, borderBottomColor: colors.border }]}>
-      <Text style={[st.leaderRank, { color: rankColor }]}>{rank}</Text>
-      <View style={[st.posDot, { backgroundColor: pc + "22" }]}>
-        <Text style={[st.posDotText, { color: pc }]}>{player.position}</Text>
+    <View style={[th.row, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+      <Text style={[th.rank, { color: colors.mutedForeground }]}>#</Text>
+      <Text style={[th.playerCol, { color: colors.mutedForeground }]}>PLAYER</Text>
+      {cols.map(c => {
+        const active = c.key === sortKey;
+        return (
+          <TouchableOpacity key={c.key} onPress={() => onSort(c.key)}
+            style={[th.col, { width: c.width }]} activeOpacity={0.7}>
+            <Text style={[th.colText, { color: active ? accentColor : colors.mutedForeground }]}>
+              {c.header}
+            </Text>
+            {active && (
+              <Feather name={sortDir === "desc" ? "chevron-down" : "chevron-up"} size={9} color={accentColor} />
+            )}
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+const th = StyleSheet.create({
+  row:       { flexDirection:"row", alignItems:"center", paddingHorizontal:12, paddingVertical:7,
+                borderBottomWidth:1 },
+  rank:      { width:24, fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.3 },
+  playerCol: { flex:1, fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.3 },
+  col:       { flexDirection:"row", alignItems:"center", justifyContent:"flex-end", gap:1 },
+  colText:   { fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.3 },
+});
+
+// One player stat row
+function StatRow({
+  rank, player, cols, sortKey, accentColor, onPress,
+}: {
+  rank:number; player:PlayerWithTeam; cols:ColDef[];
+  sortKey:string; accentColor:string; onPress:()=>void;
+}) {
+  const colors = useColors();
+  const pc     = POS_COLOR[player.position];
+  const medals = ["#FFD700","#C0C0C0","#CD7F32"];
+  const rankClr = rank <= 3 ? medals[rank-1] : colors.mutedForeground;
+  const isOdd  = rank % 2 === 0;
+
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.75}
+      style={[sr.row, {
+        backgroundColor: isOdd ? colors.card : colors.background,
+        borderBottomColor: colors.border,
+      }]}>
+
+      {/* Rank */}
+      <Text style={[sr.rank, { color: rankClr, fontFamily: rank<=3?"Inter_700Bold":"Inter_500Medium" }]}>
+        {rank <= 3 ? ["🥇","🥈","🥉"][rank-1] : rank}
+      </Text>
+
+      {/* Pos badge + Player name + Team */}
+      <View style={sr.playerCol}>
+        <View style={[sr.posBadge, { backgroundColor: pc+"22", borderColor: pc+"55" }]}>
+          <Text style={[sr.posText, { color: pc }]}>{player.position}</Text>
+        </View>
+        <View style={sr.playerInfo}>
+          <Text style={[sr.name, { color: colors.foreground }]} numberOfLines={1}>
+            {shortName(player.name)}
+          </Text>
+          <Text style={[sr.team, { color: colors.mutedForeground }]}>
+            {player.teamAbbr}{player.jerseyNumber ? ` · #${player.jerseyNumber}` : ""}
+          </Text>
+        </View>
       </View>
-      <View style={{ flex: 1 }}>
-        <Text style={[st.leaderName, { color: colors.foreground }]} numberOfLines={1}>{player.name}</Text>
-        <Text style={[st.leaderTeam, { color: colors.mutedForeground }]}>{player.teamAbbr} · #{player.jerseyNumber ?? "—"}</Text>
-      </View>
-      {cols.map((c, i) => (
-        <Text key={i} style={[st.leaderStat, {
-          color: i === 0 ? ovrColor(player.overall) : colors.foreground,
-          fontFamily: i === 0 ? "Inter_700Bold" : "Inter_600SemiBold",
-        }]}>{c}</Text>
-      ))}
+
+      {/* Stat columns */}
+      {cols.map(c => {
+        const isSorted = c.key === sortKey;
+        const val = c.fmt(player.stats, player);
+        return (
+          <Text key={c.key} style={[sr.stat, {
+            width: c.width,
+            color: isSorted ? accentColor : (val === "—" ? colors.border : colors.foreground),
+            fontFamily: isSorted ? "Inter_700Bold" : "Inter_500Medium",
+          }]}>
+            {val}
+          </Text>
+        );
+      })}
     </TouchableOpacity>
   );
 }
+const sr = StyleSheet.create({
+  row:        { flexDirection:"row", alignItems:"center", paddingHorizontal:12, paddingVertical:9,
+                borderBottomWidth:0.5 },
+  rank:       { width:24, fontSize:12, textAlign:"center" },
+  playerCol:  { flex:1, flexDirection:"row", alignItems:"center", gap:6, minWidth:0, paddingRight:4 },
+  posBadge:   { paddingHorizontal:5, paddingVertical:2, borderRadius:5, borderWidth:1, flexShrink:0 },
+  posText:    { fontSize:8.5, fontFamily:"Inter_700Bold", letterSpacing:0.4 },
+  playerInfo: { flex:1, minWidth:0 },
+  name:       { fontSize:13, fontFamily:"Inter_600SemiBold", letterSpacing:-0.2 },
+  team:       { fontSize:9.5, fontFamily:"Inter_400Regular" },
+  stat:       { textAlign:"right", fontSize:13 },
+});
 
-function ColHeader({ labels, colors }: { labels: string[]; colors: any }) {
+// Team filter pill row
+function TeamFilter({
+  teams, selected, onSelect, accentColor,
+}: {
+  teams:{id:string;abbr:string;color:string}[];
+  selected:string|null;
+  onSelect:(id:string|null)=>void;
+  accentColor:string;
+}) {
+  const colors = useColors();
   return (
-    <View style={[st.colHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-      <Text style={[st.colRank, { color: colors.mutedForeground }]}>#</Text>
-      <View style={{ width: 28 }} />
-      <Text style={[st.colName, { color: colors.mutedForeground }]}>PLAYER</Text>
-      {labels.map((l, i) => (
-        <Text key={i} style={[st.colStat, { color: colors.mutedForeground }]}>{l}</Text>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false}
+      style={{ flexGrow:0, borderBottomWidth:1, borderBottomColor:colors.border }}
+      contentContainerStyle={{ gap:6, paddingHorizontal:12, paddingVertical:8 }}>
+      <TouchableOpacity onPress={() => onSelect(null)}
+        style={[tf.pill, { backgroundColor: !selected ? accentColor : colors.secondary, borderColor: !selected ? accentColor : colors.border }]}>
+        <Text style={[tf.text, { color: !selected ? "#fff" : colors.mutedForeground }]}>All Teams</Text>
+      </TouchableOpacity>
+      {teams.map(t => (
+        <TouchableOpacity key={t.id} onPress={() => onSelect(selected === t.id ? null : t.id)}
+          style={[tf.pill, { backgroundColor: selected===t.id ? t.color+"30" : colors.secondary, borderColor: selected===t.id ? t.color : colors.border }]}>
+          <Text style={[tf.text, { color: selected===t.id ? t.color : colors.mutedForeground }]}>{t.abbr}</Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  );
+}
+const tf = StyleSheet.create({
+  pill: { paddingHorizontal:10, paddingVertical:5, borderRadius:8, borderWidth:1 },
+  text: { fontSize:11, fontFamily:"Inter_600SemiBold" },
+});
+
+// ─── Records section ─────────────────────────────────────────────────────────
+
+type RecordGroup = "pass" | "rush" | "rec" | "def";
+
+interface RecordEntry { rank:number; value:string; rawVal:number; playerName:string; team:string; season?:number; pos:NFLPosition; }
+interface RecordCategory { title:string; entries:RecordEntry[]; }
+
+function RecordList({ cats, accentColor }: { cats:RecordCategory[]; accentColor:string }) {
+  const colors = useColors();
+  return (
+    <View style={{ paddingBottom:20 }}>
+      {cats.map(cat => (
+        <View key={cat.title} style={{ marginBottom:8 }}>
+          {/* Category header */}
+          <View style={[rc.catHeader, { backgroundColor: accentColor+"20", borderLeftColor: accentColor }]}>
+            <Feather name="award" size={11} color={accentColor} />
+            <Text style={[rc.catTitle, { color: accentColor }]}>{cat.title}</Text>
+          </View>
+          {/* Column labels */}
+          <View style={[rc.colRow, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+            <Text style={[rc.colRank,   { color: colors.mutedForeground }]}>#</Text>
+            <Text style={[rc.colPlayer, { color: colors.mutedForeground }]}>PLAYER</Text>
+            <Text style={[rc.colTeam,   { color: colors.mutedForeground }]}>TEAM</Text>
+            <Text style={[rc.colSeason, { color: colors.mutedForeground }]}>YR</Text>
+            <Text style={[rc.colVal,    { color: colors.mutedForeground }]}>VALUE</Text>
+          </View>
+          {cat.entries.length === 0 ? (
+            <View style={{ paddingVertical:12, alignItems:"center" }}>
+              <Text style={{ color:colors.mutedForeground, fontSize:12, fontFamily:"Inter_400Regular" }}>No data yet</Text>
+            </View>
+          ) : cat.entries.map((e, i) => {
+            const pc = POS_COLOR[e.pos];
+            const medals = ["🥇","🥈","🥉"];
+            return (
+              <View key={i} style={[rc.row, {
+                backgroundColor: i % 2 === 0 ? colors.card : colors.background,
+                borderBottomColor: colors.border,
+              }]}>
+                <Text style={[rc.rank, { color: i<3 ? ["#FFD700","#C0C0C0","#CD7F32"][i] : colors.mutedForeground }]}>
+                  {i < 3 ? medals[i] : e.rank}
+                </Text>
+                <View style={[rc.posBadge, { backgroundColor: pc+"22", borderColor: pc+"55" }]}>
+                  <Text style={[rc.posText, { color: pc }]}>{e.pos}</Text>
+                </View>
+                <Text style={[rc.player, { color: colors.foreground }]} numberOfLines={1}>{shortName(e.playerName)}</Text>
+                <Text style={[rc.team,   { color: colors.mutedForeground }]}>{e.team}</Text>
+                <Text style={[rc.season, { color: colors.mutedForeground }]}>{e.season ?? "—"}</Text>
+                <Text style={[rc.val,    { color: accentColor }]}>{e.value}</Text>
+              </View>
+            );
+          })}
+        </View>
       ))}
     </View>
   );
 }
+const rc = StyleSheet.create({
+  catHeader: { flexDirection:"row", alignItems:"center", gap:6, paddingHorizontal:12, paddingVertical:8,
+               borderLeftWidth:3, marginTop:12 },
+  catTitle:  { fontSize:11, fontFamily:"Inter_700Bold", letterSpacing:0.8, flex:1 },
+  colRow:    { flexDirection:"row", alignItems:"center", paddingHorizontal:12, paddingVertical:5,
+               borderBottomWidth:1 },
+  colRank:   { width:28, fontSize:8.5, fontFamily:"Inter_700Bold" },
+  colPlayer: { flex:1, fontSize:8.5, fontFamily:"Inter_700Bold" },
+  colTeam:   { width:40, fontSize:8.5, fontFamily:"Inter_700Bold" },
+  colSeason: { width:36, fontSize:8.5, fontFamily:"Inter_700Bold", textAlign:"right" },
+  colVal:    { width:60, fontSize:8.5, fontFamily:"Inter_700Bold", textAlign:"right" },
+  row:       { flexDirection:"row", alignItems:"center", paddingHorizontal:12, paddingVertical:8,
+               borderBottomWidth:0.5, gap:6 },
+  rank:      { width:22, fontSize:12, textAlign:"center" },
+  posBadge:  { paddingHorizontal:5, paddingVertical:2, borderRadius:5, borderWidth:1 },
+  posText:   { fontSize:8, fontFamily:"Inter_700Bold" },
+  player:    { flex:1, fontSize:13, fontFamily:"Inter_600SemiBold", letterSpacing:-0.2 },
+  team:      { width:34, fontSize:11, fontFamily:"Inter_500Medium" },
+  season:    { width:36, fontSize:11, fontFamily:"Inter_500Medium", textAlign:"right" },
+  val:       { width:60, fontSize:14, fontFamily:"Inter_700Bold", textAlign:"right" },
+});
 
-function EmptyStatsMsg({ colors }: { colors: any }) {
-  return (
-    <View style={st.emptyBox}>
-      <Feather name="bar-chart-2" size={32} color={colors.mutedForeground} />
-      <Text style={[st.emptyTitle, { color: colors.foreground }]}>No stats yet</Text>
-      <Text style={[st.emptySub, { color: colors.mutedForeground }]}>Simulate games to see leaderboards populate</Text>
-    </View>
-  );
-}
-
-function RecordRow({ r, idx, colors }: { r: RecordEntry; idx: number; colors: any }) {
-  const noData = r.value === "—";
-  return (
-    <View style={[st.recordRow, { backgroundColor: idx % 2 === 0 ? colors.card : colors.background, borderBottomColor: colors.border }]}>
-      <View style={{ flex: 1 }}>
-        <Text style={[st.recordCategory, { color: colors.mutedForeground }]}>{r.category}</Text>
-        <Text style={[st.recordPlayer, { color: noData ? colors.mutedForeground : colors.foreground }]}>
-          {noData ? "No data yet" : `${r.playerName} · ${r.team}`}
-        </Text>
-      </View>
-      <View>
-        <Text style={[st.recordValue, { color: noData ? colors.mutedForeground : colors.nflGold }]}>{r.value}</Text>
-        {r.season && !noData && (
-          <Text style={[st.recordSeason, { color: colors.mutedForeground }]}>Season {r.season}</Text>
-        )}
-      </View>
-    </View>
-  );
-}
-
-// ─── Main Screen ──────────────────────────────────────────────────────────────
+// ─── Main Screen ───────────────────────────────────────────────────────────────
 
 export default function StatsScreen() {
   const colors = useColors();
@@ -129,456 +360,275 @@ export default function StatsScreen() {
   const { season } = useNFL();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
-  const [tab, setTab] = useState<StatTab>("passing");
-  const [defSort, setDefSort] = useState<DefSort>("tackles");
-  const [selectedPlayer, setSelectedPlayer] = useState<PlayerWithTeam | null>(null);
+  const [tab,        setTab]        = useState<StatTab>("passing");
+  const [teamFilter, setTeamFilter] = useState<string | null>(null);
+  const [sortKey,    setSortKey]    = useState<Record<StatTab, string>>({
+    passing:"passingYards", rushing:"rushingYards", receiving:"receivingYards",
+    defense:"tackles", specTeams:"fieldGoalsMade", records:"pass",
+  });
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [recordGroup, setRecordGroup] = useState<RecordGroup>("pass");
+  const [modalPlayer, setModalPlayer] = useState<PlayerWithTeam | null>(null);
 
+  // Build full player list with team metadata
   const allPlayers = useMemo<PlayerWithTeam[]>(() => {
     if (!season) return [];
     return season.teams.flatMap(t =>
       t.roster.map(p => ({
         ...p,
-        teamAbbr: t.abbreviation,
-        teamColor: t.primaryColor,
-        teamSecondary: t.secondaryColor,
+        teamAbbr: t.abbreviation, teamColor: t.primaryColor,
+        teamSecondary: t.secondaryColor, teamId: t.id,
       }))
     );
   }, [season]);
 
+  const teamList = useMemo(() =>
+    (season?.teams ?? []).map(t => ({ id:t.id, abbr:t.abbreviation, color:t.primaryColor }))
+      .sort((a,b) => a.abbr.localeCompare(b.abbr)),
+    [season]
+  );
+
   const gamesPlayed = season?.games.filter(g => g.status === "final").length ?? 0;
+  const teamColor   = season?.teams.find(t => t.id === season.playerTeamId)?.primaryColor ?? colors.nflBlue;
 
-  const passing = useMemo(() =>
-    allPlayers.filter(p => p.position === "QB" && (p.stats.attempts > 0 || p.stats.passingYards > 0))
-      .sort((a, b) => b.stats.passingYards - a.stats.passingYards).slice(0, 25),
-    [allPlayers]
-  );
-  const rushing = useMemo(() =>
-    allPlayers.filter(p => ["QB","RB","WR"].includes(p.position) && p.stats.rushingYards > 0)
-      .sort((a, b) => b.stats.rushingYards - a.stats.rushingYards).slice(0, 25),
-    [allPlayers]
-  );
-  const receiving = useMemo(() =>
-    allPlayers.filter(p => ["RB","WR","TE"].includes(p.position) && p.stats.receivingYards > 0)
-      .sort((a, b) => b.stats.receivingYards - a.stats.receivingYards).slice(0, 25),
-    [allPlayers]
-  );
-  const defense = useMemo(() => {
-    const base = allPlayers.filter(p => ["DE","DT","LB","CB","S"].includes(p.position));
-    return [...base].sort((a, b) => b.stats[defSort] - a.stats[defSort]).slice(0, 25);
-  }, [allPlayers, defSort]);
+  // Filtered + sorted helpers
+  function buildList(
+    cols: ColDef[],
+    filter: (p: PlayerWithTeam) => boolean,
+    activeKey: string,
+  ): PlayerWithTeam[] {
+    const key = activeKey;
+    const col = cols.find(c => c.key === key) ?? cols[0];
+    let players = allPlayers.filter(filter);
+    if (teamFilter) players = players.filter(p => p.teamId === teamFilter);
+    return [...players]
+      .filter(p => cols.some(c => c.get(p.stats, p) !== 0))
+      .sort((a, b) => {
+        const av = col.get(a.stats, a);
+        const bv = col.get(b.stats, b);
+        return sortDir === "desc" ? bv - av : av - bv;
+      })
+      .slice(0, 50);
+  }
 
-  const specTeams = useMemo(() =>
-    allPlayers.filter(p => ["K","P"].includes(p.position))
-      .sort((a, b) => b.stats.fieldGoalsMade + b.stats.puntsAverage - (a.stats.fieldGoalsMade + a.stats.puntsAverage))
-      .slice(0, 20),
-    [allPlayers]
-  );
+  const passSortKey = sortKey.passing;
+  const rushSortKey = sortKey.rushing;
+  const recSortKey  = sortKey.receiving;
+  const defSortKey  = sortKey.defense;
+  const stSortKey   = sortKey.specTeams;
 
-  const records = useMemo((): RecordEntry[] => {
-    type GetFn = (s: PlayerSeasonStats) => number;
-    function best(
-      category: string, filter: (p: PlayerWithTeam) => boolean, get: GetFn, fmt: (v: number) => string,
-    ): RecordEntry {
-      let bv = 0, bn = "—", bt = "—", bSeason: number | undefined;
+  const passing   = useMemo(() => buildList(PASSING_COLS,   p => p.position==="QB", passSortKey),   [allPlayers, teamFilter, passSortKey, sortDir]);
+  const rushing   = useMemo(() => buildList(RUSHING_COLS,   p => ["RB","QB","WR"].includes(p.position) && p.stats.carries>0, rushSortKey), [allPlayers, teamFilter, rushSortKey, sortDir]);
+  const receiving = useMemo(() => buildList(RECEIVING_COLS, p => ["WR","TE","RB"].includes(p.position) && p.stats.targets>0, recSortKey),  [allPlayers, teamFilter, recSortKey, sortDir]);
+  const defense   = useMemo(() => buildList(DEFENSE_COLS,   p => ["DE","DT","LB","CB","S"].includes(p.position), defSortKey), [allPlayers, teamFilter, defSortKey, sortDir]);
+  const specTeams = useMemo(() => buildList(SPECTEAMS_COLS, p => ["K","P"].includes(p.position), stSortKey), [allPlayers, teamFilter, stSortKey, sortDir]);
+
+  function handleSort(tabKey: StatTab, key: string) {
+    setSortKey(prev => {
+      const cur = prev[tabKey];
+      if (cur === key) {
+        setSortDir(d => d === "desc" ? "asc" : "desc");
+        return prev;
+      }
+      setSortDir("desc");
+      return { ...prev, [tabKey]: key };
+    });
+  }
+
+  // ── Records ────────────────────────────────────────────────────────────────
+
+  const recordCats = useMemo((): Record<RecordGroup, RecordCategory[]> => {
+    type RawEntry = RecordEntry;
+    function top25(
+      filter: (p:PlayerWithTeam)=>boolean,
+      get: (s:PlayerSeasonStats)=>number,
+      fmt: (v:number)=>string,
+      pos?: NFLPosition,
+    ): RecordEntry[] {
+      const entries: { val:number; name:string; team:string; season?:number; pos:NFLPosition }[] = [];
       for (const p of allPlayers) {
         if (!filter(p)) continue;
+        // Current season
+        const cv = get(p.stats);
+        if (cv > 0) entries.push({ val:cv, name:p.name, team:p.teamAbbr, season:p.stats.season, pos:p.position });
+        // Career seasons
         for (const cs of p.careerStats) {
           const v = get(cs);
-          if (v > bv) { bv = v; bn = p.name; bt = p.teamAbbr; bSeason = cs.season; }
+          if (v > 0) entries.push({ val:v, name:p.name, team:p.teamAbbr, season:cs.season, pos:p.position });
         }
-        const cv = get(p.stats);
-        if (cv > bv && gamesPlayed > 0) { bv = cv; bn = p.name; bt = p.teamAbbr; bSeason = p.stats.season; }
       }
-      return { category, value: bv > 0 ? fmt(bv) : "—", playerName: bn, team: bt, season: bSeason };
+      return entries
+        .sort((a,b) => b.val - a.val)
+        .slice(0, 25)
+        .map((e,i) => ({ rank:i+1, value:fmt(e.val), rawVal:e.val, playerName:e.name, team:e.team, season:e.season, pos:e.pos }));
     }
-    return [
-      best("Pass Yards (Season)",  p => p.position === "QB",                              s => s.passingYards,    v => v.toLocaleString()),
-      best("Pass TDs (Season)",    p => p.position === "QB",                              s => s.passingTDs,      v => String(v)),
-      best("QB Rating (Season)",   p => p.position === "QB",                              s => s.qbRating,        v => String(v)),
-      best("Completions (Season)", p => p.position === "QB",                              s => s.completions,     v => String(v)),
-      best("Rush Yards (Season)",  p => ["RB","QB"].includes(p.position),                 s => s.rushingYards,    v => v.toLocaleString()),
-      best("Rush TDs (Season)",    p => ["RB","QB"].includes(p.position),                 s => s.rushingTDs,      v => String(v)),
-      best("Rush Avg (Season)",    p => p.position === "RB",                              s => s.yardsPerCarry,   v => v.toFixed(1)),
-      best("Rec Yards (Season)",   p => ["WR","TE","RB"].includes(p.position),            s => s.receivingYards,  v => v.toLocaleString()),
-      best("Receptions (Season)",  p => ["WR","TE","RB"].includes(p.position),            s => s.receptions,      v => String(v)),
-      best("Rec TDs (Season)",     p => ["WR","TE","RB"].includes(p.position),            s => s.receivingTDs,    v => String(v)),
-      best("Sacks (Season)",       p => ["DE","DT","LB"].includes(p.position),            s => s.sacks,           v => v.toFixed(1)),
-      best("Tackles (Season)",     p => ["LB","CB","S"].includes(p.position),             s => s.tackles,         v => String(v)),
-      best("Interceptions (Season)", p => ["CB","S","LB"].includes(p.position),           s => s.defensiveINTs,   v => String(v)),
-      best("Pass Deflections (Season)", p => ["CB","S"].includes(p.position),             s => s.passDeflections, v => String(v)),
-    ];
+
+    return {
+      pass: [
+        { title:"Passing Yards — Single Season",   entries: top25(p=>p.position==="QB", s=>s.passingYards,  v=>v.toLocaleString()) },
+        { title:"Passing TDs — Single Season",     entries: top25(p=>p.position==="QB", s=>s.passingTDs,    v=>String(v)) },
+        { title:"QB Rating — Single Season",       entries: top25(p=>p.position==="QB", s=>s.qbRating,      v=>v.toFixed(1)) },
+        { title:"Completions — Single Season",     entries: top25(p=>p.position==="QB", s=>s.completions,   v=>String(v)) },
+        { title:"Interceptions Thrown — Season",   entries: top25(p=>p.position==="QB", s=>s.interceptions, v=>String(v)) },
+      ],
+      rush: [
+        { title:"Rushing Yards — Single Season",   entries: top25(p=>["RB","QB"].includes(p.position), s=>s.rushingYards,  v=>v.toLocaleString()) },
+        { title:"Rushing TDs — Single Season",     entries: top25(p=>["RB","QB"].includes(p.position), s=>s.rushingTDs,    v=>String(v)) },
+        { title:"Rushing Attempts — Season",       entries: top25(p=>["RB","QB"].includes(p.position), s=>s.carries,       v=>String(v)) },
+        { title:"Yards Per Carry — Season (20+ carries)", entries: top25(p=>p.position==="RB"&&p.stats.carries>=20, s=>s.carries>0?s.rushingYards/s.carries:0, v=>v.toFixed(2)) },
+      ],
+      rec: [
+        { title:"Receiving Yards — Single Season", entries: top25(p=>["WR","TE","RB"].includes(p.position), s=>s.receivingYards,  v=>v.toLocaleString()) },
+        { title:"Receptions — Single Season",      entries: top25(p=>["WR","TE","RB"].includes(p.position), s=>s.receptions,      v=>String(v)) },
+        { title:"Receiving TDs — Single Season",   entries: top25(p=>["WR","TE","RB"].includes(p.position), s=>s.receivingTDs,    v=>String(v)) },
+        { title:"Yards Per Reception — Season (20+ rec)", entries: top25(p=>["WR","TE"].includes(p.position)&&p.stats.receptions>=20, s=>s.receptions>0?s.receivingYards/s.receptions:0, v=>v.toFixed(2)) },
+      ],
+      def: [
+        { title:"Tackles — Single Season",         entries: top25(p=>["LB","CB","S","DE","DT"].includes(p.position), s=>s.tackles,         v=>String(v)) },
+        { title:"Sacks — Single Season",           entries: top25(p=>["DE","DT","LB"].includes(p.position),          s=>s.sacks,           v=>v.toFixed(1)) },
+        { title:"Interceptions — Single Season",   entries: top25(p=>["CB","S","LB"].includes(p.position),           s=>s.defensiveINTs,   v=>String(v)) },
+        { title:"Pass Deflections — Season",       entries: top25(p=>["CB","S"].includes(p.position),                s=>s.passDeflections, v=>String(v)) },
+        { title:"Forced Fumbles — Season",         entries: top25(p=>["DE","LB","CB","S"].includes(p.position),      s=>s.forcedFumbles,   v=>String(v)) },
+      ],
+    };
   }, [allPlayers]);
 
-  const TABS: { key: StatTab; label: string; icon: string }[] = [
-    { key:"passing",   label:"Pass",    icon:"send"        },
-    { key:"rushing",   label:"Rush",    icon:"zap"         },
-    { key:"receiving", label:"Rec",     icon:"target"      },
-    { key:"defense",   label:"Def",     icon:"shield"      },
-    { key:"specTeams", label:"ST",      icon:"star"        },
-    { key:"records",   label:"Records", icon:"award"       },
+  // ── Tab config ─────────────────────────────────────────────────────────────
+
+  const TABS: { key:StatTab; label:string; icon:any }[] = [
+    { key:"passing",   label:"Passing",   icon:"send"    },
+    { key:"rushing",   label:"Rushing",   icon:"zap"     },
+    { key:"receiving", label:"Receiving", icon:"target"  },
+    { key:"defense",   label:"Defense",   icon:"shield"  },
+    { key:"specTeams", label:"Spec Teams",icon:"star"    },
+    { key:"records",   label:"Records",   icon:"award"   },
   ];
 
-  const DEF_SORTS: { key: DefSort; label: string }[] = [
-    { key:"tackles",         label:"TKL"  },
-    { key:"sacks",           label:"SCK"  },
-    { key:"defensiveINTs",   label:"INT"  },
-    { key:"passDeflections", label:"PD"   },
-    { key:"forcedFumbles",   label:"FF"   },
+  const RECORD_GROUPS: { key:RecordGroup; label:string }[] = [
+    { key:"pass", label:"Passing" },
+    { key:"rush", label:"Rushing" },
+    { key:"rec",  label:"Receiving" },
+    { key:"def",  label:"Defense" },
   ];
 
-  const teamColor = season?.teams.find(t => t.id === season.playerTeamId)?.primaryColor ?? colors.nflBlue;
+  const currentCols: ColDef[] = tab==="passing" ? PASSING_COLS : tab==="rushing" ? RUSHING_COLS :
+    tab==="receiving" ? RECEIVING_COLS : tab==="defense" ? DEFENSE_COLS : SPECTEAMS_COLS;
+  const currentList = tab==="passing" ? passing : tab==="rushing" ? rushing :
+    tab==="receiving" ? receiving : tab==="defense" ? defense : specTeams;
+  const currentSortKey = sortKey[tab];
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Header */}
-      <View style={[st.header, { paddingTop: topPad + 8, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <View style={st.headerTop}>
+    <View style={{ flex:1, backgroundColor:colors.background }}>
+
+      {/* ── Header ── */}
+      <View style={[hd.wrap, { paddingTop:topPad+8, backgroundColor:colors.card, borderBottomColor:colors.border }]}>
+        <View style={hd.top}>
           <View>
-            <Text style={[st.headerTitle, { color: colors.foreground }]}>League Stats</Text>
-            <Text style={[st.headerSub, { color: colors.mutedForeground }]}>
-              {season ? `Season ${season.year} · ${gamesPlayed} games played` : "No season data"}
+            <Text style={[hd.title, { color:colors.foreground }]}>League Stats</Text>
+            <Text style={[hd.sub,   { color:colors.mutedForeground }]}>
+              {season ? `${season.year} Season · ${gamesPlayed} game${gamesPlayed!==1?"s":""} played` : "No season data"}
             </Text>
           </View>
-          <View style={[st.statsBadge, { backgroundColor: teamColor + "20", borderColor: teamColor + "50" }]}>
-            <Feather name="bar-chart-2" size={14} color={teamColor} />
+          <View style={[hd.badge, { backgroundColor:teamColor+"22", borderColor:teamColor+"55" }]}>
+            <Feather name="bar-chart-2" size={15} color={teamColor} />
           </View>
         </View>
-        {/* Tab pills */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingHorizontal: 16, paddingBottom: 12 }}>
+        {/* Category tabs */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap:6, paddingHorizontal:12, paddingBottom:10 }}>
           {TABS.map(t => (
             <TouchableOpacity key={t.key} onPress={() => setTab(t.key)}
-              style={[st.tabBtn, { backgroundColor: tab === t.key ? teamColor : colors.secondary, borderColor: tab === t.key ? teamColor : colors.border }]}>
-              <Feather name={t.icon as any} size={11} color={tab === t.key ? "#fff" : colors.mutedForeground} />
-              <Text style={[st.tabLabel, { color: tab === t.key ? "#fff" : colors.mutedForeground }]}>{t.label}</Text>
+              style={[hd.tabBtn, { backgroundColor:tab===t.key?teamColor:colors.secondary, borderColor:tab===t.key?teamColor:colors.border }]}>
+              <Feather name={t.icon} size={11} color={tab===t.key?"#fff":colors.mutedForeground} />
+              <Text style={[hd.tabLabel, { color:tab===t.key?"#fff":colors.mutedForeground }]}>{t.label}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+      {/* ── Team filter (not for records) ── */}
+      {tab !== "records" && (
+        <TeamFilter teams={teamList} selected={teamFilter} onSelect={setTeamFilter} accentColor={teamColor} />
+      )}
 
-        {/* ── PASSING ── */}
-        {tab === "passing" && (
-          <View>
-            <ColHeader labels={["YDS","TD","INT","RTG"]} colors={colors} />
-            {passing.length === 0 ? <EmptyStatsMsg colors={colors} /> : passing.map((p, i) => (
-              <LeaderRow key={p.id} rank={i+1} player={p}
-                cols={[p.stats.passingYards.toString(), p.stats.passingTDs.toString(), p.stats.interceptions.toString(), p.stats.qbRating.toString()]}
-                colors={colors} onPress={() => setSelectedPlayer(p)} />
-            ))}
-          </View>
-        )}
+      {/* ── Body ── */}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom:100 }}
+        stickyHeaderIndices={tab !== "records" ? [0] : []}>
 
-        {/* ── RUSHING ── */}
-        {tab === "rushing" && (
+        {tab !== "records" ? (
+          <>
+            {/* Sticky sortable header */}
+            <TableHeader
+              cols={currentCols}
+              sortKey={currentSortKey}
+              sortDir={sortDir}
+              onSort={k => handleSort(tab, k)}
+              accentColor={teamColor}
+            />
+            {/* Rows */}
+            {currentList.length === 0
+              ? <EmptyMsg message={gamesPlayed===0 ? "Simulate games to populate stats" : teamFilter ? "No stats for this team yet" : "No stats yet"} />
+              : currentList.map((p,i) => (
+                <StatRow
+                  key={p.id} rank={i+1} player={p}
+                  cols={currentCols} sortKey={currentSortKey}
+                  accentColor={teamColor}
+                  onPress={() => setModalPlayer(p)}
+                />
+              ))
+            }
+          </>
+        ) : (
+          /* Records */
           <View>
-            <ColHeader labels={["YDS","AVG","TD","CAR"]} colors={colors} />
-            {rushing.length === 0 ? <EmptyStatsMsg colors={colors} /> : rushing.map((p, i) => (
-              <LeaderRow key={p.id} rank={i+1} player={p}
-                cols={[p.stats.rushingYards.toString(), p.stats.yardsPerCarry.toFixed(1), p.stats.rushingTDs.toString(), p.stats.carries.toString()]}
-                colors={colors} onPress={() => setSelectedPlayer(p)} />
-            ))}
-          </View>
-        )}
-
-        {/* ── RECEIVING ── */}
-        {tab === "receiving" && (
-          <View>
-            <ColHeader labels={["YDS","AVG","TD","REC"]} colors={colors} />
-            {receiving.length === 0 ? <EmptyStatsMsg colors={colors} /> : receiving.map((p, i) => (
-              <LeaderRow key={p.id} rank={i+1} player={p}
-                cols={[p.stats.receivingYards.toString(), p.stats.yardsPerCatch.toFixed(1), p.stats.receivingTDs.toString(), p.stats.receptions.toString()]}
-                colors={colors} onPress={() => setSelectedPlayer(p)} />
-            ))}
-          </View>
-        )}
-
-        {/* ── DEFENSE ── */}
-        {tab === "defense" && (
-          <View>
-            {/* Sort sub-tabs */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 6, padding: 10 }} style={{ flexGrow: 0, backgroundColor: colors.card, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-              {DEF_SORTS.map(s => (
-                <TouchableOpacity key={s.key} onPress={() => setDefSort(s.key)}
-                  style={[st.subTab, { backgroundColor: defSort === s.key ? colors.nflRed + "30" : colors.secondary, borderColor: defSort === s.key ? colors.nflRed : colors.border }]}>
-                  <Text style={[st.subTabText, { color: defSort === s.key ? colors.nflRed : colors.mutedForeground }]}>{s.label}</Text>
+            {/* Record group sub-tabs */}
+            <View style={[rec.tabBar, { backgroundColor:colors.card, borderBottomColor:colors.border }]}>
+              {RECORD_GROUPS.map(g => (
+                <TouchableOpacity key={g.key} onPress={() => setRecordGroup(g.key)}
+                  style={[rec.groupBtn, { borderBottomColor: recordGroup===g.key ? teamColor : "transparent" }]}>
+                  <Text style={[rec.groupLabel, { color: recordGroup===g.key ? teamColor : colors.mutedForeground }]}>
+                    {g.label}
+                  </Text>
                 </TouchableOpacity>
               ))}
-            </ScrollView>
-            <ColHeader labels={["TKL","SCK","INT","PD","FF"]} colors={colors} />
-            {defense.length === 0 ? <EmptyStatsMsg colors={colors} /> : defense.map((p, i) => (
-              <LeaderRow key={p.id} rank={i+1} player={p}
-                cols={[p.stats.tackles.toString(), p.stats.sacks.toFixed(1), p.stats.defensiveINTs.toString(), p.stats.passDeflections.toString(), p.stats.forcedFumbles.toString()]}
-                colors={colors} onPress={() => setSelectedPlayer(p)} />
-            ))}
-          </View>
-        )}
-
-        {/* ── SPECIAL TEAMS ── */}
-        {tab === "specTeams" && (
-          <View>
-            <ColHeader labels={["FGM","FGA","FG%","AVG"]} colors={colors} />
-            {specTeams.length === 0 ? <EmptyStatsMsg colors={colors} /> : specTeams.map((p, i) => {
-              const fgPct = p.stats.fieldGoalsAttempted > 0
-                ? Math.round((p.stats.fieldGoalsMade / p.stats.fieldGoalsAttempted) * 100)
-                : 0;
-              return (
-                <LeaderRow key={p.id} rank={i+1} player={p}
-                  cols={[p.stats.fieldGoalsMade.toString(), p.stats.fieldGoalsAttempted.toString(), `${fgPct}%`, p.stats.puntsAverage.toFixed(1)]}
-                  colors={colors} onPress={() => setSelectedPlayer(p)} />
-              );
-            })}
-          </View>
-        )}
-
-        {/* ── RECORDS ── */}
-        {tab === "records" && (
-          <View>
-            <View style={[st.recordsHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-              <Feather name="award" size={14} color={colors.nflGold} />
-              <Text style={[st.recordsTitle, { color: colors.foreground }]}>All-Time Single Season Records</Text>
             </View>
             {gamesPlayed === 0 ? (
-              <View style={st.emptyBox}>
-                <Feather name="clock" size={32} color={colors.mutedForeground} />
-                <Text style={[st.emptyTitle, { color: colors.foreground }]}>No records yet</Text>
-                <Text style={[st.emptySub, { color: colors.mutedForeground }]}>Start simming games to build VFL history</Text>
-              </View>
+              <EmptyMsg message="Start simming games to build VFL history" />
             ) : (
-              records.map((r, i) => <RecordRow key={i} r={r} idx={i} colors={colors} />)
+              <RecordList cats={recordCats[recordGroup]} accentColor={teamColor} />
             )}
           </View>
         )}
-
       </ScrollView>
 
-      {/* Player Card Modal */}
-      <Modal visible={!!selectedPlayer} animationType="slide" transparent onRequestClose={() => setSelectedPlayer(null)}>
-        <View style={st.modalOverlay}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setSelectedPlayer(null)} />
-          <View style={[st.modalSheet, { backgroundColor: colors.background }]}>
-            <View style={[st.modalHandle, { backgroundColor: colors.border }]} />
-            <TouchableOpacity onPress={() => setSelectedPlayer(null)} style={st.modalClose}>
-              <Feather name="x" size={20} color={colors.mutedForeground} />
-            </TouchableOpacity>
-            {selectedPlayer && (
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 60, gap: 16 }}>
-                <PlayerCard
-                  player={selectedPlayer}
-                  teamPrimaryColor={selectedPlayer.teamColor}
-                  teamSecondaryColor={selectedPlayer.teamSecondary}
-                  expanded
-                  showInjury
-                />
-                {/* Season stats card */}
-                <StatsPanel player={selectedPlayer} colors={colors} />
-              </ScrollView>
-            )}
-          </View>
-        </View>
-      </Modal>
+      {/* ── Player Stats Modal ── */}
+      <PlayerStatsModal
+        player={modalPlayer}
+        visible={!!modalPlayer}
+        onClose={() => setModalPlayer(null)}
+        teamPrimaryColor={modalPlayer?.teamColor}
+        gamesPlayedThisSeason={gamesPlayed}
+      />
     </View>
   );
 }
 
-// ─── Stats panel shown inside the player modal ────────────────────────────────
+// ─── Styles ────────────────────────────────────────────────────────────────────
 
-function StatsPanel({ player, colors }: { player: PlayerWithTeam; colors: any }) {
-  const [view, setView] = useState<"season" | "career">("season");
+const hd = StyleSheet.create({
+  wrap:     { paddingHorizontal:0, borderBottomWidth:1 },
+  top:      { flexDirection:"row", alignItems:"center", justifyContent:"space-between",
+              paddingHorizontal:16, marginBottom:10 },
+  title:    { fontSize:20, fontFamily:"Inter_700Bold" },
+  sub:      { fontSize:11, fontFamily:"Inter_400Regular", marginTop:1 },
+  badge:    { width:34, height:34, borderRadius:10, alignItems:"center", justifyContent:"center", borderWidth:1 },
+  tabBtn:   { flexDirection:"row", alignItems:"center", gap:5, paddingHorizontal:12, paddingVertical:7,
+              borderRadius:8, borderWidth:1 },
+  tabLabel: { fontSize:12, fontFamily:"Inter_600SemiBold" },
+});
 
-  const careerTotals = useMemo(() => {
-    const cs = player.careerStats;
-    if (cs.length === 0) return null;
-    return cs.reduce((acc, s) => {
-      acc.gamesPlayed += s.gamesPlayed;
-      acc.passingYards += s.passingYards; acc.passingTDs += s.passingTDs;
-      acc.interceptions += s.interceptions; acc.completions += s.completions; acc.attempts += s.attempts;
-      acc.rushingYards += s.rushingYards; acc.rushingTDs += s.rushingTDs; acc.carries += s.carries;
-      acc.receivingYards += s.receivingYards; acc.receivingTDs += s.receivingTDs;
-      acc.receptions += s.receptions; acc.targets += s.targets;
-      acc.tackles += s.tackles; acc.sacks += s.sacks;
-      acc.forcedFumbles += s.forcedFumbles; acc.defensiveINTs += s.defensiveINTs;
-      acc.passDeflections += s.passDeflections;
-      acc.fieldGoalsMade += s.fieldGoalsMade; acc.fieldGoalsAttempted += s.fieldGoalsAttempted;
-      return acc;
-    }, {
-      gamesPlayed:0, passingYards:0, passingTDs:0, interceptions:0, completions:0, attempts:0,
-      rushingYards:0, rushingTDs:0, carries:0, receivingYards:0, receivingTDs:0, receptions:0, targets:0,
-      tackles:0, sacks:0, forcedFumbles:0, defensiveINTs:0, passDeflections:0,
-      fieldGoalsMade:0, fieldGoalsAttempted:0,
-    });
-  }, [player]);
-
-  const stats = view === "season" ? player.stats : (careerTotals ?? player.stats);
-
-  function StatItem({ label, value }: { label: string; value: string }) {
-    return (
-      <View style={st.statItem}>
-        <Text style={[st.statLabel, { color: colors.mutedForeground }]}>{label}</Text>
-        <Text style={[st.statValue, { color: colors.foreground }]}>{value}</Text>
-      </View>
-    );
-  }
-
-  const pos = player.position;
-  const isQB  = pos === "QB";
-  const isRB  = pos === "RB";
-  const isWRTE = ["WR","TE"].includes(pos);
-  const isDef  = ["DE","DT","LB","CB","S"].includes(pos);
-  const isK   = pos === "K";
-  const isP   = pos === "P";
-
-  return (
-    <View style={[st.statsPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      {/* Header */}
-      <View style={st.statsPanelHeader}>
-        <Text style={[st.statsPanelTitle, { color: colors.foreground }]}>Statistics</Text>
-        <View style={[st.viewToggle, { backgroundColor: colors.secondary }]}>
-          {(["season","career"] as const).map(v => (
-            <TouchableOpacity key={v} onPress={() => setView(v)}
-              style={[st.viewToggleBtn, { backgroundColor: view === v ? colors.nflBlue : "transparent" }]}>
-              <Text style={[st.viewToggleText, { color: view === v ? "#fff" : colors.mutedForeground }]}>
-                {v === "season" ? "Season" : "Career"}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-      {view === "career" && (player.careerStats.length === 0) ? (
-        <Text style={[st.noCareer, { color: colors.mutedForeground }]}>No career stats — rookie season</Text>
-      ) : (
-        <View style={st.statsGrid}>
-          <StatItem label="GP" value={String(stats.gamesPlayed)} />
-          {isQB && <>
-            <StatItem label="CMP" value={`${stats.completions}/${stats.attempts}`} />
-            <StatItem label="YDS" value={stats.passingYards.toLocaleString()} />
-            <StatItem label="TD" value={String(stats.passingTDs)} />
-            <StatItem label="INT" value={String(stats.interceptions)} />
-            <StatItem label="RTG" value={String(stats.qbRating)} />
-            <StatItem label="CMP%" value={stats.attempts > 0 ? `${Math.round(stats.completions/stats.attempts*100)}%` : "—"} />
-            <StatItem label="RU YDS" value={stats.rushingYards.toLocaleString()} />
-          </>}
-          {isRB && <>
-            <StatItem label="CAR" value={String(stats.carries)} />
-            <StatItem label="YDS" value={stats.rushingYards.toLocaleString()} />
-            <StatItem label="AVG" value={stats.yardsPerCarry.toFixed(1)} />
-            <StatItem label="TD" value={String(stats.rushingTDs)} />
-            <StatItem label="REC" value={String(stats.receptions)} />
-            <StatItem label="RE YDS" value={stats.receivingYards.toLocaleString()} />
-            <StatItem label="RE TD" value={String(stats.receivingTDs)} />
-          </>}
-          {isWRTE && <>
-            <StatItem label="TGT" value={String(stats.targets)} />
-            <StatItem label="REC" value={String(stats.receptions)} />
-            <StatItem label="YDS" value={stats.receivingYards.toLocaleString()} />
-            <StatItem label="AVG" value={stats.yardsPerCatch.toFixed(1)} />
-            <StatItem label="TD" value={String(stats.receivingTDs)} />
-          </>}
-          {isDef && <>
-            <StatItem label="TKL" value={String(stats.tackles)} />
-            <StatItem label="SCK" value={stats.sacks.toFixed(1)} />
-            <StatItem label="INT" value={String(stats.defensiveINTs)} />
-            <StatItem label="PD" value={String(stats.passDeflections)} />
-            <StatItem label="FF" value={String(stats.forcedFumbles)} />
-          </>}
-          {isK && <>
-            <StatItem label="FGM" value={String(stats.fieldGoalsMade)} />
-            <StatItem label="FGA" value={String(stats.fieldGoalsAttempted)} />
-            <StatItem label="FG%" value={stats.fieldGoalsAttempted > 0 ? `${Math.round(stats.fieldGoalsMade/stats.fieldGoalsAttempted*100)}%` : "—"} />
-          </>}
-          {isP && <>
-            <StatItem label="AVG" value={stats.puntsAverage.toFixed(1)} />
-          </>}
-        </View>
-      )}
-      {/* Career seasons */}
-      {view === "career" && player.careerStats.length > 0 && (
-        <View style={[st.careerSeasons, { borderTopColor: colors.border }]}>
-          <Text style={[st.careerSeasonsTitle, { color: colors.mutedForeground }]}>SEASON LOG</Text>
-          {[...player.careerStats].reverse().map((cs, i) => (
-            <View key={i} style={[st.careerRow, { borderBottomColor: colors.border }]}>
-              <Text style={[st.careerYr, { color: colors.nflGold }]}>{cs.season ?? "—"}</Text>
-              <Text style={[st.careerGP, { color: colors.mutedForeground }]}>{cs.gamesPlayed}G</Text>
-              <Text style={[st.careerStat, { color: colors.foreground }]}>
-                {isQB && `${cs.passingYards.toLocaleString()} YDS · ${cs.passingTDs} TD · ${cs.interceptions} INT`}
-                {isRB && `${cs.rushingYards.toLocaleString()} RU · ${cs.rushingTDs} TD · ${cs.yardsPerCarry.toFixed(1)} YPC`}
-                {isWRTE && `${cs.receivingYards.toLocaleString()} RE · ${cs.receivingTDs} TD · ${cs.receptions} REC`}
-                {isDef && `${cs.tackles} TKL · ${cs.sacks.toFixed(1)} SCK · ${cs.defensiveINTs} INT`}
-                {isK && `${cs.fieldGoalsMade}/${cs.fieldGoalsAttempted} FG`}
-                {isP && `${cs.puntsAverage.toFixed(1)} AVG`}
-              </Text>
-            </View>
-          ))}
-        </View>
-      )}
-    </View>
-  );
-}
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-const st = StyleSheet.create({
-  header:           { borderBottomWidth: 1, paddingBottom: 0 },
-  headerTop:        { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingBottom: 8 },
-  headerTitle:      { fontSize: 22, fontFamily: "Inter_700Bold" },
-  headerSub:        { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
-  statsBadge:       { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center", borderWidth: 1.5 },
-  tabBtn:           { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
-  tabLabel:         { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-
-  sectionLabel:     { padding: 12, borderBottomWidth: 1 },
-  sectionLabelText: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 0.8 },
-
-  colHeader:        { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1 },
-  colRank:          { width: 24, fontSize: 10, fontFamily: "Inter_600SemiBold" },
-  colName:          { flex: 1, fontSize: 10, fontFamily: "Inter_600SemiBold", letterSpacing: 0.4 },
-  colStat:          { width: 42, textAlign: "center", fontSize: 10, fontFamily: "Inter_600SemiBold" },
-
-  leaderRow:        { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, gap: 8 },
-  leaderRank:       { width: 22, fontSize: 13, fontFamily: "Inter_700Bold", textAlign: "center" },
-  posDot:           { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-  posDotText:       { fontSize: 10, fontFamily: "Inter_700Bold" },
-  leaderName:       { fontSize: 13, fontFamily: "Inter_600SemiBold" },
-  leaderTeam:       { fontSize: 10, fontFamily: "Inter_400Regular", marginTop: 1 },
-  leaderStat:       { width: 42, textAlign: "center", fontSize: 12 },
-
-  subTab:           { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8, borderWidth: 1 },
-  subTabText:       { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-
-  emptyBox:         { alignItems: "center", paddingVertical: 60, gap: 10 },
-  emptyTitle:       { fontSize: 16, fontFamily: "Inter_600SemiBold" },
-  emptySub:         { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center", paddingHorizontal: 40 },
-
-  recordsHeader:    { flexDirection: "row", alignItems: "center", gap: 8, padding: 14, borderBottomWidth: 1 },
-  recordsTitle:     { fontSize: 15, fontFamily: "Inter_700Bold" },
-  recordRow:        { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1 },
-  recordCategory:   { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 0.3, marginBottom: 2 },
-  recordPlayer:     { fontSize: 13, fontFamily: "Inter_400Regular" },
-  recordValue:      { fontSize: 20, fontFamily: "Inter_700Bold", textAlign: "right" },
-  recordSeason:     { fontSize: 10, fontFamily: "Inter_400Regular", textAlign: "right", marginTop: 2 },
-
-  modalOverlay:     { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.7)" },
-  modalSheet:       { borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "92%", paddingTop: 12 },
-  modalHandle:      { width: 40, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 4 },
-  modalClose:       { position: "absolute", right: 16, top: 16, zIndex: 10 },
-
-  statsPanel:       { borderRadius: 16, borderWidth: 1, overflow: "hidden" },
-  statsPanelHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 14, paddingBottom: 10 },
-  statsPanelTitle:  { fontSize: 15, fontFamily: "Inter_700Bold" },
-  viewToggle:       { flexDirection: "row", borderRadius: 8, overflow: "hidden", padding: 2 },
-  viewToggleBtn:    { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 6 },
-  viewToggleText:   { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  noCareer:         { padding: 20, fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center" },
-  statsGrid:        { flexDirection: "row", flexWrap: "wrap", gap: 0, paddingHorizontal: 14, paddingBottom: 14 },
-  statItem:         { width: "33.33%", paddingVertical: 10, paddingHorizontal: 4 },
-  statLabel:        { fontSize: 9, fontFamily: "Inter_600SemiBold", letterSpacing: 0.6, marginBottom: 2 },
-  statValue:        { fontSize: 18, fontFamily: "Inter_700Bold" },
-
-  careerSeasons:    { borderTopWidth: 1, padding: 12 },
-  careerSeasonsTitle:{ fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 0.8, marginBottom: 8 },
-  careerRow:        { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 7, borderBottomWidth: 0.5 },
-  careerYr:         { width: 36, fontSize: 12, fontFamily: "Inter_700Bold" },
-  careerGP:         { width: 26, fontSize: 11, fontFamily: "Inter_400Regular" },
-  careerStat:       { flex: 1, fontSize: 12, fontFamily: "Inter_400Regular" },
+const rec = StyleSheet.create({
+  tabBar:    { flexDirection:"row", borderBottomWidth:1 },
+  groupBtn:  { flex:1, alignItems:"center", paddingVertical:11, borderBottomWidth:2.5 },
+  groupLabel:{ fontSize:13, fontFamily:"Inter_600SemiBold" },
 });
