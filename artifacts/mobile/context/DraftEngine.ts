@@ -266,6 +266,52 @@ const WEAKNESSES_BY_POS: Partial<Record<NFLPosition, string[]>> = {
   P:   ["Field position consistency","Hang time in wind","Return coverage"],
 };
 
+// ─── Combine → Athletic Score (position-weighted) ─────────────────────────────
+
+function combineAthlScore(pos: NFLPosition, c: CombineMeasurables): number {
+  // Derived ratings (same formulas as frontoffice.tsx)
+  const spd = clamp(99 - (c.fortyYardDash - 4.3) * 65, 40, 99);
+  const vertR  = clamp(40 + (c.verticalJump - 22) * 2.565, 40, 99);
+  const broadR = clamp(40 + (c.broadJump - 90) * 1.311, 40, 99);
+  const ath = (vertR + broadR) / 2;
+  const shutR = clamp(99 - (c.shuttleRun - 3.9) * 57, 40, 99);
+  const coneR = clamp(99 - (c.threeCone - 6.4) * 33, 40, 99);
+  const qck = (shutR + coneR) / 2;
+  const str = clamp(c.benchPress * 1.6 + 22, 40, 99);
+  // Arm-length proxy for throw power (QB only, range ~29–37 inches → 40–99)
+  const armR = clamp(40 + (c.armLength - 29) * 7.4, 40, 99);
+
+  switch (pos) {
+    // Skill positions: speed is king, athleticism and quickness round it out
+    case "RB": return spd * 0.45 + ath * 0.30 + qck * 0.25;
+    case "WR": return spd * 0.45 + ath * 0.30 + qck * 0.25;
+    case "CB": return spd * 0.45 + ath * 0.25 + qck * 0.30;
+    case "S":  return spd * 0.40 + ath * 0.25 + qck * 0.25 + str * 0.10;
+    case "TE": return spd * 0.30 + ath * 0.25 + qck * 0.25 + str * 0.20;
+    case "LB": return spd * 0.30 + ath * 0.20 + qck * 0.30 + str * 0.20;
+    // D-line: strength + quickness + first-step speed
+    case "DE": return spd * 0.20 + qck * 0.40 + str * 0.40;
+    case "DT": return str  * 0.55 + qck * 0.30 + ath * 0.15;
+    // O-line: strength dominant
+    case "OL": return str  * 0.60 + ath * 0.20 + qck * 0.20;
+    // QB: arm power + footwork quickness + mobility
+    case "QB": return armR * 0.35 + qck * 0.35 + spd * 0.30;
+    default:   return 70; // K/P: neutral
+  }
+}
+
+// Adjust the raw grade by ±12 pts based on how a prospect's combine
+// measurables compare to an "average" athletic profile (score ≈ 70).
+function adjustGradeForCombine(
+  pos: NFLPosition, rawGrade: number, combine: CombineMeasurables,
+): number {
+  if (combine.didNotParticipate) return rawGrade;
+  const score = combineAthlScore(pos, combine);
+  // Each point above/below 70 shifts the grade by 0.4 pts (max ±12)
+  const adj = Math.round((score - 70) * 0.4);
+  return clamp(rawGrade + adj, 35, 99);
+}
+
 // ─── Grade → Round Projection ─────────────────────────────────────────────────
 
 function gradeToRound(grade: number): number {
@@ -315,9 +361,20 @@ export function generateDraftClass(year: number, count = 252): DraftProspect[] {
     else if (i < 128)  grade = irng(50, 70);   // Day 3
     else               grade = irng(38, 62);   // Late/UDFA
 
-    const projRound = gradeToRound(grade);
-    const projPick = irng(1, 32);
     const dnp = Math.random() < 0.06; // 6% chance didn't participate in combine
+
+    // Generate combine first so athletic profile can refine the grade
+    const combine = generateCombine(pos, grade, dnp);
+    // Adjust grade ±12 pts based on position-specific combine athleticism
+    const finalGrade = adjustGradeForCombine(pos, grade, combine);
+
+    // QB dev-trait bonus: Superstar/X-Factor QBs get a slight grade bump
+    const devTrait = genProspectDevTrait(finalGrade);
+    const devBonus = (devTrait === "X-Factor" ? 3 : devTrait === "Superstar" ? 2 : devTrait === "Star" ? 1 : 0);
+    const adjustedGrade = clamp(finalGrade + devBonus, 35, 99);
+
+    const projRound = gradeToRound(adjustedGrade);
+    const projPick = irng(1, 32);
 
     const numStrengths = irng(2, 4);
     const numWeaknesses = irng(1, 3);
@@ -329,16 +386,16 @@ export function generateDraftClass(year: number, count = 252): DraftProspect[] {
       name: rn(),
       position: pos,
       college: pick(COLLEGES),
-      overallGrade: grade,
-      potential: Math.min(99, grade + irng(0, 15)),
+      overallGrade: adjustedGrade,
+      potential: Math.min(99, adjustedGrade + irng(0, 15)),
       projectedRound: projRound,
       projectedPick: projPick,
       grade: gradeLabel(projRound),
       archetype: pick(ARCHETYPES[pos] ?? ["Prospect"]),
-      developmentTrait: genProspectDevTrait(grade),
-      combine: generateCombine(pos, grade, dnp),
-      collegeStats: generateCollegeStats(pos, grade),
-      accolades: genAccolades(pos, grade),
+      developmentTrait: devTrait,
+      combine,
+      collegeStats: generateCollegeStats(pos, adjustedGrade),
+      accolades: genAccolades(pos, adjustedGrade),
       strengths: picks(strPool, numStrengths),
       weaknesses: picks(wkPool, numWeaknesses),
       isPickedUp: false,
