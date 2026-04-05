@@ -166,48 +166,92 @@ export default function RosterScreen() {
         {tab === "depth" && (
           <View>
             {ALL_POS.map(pos => {
-              const byPos = team.roster.filter(p => p.position === pos).sort((a,b) => a.depthOrder - b.depthOrder);
+              const byPos = team.roster
+                .filter(p => p.position === pos)
+                .sort((a, b) => a.depthOrder - b.depthOrder);
               if (byPos.length === 0) return null;
               const pc = POS_COLOR[pos];
+
+              const movePlayer = (idx: number, dir: "up" | "down") => {
+                const arr = [...byPos];
+                const swap = dir === "up" ? idx - 1 : idx + 1;
+                [arr[idx], arr[swap]] = [arr[swap], arr[idx]];
+                updateDepthOrder(pos, arr.map(pl => pl.id));
+              };
+
               return (
-                <View key={pos} style={{ marginBottom: 2 }}>
-                  <View style={[st.posHeader, { backgroundColor: pc + "15", borderLeftColor: pc }]}>
+                <View key={pos} style={{ marginBottom: 1 }}>
+                  {/* position header */}
+                  <View style={[st.posHeader, { backgroundColor: pc + "18", borderLeftColor: pc }]}>
                     <Text style={[st.posLabel, { color: pc }]}>{pos}</Text>
-                    <Text style={[st.posCount, { color: colors.mutedForeground }]}>{byPos.length} players</Text>
+                    <Text style={[st.posCount, { color: colors.mutedForeground }]}>{byPos.length} deep</Text>
                   </View>
-                  {byPos.map((p, idx) => (
-                    <TouchableOpacity key={p.id} onPress={() => setSelectedPlayer(p)} activeOpacity={0.75}
-                      style={[st.depthRow, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-                      <View style={[st.depthNum, { backgroundColor: idx === 0 ? pc + "25" : colors.secondary }]}>
-                        <Text style={[st.depthNumText, { color: idx === 0 ? pc : colors.mutedForeground }]}>{idx + 1}</Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <View style={st.depthNameRow}>
-                          <Text style={[st.depthName, { color: colors.foreground }]}>{p.name}</Text>
-                          {p.yearsExperience === 0 && (
-                            <View style={[st.rookieBadge]}>
-                              <Text style={st.rookieText}>R</Text>
-                            </View>
-                          )}
-                          {p.developmentTrait !== "Normal" && (
-                            <View style={[st.devTag, { backgroundColor: DEV_COLORS[p.developmentTrait] + "25" }]}>
-                              <Feather name={DEV_ICONS[p.developmentTrait]} size={10} color={DEV_COLORS[p.developmentTrait]} />
-                              <Text style={[st.devText, { color: DEV_COLORS[p.developmentTrait] }]}>{p.developmentTrait}</Text>
-                            </View>
-                          )}
-                          {p.injury && (
-                            <View style={[st.injTag, { backgroundColor: colors.danger + "25" }]}>
-                              <Feather name="alert-circle" size={10} color={colors.danger} />
-                              <Text style={[st.injText, { color: colors.danger }]}>{p.injury.severity} · {p.injury.location}</Text>
-                            </View>
-                          )}
+
+                  {byPos.map((p, idx) => {
+                    const isStarter = idx === 0;
+                    const salaryStr = typeof p.salary === "number" ? p.salary.toFixed(1) : String(p.salary);
+                    return (
+                      <TouchableOpacity key={p.id} onPress={() => setSelectedPlayer(p)} activeOpacity={0.75}
+                        style={[st.depthRow, {
+                          backgroundColor: isStarter ? pc + "12" : colors.card,
+                          borderBottomColor: colors.border,
+                        }]}>
+
+                        {/* slot # */}
+                        <View style={[st.depthNum, { backgroundColor: isStarter ? pc : colors.secondary }]}>
+                          <Text style={[st.depthNumText, { color: isStarter ? "#fff" : colors.mutedForeground }]}>{idx + 1}</Text>
                         </View>
-                        <Text style={[st.depthMeta, { color: colors.mutedForeground }]}>Age {p.age} · {p.yearsExperience}yr exp · ${p.salary}M/yr · {p.contractYears}yr left</Text>
-                      </View>
-                      <OvrBadge value={p.overall} color={pc} />
-                      <Feather name="chevron-right" size={14} color={colors.mutedForeground} style={{ opacity: 0.5 }} />
-                    </TouchableOpacity>
-                  ))}
+
+                        {/* name + badges + meta */}
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <View style={st.depthNameRow}>
+                            <Text style={[st.depthName, { color: isStarter ? colors.foreground : colors.mutedForeground }]} numberOfLines={1}>{p.name}</Text>
+                            {p.yearsExperience === 0 && (
+                              <View style={st.rookieBadge}><Text style={st.rookieText}>R</Text></View>
+                            )}
+                            {p.developmentTrait !== "Normal" && (
+                              <View style={[st.devTag, { backgroundColor: DEV_COLORS[p.developmentTrait] + "25" }]}>
+                                <Text style={[st.devText, { color: DEV_COLORS[p.developmentTrait] }]}>{p.developmentTrait[0]}</Text>
+                              </View>
+                            )}
+                            {p.injury && (
+                              <View style={[st.injTag, { backgroundColor: colors.danger + "25" }]}>
+                                <Feather name="alert-circle" size={8} color={colors.danger} />
+                              </View>
+                            )}
+                          </View>
+                          <Text style={[st.depthMeta, { color: colors.mutedForeground }]} numberOfLines={1}>
+                            {p.age}yo · ${salaryStr}M · {p.contractYears}yr
+                          </Text>
+                        </View>
+
+                        {/* OVR pill */}
+                        <View style={[st.depthOvr, { backgroundColor: pc + "20", borderColor: pc + "50" }]}>
+                          <Text style={[st.depthOvrText, { color: pc }]}>{p.overall}</Text>
+                        </View>
+
+                        {/* up/down controls */}
+                        <View style={st.arrowCol}>
+                          <TouchableOpacity
+                            onPress={e => { e.stopPropagation?.(); movePlayer(idx, "up"); }}
+                            disabled={idx === 0}
+                            style={[st.arrowBtn, { opacity: idx === 0 ? 0.18 : 1 }]}
+                            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                          >
+                            <Feather name="chevron-up" size={15} color={pc} />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={e => { e.stopPropagation?.(); movePlayer(idx, "down"); }}
+                            disabled={idx === byPos.length - 1}
+                            style={[st.arrowBtn, { opacity: idx === byPos.length - 1 ? 0.18 : 1 }]}
+                            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                          >
+                            <Feather name="chevron-down" size={15} color={colors.mutedForeground} />
+                          </TouchableOpacity>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               );
             })}
@@ -465,21 +509,25 @@ const st = StyleSheet.create({
   tabScroll:      {},
   tabBtn:         { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1 },
   tabLabel:       { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  posHeader:      { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 7, borderLeftWidth: 3 },
-  posLabel:       { fontSize: 13, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
-  posCount:       { fontSize: 11, fontFamily: "Inter_400Regular" },
-  depthRow:       { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1 },
-  depthNum:       { width: 26, height: 26, borderRadius: 6, alignItems: "center", justifyContent: "center" },
-  depthNumText:   { fontSize: 13, fontFamily: "Inter_700Bold" },
-  depthNameRow:   { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
-  depthName:      { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  depthMeta:      { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },
-  rookieBadge:    { backgroundColor: "#FF6B35", paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 },
-  rookieText:     { fontSize: 9, fontFamily: "Inter_700Bold", color: "#fff", letterSpacing: 0.5 },
-  devTag:         { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5 },
-  devText:        { fontSize: 9, fontFamily: "Inter_600SemiBold" },
-  injTag:         { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5 },
-  injText:        { fontSize: 9, fontFamily: "Inter_600SemiBold" },
+  posHeader:      { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 4, borderLeftWidth: 3 },
+  posLabel:       { fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.8 },
+  posCount:       { fontSize: 10, fontFamily: "Inter_400Regular" },
+  depthRow:       { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 5, borderBottomWidth: 1 },
+  depthNum:       { width: 20, height: 20, borderRadius: 5, alignItems: "center", justifyContent: "center" },
+  depthNumText:   { fontSize: 10, fontFamily: "Inter_700Bold" },
+  depthNameRow:   { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1 },
+  depthName:      { fontSize: 12, fontFamily: "Inter_600SemiBold", flexShrink: 1 },
+  depthMeta:      { fontSize: 10, fontFamily: "Inter_400Regular", marginTop: 1 },
+  depthOvr:       { width: 32, height: 28, borderRadius: 6, alignItems: "center", justifyContent: "center", borderWidth: 1 },
+  depthOvrText:   { fontSize: 12, fontFamily: "Inter_700Bold" },
+  arrowCol:       { flexDirection: "column", gap: 0, alignItems: "center" },
+  arrowBtn:       { padding: 2 },
+  rookieBadge:    { backgroundColor: "#FF6B35", paddingHorizontal: 4, paddingVertical: 1, borderRadius: 3 },
+  rookieText:     { fontSize: 8, fontFamily: "Inter_700Bold", color: "#fff", letterSpacing: 0.5 },
+  devTag:         { flexDirection: "row", alignItems: "center", paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4 },
+  devText:        { fontSize: 8, fontFamily: "Inter_700Bold" },
+  injTag:         { flexDirection: "row", alignItems: "center", gap: 2, paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4 },
+  injText:        { fontSize: 8, fontFamily: "Inter_600SemiBold" },
   posChip:        { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
   posChipText:    { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   playerCard:     { borderBottomWidth: 1, paddingHorizontal: 16, paddingVertical: 12 },
