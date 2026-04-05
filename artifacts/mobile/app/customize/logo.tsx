@@ -10,34 +10,19 @@ import { LogoCreatorCanvas } from "@/components/LogoCreatorCanvas";
 import { useColors } from "@/hooks/useColors";
 import { useNFL } from "@/context/NFLContext";
 import type {
-  AnimalMascot, LogoFontStyle, LogoType, ShieldStyle, TeamCustomization, TeamLogo,
+  LogoFontStyle, LogoType, ShieldStyle, TeamCustomization, TeamLogo,
 } from "@/context/types";
 
 const LOGO_TYPES: { value: LogoType; label: string; icon: string }[] = [
-  { value: "shield",      label: "Shield",     icon: "shield" },
-  { value: "animal",      label: "Animal",     icon: "feather" },
-  { value: "lettermark",  label: "Lettermark", label2: "A", icon: "type" } as any,
-  { value: "helmet",      label: "Helmet",     icon: "cpu" },
+  { value: "shield",     label: "Shield",     icon: "shield" },
+  { value: "lettermark", label: "Lettermark", icon: "type"   },
 ];
 
 const SHIELD_STYLES: { value: ShieldStyle; label: string }[] = [
-  { value: 1, label: "Classic"  },
+  { value: 1, label: "Classic" },
   { value: 2, label: "Hexagon" },
   { value: 3, label: "Wide"    },
   { value: 4, label: "Tall"    },
-];
-
-const ANIMALS: { value: AnimalMascot; label: string; emoji: string }[] = [
-  { value: "eagle",    label: "Eagle",    emoji: "🦅" },
-  { value: "wolf",     label: "Wolf",     emoji: "🐺" },
-  { value: "bear",     label: "Bear",     emoji: "🐻" },
-  { value: "bull",     label: "Bull",     emoji: "🐂" },
-  { value: "hawk",     label: "Hawk",     emoji: "🦅" },
-  { value: "fox",      label: "Fox",      emoji: "🦊" },
-  { value: "raven",    label: "Raven",    emoji: "🐦" },
-  { value: "stallion", label: "Stallion", emoji: "🐴" },
-  { value: "lion",     label: "Lion",     emoji: "🦁" },
-  { value: "tiger",    label: "Tiger",    emoji: "🐯" },
 ];
 
 const FONT_STYLES: { value: LogoFontStyle; label: string }[] = [
@@ -167,32 +152,6 @@ export default function LogoScreen() {
           </>
         )}
 
-        {/* ── ANIMAL options ── */}
-        {logo.type === "animal" && (
-          <>
-            <Text style={[st.sectionLabel, { color: colors.mutedForeground }]}>MASCOT</Text>
-            <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 14 }]}>
-              <View style={st.animalGrid}>
-                {ANIMALS.map(a => (
-                  <TouchableOpacity
-                    key={a.value}
-                    onPress={() => updateLogo({ mascot: a.value })}
-                    style={[st.animalItem, {
-                      backgroundColor: logo.mascot === a.value ? colors.nflBlue + "25" : colors.background,
-                      borderColor: logo.mascot === a.value ? colors.nflBlue : colors.border,
-                    }]}
-                  >
-                    <Text style={st.animalEmoji}>{a.emoji}</Text>
-                    <Text style={[st.animalLabel, { color: logo.mascot === a.value ? colors.nflBlue : colors.mutedForeground }]}>
-                      {a.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          </>
-        )}
-
         {/* ── LETTERMARK options ── */}
         {logo.type === "lettermark" && (
           <>
@@ -220,24 +179,6 @@ export default function LogoScreen() {
           </>
         )}
 
-        {/* ── HELMET options ── */}
-        {logo.type === "helmet" && (
-          <>
-            <Text style={[st.sectionLabel, { color: colors.mutedForeground }]}>HELMET MARK</Text>
-            <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 14 }]}>
-              <Text style={[st.optLabel, { color: colors.mutedForeground }]}>SIDE LETTERS (1–2 CHARS)</Text>
-              <TextInput
-                value={logo.letter ?? ""}
-                onChangeText={v => updateLogo({ letter: v.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,2) })}
-                style={[st.letterInput, { color: colors.foreground, borderColor: colors.border }]}
-                placeholder="e.g. VF"
-                placeholderTextColor={colors.mutedForeground}
-                maxLength={2}
-                autoCapitalize="characters"
-              />
-            </View>
-          </>
-        )}
       </ScrollView>
 
       <ColorPickerModal
@@ -299,8 +240,4 @@ const st = StyleSheet.create({
   colorSwatch: { width: 28, height: 28, borderRadius: 7, borderWidth: 1, borderColor: "rgba(255,255,255,0.15)" },
   divider:     { height: 1, marginHorizontal: 0, marginVertical: 8 },
   letterInput: { fontSize: 22, fontFamily: "Inter_700Bold", letterSpacing: 4, borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, marginTop: 6, marginBottom: 4 },
-  animalGrid:  { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  animalItem:  { width: "22%", alignItems: "center", paddingVertical: 10, borderRadius: 10, borderWidth: 1.5 },
-  animalEmoji: { fontSize: 26 },
-  animalLabel: { fontSize: 9, fontFamily: "Inter_600SemiBold", marginTop: 4, letterSpacing: 0.3 },
 });
