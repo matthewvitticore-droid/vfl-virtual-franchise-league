@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { useLocalSearchParams } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
   Alert, Platform, ScrollView, StyleSheet, Text, TextInput,
@@ -37,8 +38,9 @@ export default function FrontOfficeScreen() {
   const insets = useSafeAreaInsets();
   const { membership } = useAuth();
   const { season, getPlayerTeam, signFreeAgent, userDraftPick, simulateDraftPick, simPicksUntilUserTurn, unlockScouting, proposeTrade, respondToTrade } = useNFL();
+  const params = useLocalSearchParams<{ tab?: string }>();
   const [isSimming, setIsSimming] = useState(false);
-  const [tab, setTab] = useState<Tab>("freeAgency");
+  const [tab, setTab] = useState<Tab>(() => (params.tab === "draft" || params.tab === "trades") ? params.tab : "freeAgency");
   const [draftView, setDraftView] = useState<DraftView>("board");
   const [posFilter, setPosFilter] = useState<NFLPosition | "ALL">("ALL");
   const [sortKey, setSortKey] = useState<SortKey>("grade");

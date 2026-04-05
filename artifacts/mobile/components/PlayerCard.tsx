@@ -184,8 +184,15 @@ export function PlayerCard({
             </View>
           </View>
 
-          {/* Player name */}
-          <Text style={card.playerName} numberOfLines={1}>{player.name.toUpperCase()}</Text>
+          {/* Player name + rookie badge */}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text style={[card.playerName, { flex: 1 }]} numberOfLines={1}>{player.name.toUpperCase()}</Text>
+            {player.yearsExperience === 0 && (
+              <View style={card.rookieBadge}>
+                <Text style={card.rookieTxt}>R</Text>
+              </View>
+            )}
+          </View>
 
           {/* Accent underline */}
           <LinearGradient
@@ -199,6 +206,12 @@ export function PlayerCard({
             {player.age}yo · {player.yearsExperience}yr
             {role ? ` · ${role}` : player.college ? ` · ${player.college}` : ""}
           </Text>
+          {/* Draft bio */}
+          {!!player.draftYear && (
+            <Text style={card.draftBio} numberOfLines={1}>
+              {player.draftYear} · Rd {player.draftRound} · #{player.draftPick}
+            </Text>
+          )}
 
           {/* Injury banner */}
           {showInjury && player.injury && (
@@ -364,6 +377,17 @@ const card = StyleSheet.create({
   meta: {
     fontSize: 9, fontFamily: "Inter_400Regular",
     color: "rgba(255,255,255,0.42)", marginBottom: 1,
+  },
+  rookieBadge: {
+    backgroundColor: "#FF6B35", paddingHorizontal: 5, paddingVertical: 2,
+    borderRadius: 4, alignSelf: "flex-start",
+  },
+  rookieTxt: {
+    fontSize: 9, fontFamily: "Inter_700Bold", color: "#fff", letterSpacing: 0.5,
+  },
+  draftBio: {
+    fontSize: 8.5, fontFamily: "Inter_600SemiBold",
+    color: "rgba(255,255,255,0.38)", letterSpacing: 0.3, marginBottom: 1,
   },
   injBanner: {
     flexDirection: "row", alignItems: "center", gap: 4,

@@ -27,8 +27,9 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { membership, signOut } = useAuth();
-  const { season, isLoading, isSyncing, syncError, teamCustomization, getPlayerTeam, getWeekGames, simulateWeek, getStandings, toggleCoGMMode, advancePhase } = useNFL();
+  const { season, isLoading, isSyncing, syncError, teamCustomization, getPlayerTeam, getWeekGames, simulateWeek, simulateSeason, getStandings, toggleCoGMMode, advancePhase } = useNFL();
   const [simulating, setSimulating] = useState(false);
+  const [simSeason, setSimSeason] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [advancing, setAdvancing] = useState(false);
   const tickerX = useRef(new Animated.Value(0)).current;
@@ -171,8 +172,8 @@ export default function HomeScreen() {
 
         {/* Team Hero Card */}
         {team && (
-          <View style={[st.heroCard, { backgroundColor: teamColor + "14", borderColor: teamColor + "50" }]}>
-            <View style={[st.heroAccent, { backgroundColor: teamColor }]} />
+          <View style={[st.heroCard, { backgroundColor: teamColor + "22", borderColor: teamColor + "70" }]}>
+            <View style={[st.heroAccent, { backgroundColor: teamColor, height: 4 }]} />
             <View style={st.heroContent}>
               <NFLTeamBadge abbreviation={team.abbreviation} primaryColor={team.primaryColor} size="lg" />
               <View style={{ flex: 1, marginLeft: 16 }}>
@@ -191,26 +192,35 @@ export default function HomeScreen() {
               </View>
             </View>
 
-            {/* Cap bar */}
-            <View style={st.capSection}>
-              <View style={st.capTopRow}>
-                <Text style={[st.capLabel, { color: colors.mutedForeground }]}>SALARY CAP</Text>
-                <Text style={[st.capValues, { color: colors.foreground }]}>${capUsed}M / ${capTotal}M</Text>
-                <View style={[st.capAvailTag, { backgroundColor: parseFloat(capLeft) > 0 ? colors.success + "25" : colors.danger + "25" }]}>
-                  <Text style={[st.capAvailText, { color: parseFloat(capLeft) > 0 ? colors.success : colors.danger }]}>${capLeft}M AVAIL</Text>
-                </View>
-              </View>
-              <View style={[st.capTrack, { backgroundColor: colors.secondary }]}>
-                <View style={[st.capFill, { width: `${Math.round(capPct * 100)}%`, backgroundColor: capPct > 0.95 ? colors.danger : capPct > 0.8 ? colors.warning : teamColor }]} />
-              </View>
-            </View>
+          </View>
+        )}
 
-            {/* Stat chips */}
-            <View style={[st.statRow, { borderTopColor: teamColor + "30" }]}>
-              <StatChip label="PF"    value={`${team.pointsFor}`}     color={colors.success} />
-              <StatChip label="PA"    value={`${team.pointsAgainst}`} color={colors.danger} />
-              <StatChip label="ROSTER" value={`${roster.length}`}      color={teamColor} />
-              <StatChip label="PICKS"  value={`${team.draftPicks.length}`} color={colors.nflGold} />
+        {/* Compact stats strip */}
+        {team && (
+          <View style={[st.statsStrip, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={st.statStripItem}>
+              <Text style={[st.statStripVal, { color: parseFloat(capLeft) > 0 ? colors.success : colors.danger }]}>${capLeft}M</Text>
+              <Text style={[st.statStripLbl, { color: colors.mutedForeground }]}>CAP AVAIL</Text>
+            </View>
+            <View style={[st.statDivider, { backgroundColor: colors.border }]} />
+            <View style={st.statStripItem}>
+              <Text style={[st.statStripVal, { color: colors.success }]}>{team.pointsFor}</Text>
+              <Text style={[st.statStripLbl, { color: colors.mutedForeground }]}>PF</Text>
+            </View>
+            <View style={[st.statDivider, { backgroundColor: colors.border }]} />
+            <View style={st.statStripItem}>
+              <Text style={[st.statStripVal, { color: colors.danger }]}>{team.pointsAgainst}</Text>
+              <Text style={[st.statStripLbl, { color: colors.mutedForeground }]}>PA</Text>
+            </View>
+            <View style={[st.statDivider, { backgroundColor: colors.border }]} />
+            <View style={st.statStripItem}>
+              <Text style={[st.statStripVal, { color: teamColor }]}>{roster.length}</Text>
+              <Text style={[st.statStripLbl, { color: colors.mutedForeground }]}>ROSTER</Text>
+            </View>
+            <View style={[st.statDivider, { backgroundColor: colors.border }]} />
+            <View style={st.statStripItem}>
+              <Text style={[st.statStripVal, { color: colors.nflGold }]}>{team.draftPicks.length}</Text>
+              <Text style={[st.statStripLbl, { color: colors.mutedForeground }]}>PICKS</Text>
             </View>
           </View>
         )}
@@ -233,7 +243,7 @@ export default function HomeScreen() {
           <QuickTile icon="users"   label="Depth Chart"  sub="Manage lineups"      color={teamColor}         onPress={() => router.push("/(tabs)/roster")} />
           <QuickTile icon="user-plus" label="Free Agency" sub={`${season?.freeAgents.length ?? 0} available`} color={colors.success} onPress={() => router.push("/(tabs)/frontoffice")} />
           <QuickTile icon="git-merge" label="Trades"      sub="Build an offer"      color={colors.nflRed}     onPress={() => router.push("/(tabs)/frontoffice")} />
-          <QuickTile icon="award"   label="Draft Room"   sub={`${season?.draftProspects.filter(p=>!p.isPickedUp).length ?? 0} prospects`} color={colors.nflGold} onPress={() => router.push("/(tabs)/frontoffice")} />
+          <QuickTile icon="award"   label="Draft Room"   sub={`${season?.draftProspects.filter(p=>!p.isPickedUp).length ?? 0} prospects`} color={colors.nflGold} onPress={() => router.push({ pathname: "/(tabs)/frontoffice", params: { tab: "draft" } })} />
           <QuickTile icon="edit-2"  label="Customize"   sub="Team identity & kits"  color={colors.nflBlue}    onPress={() => router.push("/customize")} />
         </View>
 
@@ -403,6 +413,21 @@ export default function HomeScreen() {
                       : <Feather name={canAdvance ? "chevrons-right" : "fast-forward"} size={16} color={canPress ? "#fff" : colors.mutedForeground} />}
                     <Text style={[st.cmdBtnTxt, { color: canPress ? "#fff" : colors.mutedForeground }]}>
                       {isScout ? "GM / Coach Only" : btnLabel}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {canSim && !isOffseasonPhase && !allPlayoffGamesDone && !isScout && (
+                  <TouchableOpacity
+                    onPress={() => { setSimSeason(true); simulateSeason().finally(() => setSimSeason(false)); }}
+                    disabled={simSeason || simulating}
+                    activeOpacity={0.82}
+                    style={[st.cmdBtnSecondary, { borderColor: teamColor + "60" }]}
+                  >
+                    {simSeason
+                      ? <ActivityIndicator color={teamColor} size="small" />
+                      : <Feather name="zap" size={14} color={simSeason ? colors.mutedForeground : teamColor} />}
+                    <Text style={[st.cmdBtnSecondaryTxt, { color: simSeason ? colors.mutedForeground : teamColor }]}>
+                      {simSeason ? "Simulating to VFL Bowl…" : "Sim to VFL Bowl"}
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -590,6 +615,12 @@ const st = StyleSheet.create({
   gameTeamLabel:  { fontSize:10, fontFamily:"Inter_500Medium" },
   gameFooter:     { flexDirection:"row", alignItems:"center", justifyContent:"center", gap:6, padding:10, borderTopWidth:1 },
   gameFooterText: { fontSize:12, fontFamily:"Inter_600SemiBold" },
+  // Compact stats strip
+  statsStrip:     { flexDirection:"row", alignItems:"center", borderRadius:12, borderWidth:1, marginBottom:14, paddingVertical:10, paddingHorizontal:8 },
+  statStripItem:  { flex:1, alignItems:"center", gap:2 },
+  statStripVal:   { fontSize:15, fontFamily:"Inter_700Bold" },
+  statStripLbl:   { fontSize:8.5, fontFamily:"Inter_600SemiBold", letterSpacing:0.8 },
+  statDivider:    { width:1, height:28, opacity:0.4 },
   // Season Command Center
   cmdCard:        { borderRadius:16, borderWidth:1.5, marginBottom:16, overflow:"hidden", backgroundColor:"#0E0E1C" },
   cmdAccent:      { height:3 },
@@ -601,6 +632,8 @@ const st = StyleSheet.create({
   cmdSub:         { fontSize:12, fontFamily:"Inter_400Regular", lineHeight:17 },
   cmdBtn:         { flexDirection:"row", alignItems:"center", justifyContent:"center", gap:9, paddingVertical:13, borderRadius:12, marginTop:4 },
   cmdBtnTxt:      { fontSize:15, fontFamily:"Inter_700Bold" },
+  cmdBtnSecondary: { flexDirection:"row", alignItems:"center", justifyContent:"center", gap:7, paddingVertical:10, borderRadius:12, borderWidth:1, backgroundColor:"transparent" },
+  cmdBtnSecondaryTxt: { fontSize:13, fontFamily:"Inter_600SemiBold" },
   // News
   newsItem:       { borderRadius:12, borderWidth:1, padding:12, marginBottom:8 },
   newsCat:        { alignSelf:"flex-start", paddingHorizontal:7, paddingVertical:2, borderRadius:5, marginBottom:5 },

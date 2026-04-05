@@ -184,6 +184,11 @@ export default function RosterScreen() {
                       <View style={{ flex: 1 }}>
                         <View style={st.depthNameRow}>
                           <Text style={[st.depthName, { color: colors.foreground }]}>{p.name}</Text>
+                          {p.yearsExperience === 0 && (
+                            <View style={[st.rookieBadge]}>
+                              <Text style={st.rookieText}>R</Text>
+                            </View>
+                          )}
                           {p.developmentTrait !== "Normal" && (
                             <View style={[st.devTag, { backgroundColor: DEV_COLORS[p.developmentTrait] + "25" }]}>
                               <Feather name={DEV_ICONS[p.developmentTrait]} size={10} color={DEV_COLORS[p.developmentTrait]} />
@@ -469,6 +474,8 @@ const st = StyleSheet.create({
   depthNameRow:   { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
   depthName:      { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   depthMeta:      { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },
+  rookieBadge:    { backgroundColor: "#FF6B35", paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 },
+  rookieText:     { fontSize: 9, fontFamily: "Inter_700Bold", color: "#fff", letterSpacing: 0.5 },
   devTag:         { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5 },
   devText:        { fontSize: 9, fontFamily: "Inter_600SemiBold" },
   injTag:         { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5 },

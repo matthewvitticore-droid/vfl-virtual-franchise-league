@@ -1053,6 +1053,61 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
     await save(current);
   }, [season, save]);
 
+  const simulateSeason = useCallback(async () => {
+    if (!season) return;
+    let current = { ...season, teams: season.teams.map(t => ({ ...t, roster: [...t.roster] })), games: [...season.games] };
+    let maxIter = 40;
+    while (!current.vflBowlWinnerId && maxIter-- > 0) {
+      const weekGames = current.games.filter(g => g.week === current.currentWeek && g.status === "upcoming");
+      if (weekGames.length === 0) break;
+      for (const game of weekGames) {
+        const homeTeam = current.teams.find(t => t.id === game.homeTeamId)!;
+        const awayTeam = current.teams.find(t => t.id === game.awayTeamId)!;
+        if (!homeTeam || !awayTeam) continue;
+        const result = simulateFullGame(homeTeam, awayTeam, game.week);
+        if (!game.isPlayoffGame) {
+          current.teams = current.teams.map(t => {
+            if (t.id === homeTeam.id) {
+              const won = result.homeScore > result.awayScore;
+              const tied = result.homeScore === result.awayScore;
+              return { ...t, wins: t.wins + (won?1:0), losses: t.losses + (!won&&!tied?1:0), ties: t.ties + (tied?1:0), pointsFor: t.pointsFor + result.homeScore, pointsAgainst: t.pointsAgainst + result.awayScore };
+            }
+            if (t.id === awayTeam.id) {
+              const won = result.awayScore > result.homeScore;
+              const tied = result.homeScore === result.awayScore;
+              return { ...t, wins: t.wins + (won?1:0), losses: t.losses + (!won&&!tied?1:0), ties: t.ties + (tied?1:0), pointsFor: t.pointsFor + result.awayScore, pointsAgainst: t.pointsAgainst + result.homeScore };
+            }
+            return t;
+          });
+        }
+        current.games = current.games.map(g => g.id === game.id ? { ...g, ...result, id: g.id, week: g.week } : g);
+        if (result.playerStats) {
+          const ps = result.playerStats;
+          current.teams = current.teams.map(t => {
+            if (t.id !== homeTeam.id && t.id !== awayTeam.id) return t;
+            return { ...t, roster: t.roster.map(p => { const gl = ps[p.id]; return gl ? { ...p, stats: mergePlayerStats(p.stats, gl) } : p; }) };
+          });
+        }
+      }
+      const nextWeek = current.currentWeek + 1;
+      current = { ...current, currentWeek: nextWeek };
+      if (!current.isPlayoffs && current.currentWeek > 18) {
+        current = beginPlayoffs(current) as typeof current;
+        continue;
+      }
+      if (current.isPlayoffs && weekGames.some(g => g.isPlayoffGame)) {
+        const vflBowl = current.games.filter(g => g.isPlayoffGame && g.playoffRound === "vflBowl");
+        if (vflBowl.length > 0 && vflBowl.every(g => g.status === "final")) {
+          current = endPlayoffs(current, vflBowl[0]) as typeof current;
+          break;
+        } else {
+          current = advancePlayoffRound(current) as typeof current;
+        }
+      }
+    }
+    await save(current);
+  }, [season, save]);
+
   // ── Roster Actions ─────────────────────────────────────────────────────────
 
   const signFreeAgent = useCallback(async (playerId: string, contractYears: number, salary: number) => {
@@ -1215,6 +1270,10 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       developmentTrait: genDevTrait(rookieOvr, 21),
       college: prospect.college,
       jerseyNumber: genJerseyNumber(prospect.position, irng(0, 99)),
+      draftYear: season.year,
+      draftRound: draftState.currentRound,
+      draftPick: draftState.overallPick,
+      draftTeamId: season.playerTeamId,
     };
 
     const newsItem: Omit<NewsItem,"id"|"timestamp"> = {
@@ -1475,7 +1534,7 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       getTeam, getPlayerTeam, getStandings, getWeekGames,
       signFreeAgent, releasePlayer, restructureContract, updateDepthOrder,
       updateGamePlan, updateFormation, updateOffenseScheme,
-      simulateGame, simulateWeek,
+      simulateGame, simulateWeek, simulateSeason,
       userDraftPick, simulateDraftPick, simPicksUntilUserTurn, unlockScouting,
       proposeTrade, respondToTrade,
       advancePhase, addNews, resetSeason,

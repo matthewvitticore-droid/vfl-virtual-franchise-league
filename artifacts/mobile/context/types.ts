@@ -197,6 +197,10 @@ export interface Player {
   developmentTrait: DevelopmentTrait;
   college?: string;
   jerseyNumber?: number;
+  draftYear?: number;
+  draftRound?: number;
+  draftPick?: number;
+  draftTeamId?: string;
 }
 
 // ─── Draft Prospect ───────────────────────────────────────────────────────────
@@ -506,6 +510,7 @@ export interface NFLContextValue {
   // Simulation
   simulateGame: (gameId: string) => Promise<void>;
   simulateWeek: () => Promise<void>;
+  simulateSeason: () => Promise<void>;
   // Draft
   userDraftPick: (prospectId: string) => Promise<void>;
   simulateDraftPick: () => Promise<void>;
