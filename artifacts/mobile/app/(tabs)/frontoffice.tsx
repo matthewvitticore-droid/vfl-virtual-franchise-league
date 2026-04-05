@@ -36,7 +36,8 @@ export default function FrontOfficeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { membership } = useAuth();
-  const { season, getPlayerTeam, signFreeAgent, userDraftPick, simulateDraftPick, unlockScouting, proposeTrade, respondToTrade } = useNFL();
+  const { season, getPlayerTeam, signFreeAgent, userDraftPick, simulateDraftPick, simPicksUntilUserTurn, unlockScouting, proposeTrade, respondToTrade } = useNFL();
+  const [isSimming, setIsSimming] = useState(false);
   const [tab, setTab] = useState<Tab>("freeAgency");
   const [draftView, setDraftView] = useState<DraftView>("board");
   const [posFilter, setPosFilter] = useState<NFLPosition | "ALL">("ALL");
@@ -136,6 +137,13 @@ export default function FrontOfficeScreen() {
     await simulateDraftPick();
   }
 
+  async function handleSimToMyPick() {
+    if (!ds || ds.isComplete || ds.isUserTurn || isSimming) return;
+    setIsSimming(true);
+    await simPicksUntilUserTurn();
+    setIsSimming(false);
+  }
+
   function evaluateTradeValue() {
     if (!season || !team) return 0;
     const allPlayers = season.teams.flatMap(t => t.roster);
@@ -222,11 +230,18 @@ export default function FrontOfficeScreen() {
                 </Text>
               </View>
               {!ds.isComplete && !ds.isUserTurn && (
-                <TouchableOpacity onPress={handleSimulateAllAI}
-                  style={[st.simPickBtn, { backgroundColor: teamColor }]}>
-                  <Feather name="chevrons-right" size={14} color="#fff" />
-                  <Text style={[st.simPickBtnText]}>Sim Pick</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection:"row", gap:6 }}>
+                  <TouchableOpacity onPress={handleSimulateAllAI}
+                    style={[st.simPickBtn, { backgroundColor: colors.secondary, borderWidth:1, borderColor: colors.border }]}>
+                    <Feather name="chevron-right" size={13} color={colors.foreground} />
+                    <Text style={[st.simPickBtnText, { color: colors.foreground }]}>1 Pick</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={handleSimToMyPick} disabled={isSimming}
+                    style={[st.simPickBtn, { backgroundColor: isSimming ? colors.secondary : teamColor, opacity: isSimming ? 0.6 : 1 }]}>
+                    <Feather name="chevrons-right" size={13} color="#fff" />
+                    <Text style={[st.simPickBtnText, { color:"#fff" }]}>{isSimming ? "Simming…" : "My Pick"}</Text>
+                  </TouchableOpacity>
+                </View>
               )}
             </View>
           )}
@@ -262,12 +277,7 @@ export default function FrontOfficeScreen() {
                     setSelectedProspect(p);
                   }}
                   onScout={() => unlockScouting(p.id)}
-                  onDraft={() => {
-                    Alert.alert(`Draft ${p.name}?`, `${p.position} · ${p.college} · Grade: ${p.grade} · Overall: ${p.overallGrade}`, [
-                      { text:"Cancel" },
-                      { text:"Select Player", onPress: () => userDraftPick(p.id) },
-                    ]);
-                  }}
+                  onDraft={() => userDraftPick(p.id)}
                 />
               ))}
             </ScrollView>
@@ -299,12 +309,7 @@ export default function FrontOfficeScreen() {
                     <CombineRow key={p.id} p={p} rank={idx+1} colors={colors} teamColor={teamColor}
                       isUserTurn={ds?.isUserTurn ?? false} isGM={isGM}
                       onTap={() => setSelectedProspect(p)}
-                      onDraft={() => {
-                        Alert.alert(`Draft ${p.name}?`, `${p.position} · ${p.college} · Grade: ${p.grade}`, [
-                          { text:"Cancel" },
-                          { text:"Select Player", onPress: () => userDraftPick(p.id) },
-                        ]);
-                      }}
+                      onDraft={() => userDraftPick(p.id)}
                     />
                   ))}
                 </View>
@@ -319,6 +324,8 @@ export default function FrontOfficeScreen() {
                 <Feather name="clock" size={14} color={teamColor} />
                 <Text style={[st.warRoomTitle, { color: colors.foreground }]}>Draft Board — {ds?.completedPicks.length ?? 0} picks made</Text>
               </View>
+              {/* Positions of Need grid */}
+              {team && <RosterNeedGrid team={team} colors={colors} teamColor={teamColor} />}
               {(ds?.completedPicks ?? []).slice().reverse().map(pick => {
                 const pickTeam = season?.teams.find(t => t.id === pick.teamId);
                 const isUser = pick.teamId === season?.playerTeamId;
@@ -497,12 +504,7 @@ export default function FrontOfficeScreen() {
         teamColor={teamColor}
         isGM={isGM}
         isUserTurn={ds?.isUserTurn ?? false}
-        onDraft={selectedProspect ? () => {
-          Alert.alert(`Draft ${selectedProspect.name}?`, `${selectedProspect.position} · ${selectedProspect.college}`, [
-            { text: "Cancel" },
-            { text: "Select Player", onPress: () => { userDraftPick(selectedProspect.id); setSelectedProspect(null); } },
-          ]);
-        } : undefined}
+        onDraft={selectedProspect ? () => { userDraftPick(selectedProspect.id); setSelectedProspect(null); } : undefined}
       />
     </View>
   );
@@ -788,6 +790,79 @@ function formatHeight(inches: number): string {
   const ft = Math.floor(inches / 12);
   const i = inches % 12;
   return `${ft}'${i}"`;
+}
+
+// ─── Roster Need Grid ─────────────────────────────────────────────────────────
+
+const POS_MIN_DEPTH: Record<NFLPosition, number> = {
+  QB:1, RB:2, WR:3, TE:1, OL:5, DE:2, DT:2, LB:3, CB:3, S:2, K:1, P:1,
+};
+
+function RosterNeedGrid({ team, colors, teamColor }: { team: any; colors: any; teamColor: string }) {
+  const positions: NFLPosition[] = ["QB","RB","WR","TE","OL","DE","DT","LB","CB","S","K","P"];
+  const byPos: Record<string, any[]> = {};
+  positions.forEach(pos => {
+    byPos[pos] = (team.roster as any[])
+      .filter((p: any) => p.position === pos)
+      .sort((a: any, b: any) => b.overall - a.overall);
+  });
+
+  function needColor(pos: NFLPosition) {
+    const count = byPos[pos].length;
+    const min = POS_MIN_DEPTH[pos];
+    if (count === 0) return "#EF4444";
+    if (count < min) return "#F97316";
+    if (count === min) return "#EAB308";
+    return "#22C55E";
+  }
+
+  return (
+    <View style={{ margin:10, borderRadius:10, overflow:"hidden", borderWidth:1, borderColor: colors.border }}>
+      <View style={{ flexDirection:"row", alignItems:"center", gap:6, paddingHorizontal:10, paddingVertical:7, backgroundColor: colors.card, borderBottomWidth:1, borderBottomColor: colors.border }}>
+        <Feather name="grid" size={12} color={teamColor} />
+        <Text style={{ fontSize:11, fontFamily:"Inter_700Bold", color: colors.foreground, letterSpacing:0.5 }}>POSITIONS OF NEED</Text>
+        <View style={{ flexDirection:"row", alignItems:"center", gap:8, marginLeft:"auto" as any }}>
+          {([["#22C55E","Set"],["#EAB308","OK"],["#F97316","Thin"],["#EF4444","Need"]] as [string,string][]).map(([c,l]) => (
+            <View key={l} style={{ flexDirection:"row", alignItems:"center", gap:3 }}>
+              <View style={{ width:7, height:7, borderRadius:2, backgroundColor:c }} />
+              <Text style={{ fontSize:9, fontFamily:"Inter_400Regular", color: colors.mutedForeground }}>{l}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+      <View style={{ flexDirection:"row", flexWrap:"wrap", backgroundColor: colors.card }}>
+        {positions.map((pos, idx) => {
+          const players = byPos[pos];
+          const nc = needColor(pos);
+          const top = players[0];
+          const count = players.length;
+          return (
+            <View key={pos} style={{
+              width:"25%", borderRightWidth: (idx % 4 === 3) ? 0 : 1, borderBottomWidth: idx < 8 ? 1 : 0,
+              borderColor: colors.border, paddingHorizontal:8, paddingVertical:7,
+            }}>
+              <View style={{ flexDirection:"row", alignItems:"center", justifyContent:"space-between", marginBottom:3 }}>
+                <Text style={{ fontSize:11, fontFamily:"Inter_700Bold", color: POS_COLOR[pos] }}>{pos}</Text>
+                <View style={{ width:8, height:8, borderRadius:2, backgroundColor: nc }} />
+              </View>
+              {top ? (
+                <>
+                  <Text numberOfLines={1} style={{ fontSize:10, fontFamily:"Inter_600SemiBold", color: colors.foreground }}>
+                    {top.name.split(" ").slice(-1)[0]}
+                  </Text>
+                  <Text style={{ fontSize:10, fontFamily:"Inter_400Regular", color: colors.mutedForeground }}>
+                    {top.overall} OVR · {count} deep
+                  </Text>
+                </>
+              ) : (
+                <Text style={{ fontSize:10, fontFamily:"Inter_700Bold", color:"#EF4444" }}>NEED</Text>
+              )}
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
