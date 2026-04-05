@@ -17,39 +17,47 @@ import { NFLTeamBadge } from "@/components/NFLTeamBadge";
 import { useColors } from "@/hooks/useColors";
 import { FranchiseMemberRole, useAuth } from "@/context/AuthContext";
 
-const NFL_TEAMS = [
-  { id: "team-0",  city: "Buffalo",       name: "Bills",      abbr: "BUF", color: "#00338D" },
-  { id: "team-1",  city: "Miami",         name: "Dolphins",   abbr: "MIA", color: "#008E97" },
-  { id: "team-2",  city: "New England",   name: "Patriots",   abbr: "NE",  color: "#002244" },
-  { id: "team-3",  city: "New York",      name: "Jets",       abbr: "NYJ", color: "#125740" },
-  { id: "team-4",  city: "Baltimore",     name: "Ravens",     abbr: "BAL", color: "#241773" },
-  { id: "team-5",  city: "Cincinnati",    name: "Bengals",    abbr: "CIN", color: "#FB4F14" },
-  { id: "team-6",  city: "Cleveland",     name: "Browns",     abbr: "CLE", color: "#311D00" },
-  { id: "team-7",  city: "Pittsburgh",    name: "Steelers",   abbr: "PIT", color: "#FFB612" },
-  { id: "team-8",  city: "Houston",       name: "Texans",     abbr: "HOU", color: "#03202F" },
-  { id: "team-9",  city: "Indianapolis",  name: "Colts",      abbr: "IND", color: "#002C5F" },
-  { id: "team-10", city: "Jacksonville",  name: "Jaguars",    abbr: "JAX", color: "#006778" },
-  { id: "team-11", city: "Tennessee",     name: "Titans",     abbr: "TEN", color: "#0C2340" },
-  { id: "team-12", city: "Denver",        name: "Broncos",    abbr: "DEN", color: "#FB4F14" },
-  { id: "team-13", city: "Kansas City",   name: "Chiefs",     abbr: "KC",  color: "#E31837" },
-  { id: "team-14", city: "Las Vegas",     name: "Raiders",    abbr: "LV",  color: "#000000" },
-  { id: "team-15", city: "Los Angeles",   name: "Chargers",   abbr: "LAC", color: "#0080C6" },
-  { id: "team-16", city: "Dallas",        name: "Cowboys",    abbr: "DAL", color: "#003594" },
-  { id: "team-17", city: "New York",      name: "Giants",     abbr: "NYG", color: "#0B2265" },
-  { id: "team-18", city: "Philadelphia",  name: "Eagles",     abbr: "PHI", color: "#004C54" },
-  { id: "team-19", city: "Washington",    name: "Commanders", abbr: "WAS", color: "#5A1414" },
-  { id: "team-20", city: "Chicago",       name: "Bears",      abbr: "CHI", color: "#0B162A" },
-  { id: "team-21", city: "Detroit",       name: "Lions",      abbr: "DET", color: "#0076B6" },
-  { id: "team-22", city: "Green Bay",     name: "Packers",    abbr: "GB",  color: "#203731" },
-  { id: "team-23", city: "Minnesota",     name: "Vikings",    abbr: "MIN", color: "#4F2683" },
-  { id: "team-24", city: "Atlanta",       name: "Falcons",    abbr: "ATL", color: "#A71930" },
-  { id: "team-25", city: "Carolina",      name: "Panthers",   abbr: "CAR", color: "#0085CA" },
-  { id: "team-26", city: "New Orleans",   name: "Saints",     abbr: "NO",  color: "#D3BC8D" },
-  { id: "team-27", city: "Tampa Bay",     name: "Buccaneers", abbr: "TB",  color: "#D50A0A" },
-  { id: "team-28", city: "Arizona",       name: "Cardinals",  abbr: "ARI", color: "#97233F" },
-  { id: "team-29", city: "Los Angeles",   name: "Rams",       abbr: "LAR", color: "#003594" },
-  { id: "team-30", city: "San Francisco", name: "49ers",      abbr: "SF",  color: "#AA0000" },
-  { id: "team-31", city: "Seattle",       name: "Seahawks",   abbr: "SEA", color: "#002244" },
+const GFL_TEAMS = [
+  // Ironclad Conference — East
+  { id: "team-0",  city: "Hartford",      name: "Sentinels",    abbr: "HRT", color: "#1B3462" },
+  { id: "team-1",  city: "Providence",    name: "Storm",        abbr: "PVS", color: "#7F1D1D" },
+  { id: "team-2",  city: "Burlington",    name: "Frost",        abbr: "BLF", color: "#1E3A8A" },
+  { id: "team-3",  city: "Albany",        name: "Forge",        abbr: "ALF", color: "#1C2833" },
+  // Ironclad Conference — North
+  { id: "team-4",  city: "Syracuse",      name: "Stallions",    abbr: "SYS", color: "#4527A0" },
+  { id: "team-5",  city: "Pittsburgh",    name: "Ironmen",      abbr: "PMN", color: "#374151" },
+  { id: "team-6",  city: "Columbus",      name: "Knights",      abbr: "CKN", color: "#7F1D1D" },
+  { id: "team-7",  city: "Cleveland",     name: "Foundry",      abbr: "CLD", color: "#92400E" },
+  // Ironclad Conference — South
+  { id: "team-8",  city: "Nashville",     name: "Desperados",   abbr: "NVD", color: "#111827" },
+  { id: "team-9",  city: "Memphis",       name: "Blaze",        abbr: "MBZ", color: "#C2410C" },
+  { id: "team-10", city: "Birmingham",    name: "Bolt",         abbr: "BBT", color: "#6B21A8" },
+  { id: "team-11", city: "Chattanooga",   name: "Thunder",      abbr: "CTR", color: "#065F46" },
+  // Ironclad Conference — West
+  { id: "team-12", city: "Denver",        name: "Peaks",        abbr: "DVP", color: "#3730A3" },
+  { id: "team-13", city: "Reno",          name: "Royals",       abbr: "RNR", color: "#1E40AF" },
+  { id: "team-14", city: "Salt Lake",     name: "Blizzard",     abbr: "SLB", color: "#1E3A8A" },
+  { id: "team-15", city: "Sacramento",    name: "Miners",       abbr: "SMN", color: "#D97706" },
+  // Gridiron Conference — East
+  { id: "team-16", city: "Raleigh",       name: "Thunderhawks", abbr: "RTH", color: "#6B1B3C" },
+  { id: "team-17", city: "Richmond",      name: "Cavalry",      abbr: "RCV", color: "#1E3A8A" },
+  { id: "team-18", city: "Annapolis",     name: "Corsairs",     abbr: "ACS", color: "#0C2340" },
+  { id: "team-19", city: "Charlotte",     name: "Vipers",       abbr: "CHV", color: "#4B1994" },
+  // Gridiron Conference — North
+  { id: "team-20", city: "Rockford",      name: "Blaze",        abbr: "RBZ", color: "#C2410C" },
+  { id: "team-21", city: "Milwaukee",     name: "Wolves",       abbr: "MWW", color: "#14532D" },
+  { id: "team-22", city: "Madison",       name: "Ice",          abbr: "MDI", color: "#1E40AF" },
+  { id: "team-23", city: "Grand Rapids",  name: "Fury",         abbr: "GRF", color: "#4E0B2A" },
+  // Gridiron Conference — South
+  { id: "team-24", city: "Savannah",      name: "Marshmen",     abbr: "SVT", color: "#0F4C35" },
+  { id: "team-25", city: "Baton Rouge",   name: "Bayou",        abbr: "BRB", color: "#4B1994" },
+  { id: "team-26", city: "Tampa",         name: "Surge",        abbr: "TSG", color: "#991B1B" },
+  { id: "team-27", city: "Orlando",       name: "Storm",        abbr: "ORS", color: "#0C2340" },
+  // Gridiron Conference — West
+  { id: "team-28", city: "Portland",      name: "Lumberjacks",  abbr: "PLJ", color: "#14532D" },
+  { id: "team-29", city: "Seattle",       name: "Cascade",      abbr: "SCS", color: "#1E3A8A" },
+  { id: "team-30", city: "San Francisco", name: "Fog",          abbr: "SFF", color: "#B45309" },
+  { id: "team-31", city: "Los Angeles",   name: "Surf",         abbr: "LAS", color: "#0E7490" },
 ];
 
 const ROLES: { value: FranchiseMemberRole; label: string; desc: string; icon: string }[] = [
@@ -70,7 +78,7 @@ export default function FranchiseLobbyScreen() {
 
   // Create state
   const [franchiseName, setFranchiseName] = useState("");
-  const [selectedTeamId, setSelectedTeamId] = useState("team-13"); // KC
+  const [selectedTeamId, setSelectedTeamId] = useState("team-13"); // Reno Royals
   const [createRole, setCreateRole] = useState<FranchiseMemberRole>("GM");
   const [displayName, setDisplayName] = useState("");
 
@@ -82,7 +90,7 @@ export default function FranchiseLobbyScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const selectedTeam = NFL_TEAMS.find(t => t.id === selectedTeamId) ?? NFL_TEAMS[13];
+  const selectedTeam = GFL_TEAMS.find(t => t.id === selectedTeamId) ?? GFL_TEAMS[13];
 
   const handleCreate = async () => {
     if (!franchiseName.trim()) { setError("Please enter a franchise name."); return; }
@@ -188,7 +196,7 @@ export default function FranchiseLobbyScreen() {
         {screen === "create" && (
           <View style={styles.form}>
             <InputField label="Franchise Name" placeholder="e.g. Dynasty FC" value={franchiseName} onChangeText={setFranchiseName} icon="shield" />
-            <InputField label="Your Display Name" placeholder="e.g. ChiefsGM" value={displayName} onChangeText={setDisplayName} icon="user" />
+            <InputField label="Your Display Name" placeholder="e.g. RoyalsGM" value={displayName} onChangeText={setDisplayName} icon="user" />
 
             {/* Team Picker */}
             <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Choose Your Team</Text>
@@ -197,7 +205,7 @@ export default function FranchiseLobbyScreen() {
               <Text style={[styles.selectedTeamName, { color: colors.foreground }]}>{selectedTeam.city} {selectedTeam.name}</Text>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.teamPickerRow}>
-              {NFL_TEAMS.map(t => (
+              {GFL_TEAMS.map(t => (
                 <TouchableOpacity
                   key={t.id}
                   onPress={() => setSelectedTeamId(t.id)}

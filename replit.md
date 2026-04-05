@@ -1,7 +1,7 @@
-# FootballSim — Co-GM NFL Franchise Simulator
+# Gridiron GM — Co-GM Football Franchise Simulator
 
 ## Overview
-An NFL franchise simulator built in Expo React Native where multiple users share a single franchise in real time via Supabase. All 32 real NFL teams with diverse fictional rosters, realistic ratings, and broadcast-style play-by-play simulation. Full Madden-depth franchise mode with free agency, draft war room, trade builder, injury system, and depth chart management.
+An original football franchise simulator built in Expo React Native. 32 fully fictional teams across two conferences (Ironclad / Gridiron), Co-GM multiplayer via Supabase realtime, broadcast-style play-by-play simulation, free agency, draft war room, trade builder, injury system, and depth chart management. App name: Gridiron GM. League name: GFL (Gridiron Football League).
 
 ## Architecture
 

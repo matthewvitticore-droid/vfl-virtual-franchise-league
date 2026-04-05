@@ -105,7 +105,7 @@ export default function HomeScreen() {
         {/* Header */}
         <View style={st.headerRow}>
           <View>
-            <Text style={[st.seasonLabel, { color: colors.mutedForeground }]}>NFL {season?.year} SEASON</Text>
+            <Text style={[st.seasonLabel, { color: colors.mutedForeground }]}>GFL {season?.year} SEASON</Text>
             <Text style={[st.weekLabel, { color: colors.foreground }]}>WEEK {season?.currentWeek}</Text>
           </View>
           <View style={st.headerRight}>
@@ -271,7 +271,7 @@ export default function HomeScreen() {
 
         {/* Standings snapshot */}
         <View style={st.section}>
-          <SectionTitle>{team?.conference ?? "AFC"} Standings</SectionTitle>
+          <SectionTitle>{team?.conference ?? "Ironclad"} Standings</SectionTitle>
           <View style={[st.standingsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {standings.slice(0, 8).map((t, idx) => (
               <View key={t.id} style={[st.standingRow, { borderBottomColor: colors.border, backgroundColor: t.id === season?.playerTeamId ? teamColor + "15" : "transparent" }]}>

@@ -1,7 +1,7 @@
 // ─── Core Enums & Primitives ──────────────────────────────────────────────────
 
 export type Role = "GM" | "Coach" | "Scout";
-export type Conference = "AFC" | "NFC";
+export type Conference = "Ironclad" | "Gridiron";
 export type Division = "North" | "South" | "East" | "West";
 export type NFLPosition = "QB" | "RB" | "WR" | "TE" | "OL" | "DE" | "DT" | "LB" | "CB" | "S" | "K" | "P";
 export type ContractStatus = "Starter" | "Backup" | "Practice Squad" | "Free Agent";

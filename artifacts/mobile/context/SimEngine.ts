@@ -13,8 +13,8 @@ function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length
 
 // ─── Weather Generation ────────────────────────────────────────────────────────
 
-const DOME_TEAMS = ["NO","LV","ATL","DAL","HOU","DET","IND","MIN","ARI","LAR","LAC","SF"];
-const COLD_CITIES = ["BUF","GB","CHI","MIN","CLE","DET","PIT","NE","BAL","NYJ","NYG","PHI"];
+const DOME_TEAMS = ["NVD","ORS","CHV","RNR","SMN","BBT","MBZ","SYS"];
+const COLD_CITIES = ["HRT","BLF","ALF","PMN","CLD","MDI","MWW","GRF","SLB","CTR","RBZ","SCS"];
 const DIRS = ["N","NE","E","SE","S","SW","W","NW"];
 
 export function generateWeather(homeAbbr: string, week: number): GameWeather {

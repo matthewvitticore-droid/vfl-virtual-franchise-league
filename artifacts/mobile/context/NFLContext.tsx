@@ -15,7 +15,7 @@ export type { Season, NFLTeam, Player, DraftProspect, DraftPick, NFLGame, NewsIt
   TradeOffer, NFLContextValue, NFLPosition, ContractStatus, GamePlan, Formation,
   OffenseScheme, Conference, Division, PlayerSeasonStats, DevelopmentTrait } from "./types";
 
-const CACHE_KEY = "nfl_season_v8";
+const CACHE_KEY = "gfl_season_v1";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -207,7 +207,7 @@ function generateFreeAgents(count = 60): Player[] {
   });
 }
 
-// ─── All 32 NFL Teams ─────────────────────────────────────────────────────────
+// ─── All 32 GFL Teams ─────────────────────────────────────────────────────────
 
 interface TeamTemplate {
   city: string; name: string; abbreviation: string;
@@ -217,46 +217,46 @@ interface TeamTemplate {
 }
 
 const NFL_TEAMS: TeamTemplate[] = [
-  // AFC East
-  { city:"Buffalo",    name:"Bills",       abbreviation:"BUF", conference:"AFC", division:"East", primaryColor:"#00338D", secondaryColor:"#C60C30", stadium:"Highmark Stadium",         overall:89 },
-  { city:"Miami",      name:"Dolphins",    abbreviation:"MIA", conference:"AFC", division:"East", primaryColor:"#008E97", secondaryColor:"#FC4C02", stadium:"Hard Rock Stadium",         overall:82 },
-  { city:"New England",name:"Patriots",    abbreviation:"NE",  conference:"AFC", division:"East", primaryColor:"#002244", secondaryColor:"#C60C30", stadium:"Gillette Stadium",          overall:77 },
-  { city:"New York",   name:"Jets",        abbreviation:"NYJ", conference:"AFC", division:"East", primaryColor:"#125740", secondaryColor:"#000000", stadium:"MetLife Stadium",           overall:78 },
-  // AFC North
-  { city:"Baltimore",  name:"Ravens",      abbreviation:"BAL", conference:"AFC", division:"North", primaryColor:"#241773", secondaryColor:"#000000", stadium:"M&T Bank Stadium",         overall:88 },
-  { city:"Cincinnati", name:"Bengals",     abbreviation:"CIN", conference:"AFC", division:"North", primaryColor:"#FB4F14", secondaryColor:"#000000", stadium:"Paycor Stadium",           overall:84 },
-  { city:"Cleveland",  name:"Browns",      abbreviation:"CLE", conference:"AFC", division:"North", primaryColor:"#311D00", secondaryColor:"#FF3C00", stadium:"FirstEnergy Stadium",      overall:79 },
-  { city:"Pittsburgh", name:"Steelers",    abbreviation:"PIT", conference:"AFC", division:"North", primaryColor:"#101820", secondaryColor:"#FFB612", stadium:"Acrisure Stadium",         overall:82 },
-  // AFC South
-  { city:"Houston",    name:"Texans",      abbreviation:"HOU", conference:"AFC", division:"South", primaryColor:"#03202F", secondaryColor:"#A71930", stadium:"NRG Stadium",              overall:80 },
-  { city:"Indianapolis",name:"Colts",      abbreviation:"IND", conference:"AFC", division:"South", primaryColor:"#002C5F", secondaryColor:"#A2AAAD", stadium:"Lucas Oil Stadium",        overall:78 },
-  { city:"Jacksonville",name:"Jaguars",    abbreviation:"JAC", conference:"AFC", division:"South", primaryColor:"#006778", secondaryColor:"#D7A22A", stadium:"EverBank Stadium",         overall:76 },
-  { city:"Tennessee",  name:"Titans",      abbreviation:"TEN", conference:"AFC", division:"South", primaryColor:"#0C2340", secondaryColor:"#4B92DB", stadium:"Nissan Stadium",           overall:77 },
-  // AFC West
-  { city:"Denver",     name:"Broncos",     abbreviation:"DEN", conference:"AFC", division:"West", primaryColor:"#FB4F14", secondaryColor:"#002244", stadium:"Empower Field",             overall:79 },
-  { city:"Kansas City",name:"Chiefs",      abbreviation:"KC",  conference:"AFC", division:"West", primaryColor:"#E31837", secondaryColor:"#FFB612", stadium:"Arrowhead Stadium",         overall:91 },
-  { city:"Las Vegas",  name:"Raiders",     abbreviation:"LV",  conference:"AFC", division:"West", primaryColor:"#000000", secondaryColor:"#A5ACAF", stadium:"Allegiant Stadium",         overall:78 },
-  { city:"Los Angeles",name:"Chargers",    abbreviation:"LAC", conference:"AFC", division:"West", primaryColor:"#0080C6", secondaryColor:"#FFC20E", stadium:"SoFi Stadium",              overall:81 },
-  // NFC East
-  { city:"Dallas",     name:"Cowboys",     abbreviation:"DAL", conference:"NFC", division:"East", primaryColor:"#003594", secondaryColor:"#869397", stadium:"AT&T Stadium",              overall:86 },
-  { city:"New York",   name:"Giants",      abbreviation:"NYG", conference:"NFC", division:"East", primaryColor:"#0B2265", secondaryColor:"#A71930", stadium:"MetLife Stadium",           overall:76 },
-  { city:"Philadelphia",name:"Eagles",     abbreviation:"PHI", conference:"NFC", division:"East", primaryColor:"#004C54", secondaryColor:"#A5ACAF", stadium:"Lincoln Financial Field",   overall:87 },
-  { city:"Washington", name:"Commanders", abbreviation:"WAS", conference:"NFC", division:"East", primaryColor:"#5A1414", secondaryColor:"#FFB612", stadium:"Northwest Stadium",          overall:78 },
-  // NFC North
-  { city:"Chicago",    name:"Bears",       abbreviation:"CHI", conference:"NFC", division:"North", primaryColor:"#0B162A", secondaryColor:"#C83803", stadium:"Soldier Field",            overall:75 },
-  { city:"Detroit",    name:"Lions",       abbreviation:"DET", conference:"NFC", division:"North", primaryColor:"#0076B6", secondaryColor:"#B0B7BC", stadium:"Ford Field",               overall:83 },
-  { city:"Green Bay",  name:"Packers",     abbreviation:"GB",  conference:"NFC", division:"North", primaryColor:"#203731", secondaryColor:"#FFB612", stadium:"Lambeau Field",            overall:84 },
-  { city:"Minnesota",  name:"Vikings",     abbreviation:"MIN", conference:"NFC", division:"North", primaryColor:"#4F2683", secondaryColor:"#FFC62F", stadium:"U.S. Bank Stadium",        overall:82 },
-  // NFC South
-  { city:"Atlanta",    name:"Falcons",     abbreviation:"ATL", conference:"NFC", division:"South", primaryColor:"#A71930", secondaryColor:"#000000", stadium:"Mercedes-Benz Stadium",    overall:78 },
-  { city:"Carolina",   name:"Panthers",    abbreviation:"CAR", conference:"NFC", division:"South", primaryColor:"#0085CA", secondaryColor:"#101820", stadium:"Bank of America Stadium",  overall:74 },
-  { city:"New Orleans",name:"Saints",      abbreviation:"NO",  conference:"NFC", division:"South", primaryColor:"#D3BC8D", secondaryColor:"#101820", stadium:"Caesars Superdome",        overall:80 },
-  { city:"Tampa Bay",  name:"Buccaneers",  abbreviation:"TB",  conference:"NFC", division:"South", primaryColor:"#D50A0A", secondaryColor:"#FF7900", stadium:"Raymond James Stadium",    overall:81 },
-  // NFC West
-  { city:"Arizona",    name:"Cardinals",   abbreviation:"ARI", conference:"NFC", division:"West", primaryColor:"#97233F", secondaryColor:"#000000", stadium:"State Farm Stadium",        overall:74 },
-  { city:"Los Angeles",name:"Rams",        abbreviation:"LAR", conference:"NFC", division:"West", primaryColor:"#003594", secondaryColor:"#FFA300", stadium:"SoFi Stadium",              overall:83 },
-  { city:"San Francisco",name:"49ers",     abbreviation:"SF",  conference:"NFC", division:"West", primaryColor:"#AA0000", secondaryColor:"#B3995D", stadium:"Levi's Stadium",           overall:89 },
-  { city:"Seattle",    name:"Seahawks",    abbreviation:"SEA", conference:"NFC", division:"West", primaryColor:"#002244", secondaryColor:"#69BE28", stadium:"Lumen Field",              overall:80 },
+  // Ironclad Conference — East
+  { city:"Hartford",     name:"Sentinels",    abbreviation:"HRT", conference:"Ironclad", division:"East",  primaryColor:"#1B3462", secondaryColor:"#9CA3AF", stadium:"Granite Peak Arena",    overall:89 },
+  { city:"Providence",   name:"Storm",        abbreviation:"PVS", conference:"Ironclad", division:"East",  primaryColor:"#7F1D1D", secondaryColor:"#374151", stadium:"Bay View Stadium",       overall:82 },
+  { city:"Burlington",   name:"Frost",        abbreviation:"BLF", conference:"Ironclad", division:"East",  primaryColor:"#1E3A8A", secondaryColor:"#BFDBFE", stadium:"Lakeside Field",         overall:77 },
+  { city:"Albany",       name:"Forge",        abbreviation:"ALF", conference:"Ironclad", division:"East",  primaryColor:"#1C2833", secondaryColor:"#D97706", stadium:"Irongate Arena",         overall:78 },
+  // Ironclad Conference — North
+  { city:"Syracuse",     name:"Stallions",    abbreviation:"SYS", conference:"Ironclad", division:"North", primaryColor:"#4527A0", secondaryColor:"#FFC107", stadium:"Pinnacle Dome",          overall:88 },
+  { city:"Pittsburgh",   name:"Ironmen",      abbreviation:"PMN", conference:"Ironclad", division:"North", primaryColor:"#374151", secondaryColor:"#FFC107", stadium:"Steel City Arena",       overall:84 },
+  { city:"Columbus",     name:"Knights",      abbreviation:"CKN", conference:"Ironclad", division:"North", primaryColor:"#7F1D1D", secondaryColor:"#9CA3AF", stadium:"Cavalry Field",          overall:79 },
+  { city:"Cleveland",    name:"Foundry",      abbreviation:"CLD", conference:"Ironclad", division:"North", primaryColor:"#92400E", secondaryColor:"#6B7280", stadium:"Foundry Stadium",        overall:82 },
+  // Ironclad Conference — South
+  { city:"Nashville",    name:"Desperados",   abbreviation:"NVD", conference:"Ironclad", division:"South", primaryColor:"#111827", secondaryColor:"#D97706", stadium:"Opry Coliseum",          overall:80 },
+  { city:"Memphis",      name:"Blaze",        abbreviation:"MBZ", conference:"Ironclad", division:"South", primaryColor:"#C2410C", secondaryColor:"#1F2937", stadium:"Riverside Arena",        overall:78 },
+  { city:"Birmingham",   name:"Bolt",         abbreviation:"BBT", conference:"Ironclad", division:"South", primaryColor:"#6B21A8", secondaryColor:"#6B7280", stadium:"Bolt Field",             overall:76 },
+  { city:"Chattanooga",  name:"Thunder",      abbreviation:"CTR", conference:"Ironclad", division:"South", primaryColor:"#065F46", secondaryColor:"#B45309", stadium:"Thunder Gorge Arena",    overall:77 },
+  // Ironclad Conference — West
+  { city:"Denver",       name:"Peaks",        abbreviation:"DVP", conference:"Ironclad", division:"West",  primaryColor:"#3730A3", secondaryColor:"#FBBF24", stadium:"Summit Field",           overall:79 },
+  { city:"Reno",         name:"Royals",       abbreviation:"RNR", conference:"Ironclad", division:"West",  primaryColor:"#1E40AF", secondaryColor:"#D4AF37", stadium:"Crown Coliseum",         overall:91 },
+  { city:"Salt Lake",    name:"Blizzard",     abbreviation:"SLB", conference:"Ironclad", division:"West",  primaryColor:"#1E3A8A", secondaryColor:"#E0F2FE", stadium:"Blizzard Basin",         overall:78 },
+  { city:"Sacramento",   name:"Miners",       abbreviation:"SMN", conference:"Ironclad", division:"West",  primaryColor:"#D97706", secondaryColor:"#111827", stadium:"Gold Rush Field",        overall:81 },
+  // Gridiron Conference — East
+  { city:"Raleigh",      name:"Thunderhawks", abbreviation:"RTH", conference:"Gridiron", division:"East",  primaryColor:"#6B1B3C", secondaryColor:"#374151", stadium:"Thunderhawk Arena",      overall:86 },
+  { city:"Richmond",     name:"Cavalry",      abbreviation:"RCV", conference:"Gridiron", division:"East",  primaryColor:"#1E3A8A", secondaryColor:"#991B1B", stadium:"Colonial Field",         overall:76 },
+  { city:"Annapolis",    name:"Corsairs",     abbreviation:"ACS", conference:"Gridiron", division:"East",  primaryColor:"#0C2340", secondaryColor:"#C41230", stadium:"Chesapeake Arena",       overall:87 },
+  { city:"Charlotte",    name:"Vipers",       abbreviation:"CHV", conference:"Gridiron", division:"East",  primaryColor:"#4B1994", secondaryColor:"#65A30D", stadium:"Viper Pit Dome",         overall:78 },
+  // Gridiron Conference — North
+  { city:"Rockford",     name:"Blaze",        abbreviation:"RBZ", conference:"Gridiron", division:"North", primaryColor:"#C2410C", secondaryColor:"#111827", stadium:"Blaze Arena",            overall:75 },
+  { city:"Milwaukee",    name:"Wolves",       abbreviation:"MWW", conference:"Gridiron", division:"North", primaryColor:"#14532D", secondaryColor:"#9CA3AF", stadium:"Lakefront Field",        overall:83 },
+  { city:"Madison",      name:"Ice",          abbreviation:"MDI", conference:"Gridiron", division:"North", primaryColor:"#1E40AF", secondaryColor:"#E0F2FE", stadium:"Ice Bowl Stadium",       overall:84 },
+  { city:"Grand Rapids", name:"Fury",         abbreviation:"GRF", conference:"Gridiron", division:"North", primaryColor:"#4E0B2A", secondaryColor:"#FBBF24", stadium:"Fury Field",             overall:82 },
+  // Gridiron Conference — South
+  { city:"Savannah",     name:"Marshmen",     abbreviation:"SVT", conference:"Gridiron", division:"South", primaryColor:"#0F4C35", secondaryColor:"#FBBF24", stadium:"Marsh Meadows Arena",    overall:78 },
+  { city:"Baton Rouge",  name:"Bayou",        abbreviation:"BRB", conference:"Gridiron", division:"South", primaryColor:"#4B1994", secondaryColor:"#FBBF24", stadium:"Bayou Bowl",             overall:80 },
+  { city:"Tampa",        name:"Surge",        abbreviation:"TSG", conference:"Gridiron", division:"South", primaryColor:"#991B1B", secondaryColor:"#6B7280", stadium:"Surge Stadium",          overall:81 },
+  { city:"Orlando",      name:"Storm",        abbreviation:"ORS", conference:"Gridiron", division:"South", primaryColor:"#0C2340", secondaryColor:"#0369A1", stadium:"Storm Dome",             overall:74 },
+  // Gridiron Conference — West
+  { city:"Portland",     name:"Lumberjacks",  abbreviation:"PLJ", conference:"Gridiron", division:"West",  primaryColor:"#14532D", secondaryColor:"#991B1B", stadium:"Timber Field",           overall:74 },
+  { city:"Seattle",      name:"Cascade",      abbreviation:"SCS", conference:"Gridiron", division:"West",  primaryColor:"#1E3A8A", secondaryColor:"#166534", stadium:"Cascade Arena",          overall:83 },
+  { city:"San Francisco",name:"Fog",          abbreviation:"SFF", conference:"Gridiron", division:"West",  primaryColor:"#B45309", secondaryColor:"#7F1D1D", stadium:"Bay Shore Stadium",      overall:89 },
+  { city:"Los Angeles",  name:"Surf",         abbreviation:"LAS", conference:"Gridiron", division:"West",  primaryColor:"#0E7490", secondaryColor:"#EA580C", stadium:"Surf Stadium",           overall:80 },
 ];
 
 // ─── Schedule Generation ──────────────────────────────────────────────────────
@@ -331,7 +331,7 @@ function initSeason(playerTeamId?: string): Season {
     };
   });
 
-  const finalPlayerTeamId = playerTeamId ?? teams[13].id; // Kansas City Chiefs default
+  const finalPlayerTeamId = playerTeamId ?? teams[13].id; // Reno Royals default
   const games = generateSchedule(teams);
   const draftProspects = generateDraftClass(2025, 252);
   const teamIds = teams.map(t => t.id);
@@ -351,8 +351,8 @@ function initSeason(playerTeamId?: string): Season {
     isPlayoffs: false,
     news: [{
       id: uid(),
-      headline: "NFL 2025 Season Kicks Off!",
-      body: "All 32 teams begin their quest for the Super Bowl. Who will hoist the Lombardi Trophy?",
+      headline: "GFL 2025 Season Kicks Off!",
+      body: "All 32 teams launch their quest for the Gridiron Cup. Who will lift the trophy?",
       category: "general",
       timestamp: Date.now(),
       week: 1,

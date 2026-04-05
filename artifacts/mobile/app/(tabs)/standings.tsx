@@ -12,14 +12,14 @@ import { NFLTeamBadge } from "@/components/NFLTeamBadge";
 import { useColors } from "@/hooks/useColors";
 import { Conference, Division, NFLTeam, useNFL } from "@/context/NFLContext";
 
-const CONFERENCES: Conference[] = ["AFC", "NFC"];
+const CONFERENCES: Conference[] = ["Ironclad", "Gridiron"];
 const DIVISIONS: Division[] = ["East", "North", "South", "West"];
 
 export default function StandingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { season, getStandings } = useNFL();
-  const [activeConf, setActiveConf] = useState<Conference>("AFC");
+  const [activeConf, setActiveConf] = useState<Conference>("Ironclad");
   const [viewMode, setViewMode] = useState<"division" | "conference">("division");
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
