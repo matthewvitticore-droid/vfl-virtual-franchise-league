@@ -26,7 +26,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { membership, signOut } = useAuth();
-  const { season, isLoading, isSyncing, syncError, getPlayerTeam, getWeekGames, simulateWeek, getStandings } = useNFL();
+  const { season, isLoading, isSyncing, syncError, getPlayerTeam, getWeekGames, simulateWeek, getStandings, toggleCoGMMode } = useNFL();
   const [simulating, setSimulating] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const tickerX = useRef(new Animated.Value(0)).current;
@@ -192,6 +192,39 @@ export default function HomeScreen() {
           <QuickTile icon="award"   label="Draft Room"   sub={`${season?.draftProspects.filter(p=>!p.isPickedUp).length ?? 0} prospects`} color={colors.nflGold} onPress={() => router.push("/(tabs)/frontoffice")} />
           <QuickTile icon="edit-2"  label="Customize"   sub="Team identity & kits"  color={colors.nflBlue}    onPress={() => router.push("/customize")} />
         </View>
+
+        {/* Co-GM Mode Card */}
+        {season && (
+          <View style={[st.coGMCard, { backgroundColor: colors.card, borderColor: season.coGMMode ? colors.nflBlue + "80" : colors.border }]}>
+            <View style={[st.coGMAccent, { backgroundColor: season.coGMMode ? colors.nflBlue : colors.mutedForeground }]} />
+            <View style={st.coGMInner}>
+              <View style={[st.coGMIconWrap, { backgroundColor: (season.coGMMode ? colors.nflBlue : colors.mutedForeground) + "25" }]}>
+                <Feather name={season.coGMMode ? "users" : "user"} size={18} color={season.coGMMode ? colors.nflBlue : colors.mutedForeground} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[st.coGMTitle, { color: colors.foreground }]}>
+                  {season.coGMMode ? "Co-GM Mode Active" : "Solo Mode"}
+                </Text>
+                <Text style={[st.coGMSub, { color: colors.mutedForeground }]}>
+                  {season.coGMMode
+                    ? `Invite code: ${membership?.joinCode ?? "—"}  •  Tap to switch to Solo`
+                    : "Tap to enable Co-GM and invite a partner"}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={toggleCoGMMode}
+                style={[st.coGMToggleBtn, {
+                  backgroundColor: season.coGMMode ? colors.nflBlue : colors.secondary,
+                  borderColor: season.coGMMode ? colors.nflBlue : colors.border,
+                }]}
+              >
+                <Text style={[st.coGMToggleTxt, { color: season.coGMMode ? "#fff" : colors.mutedForeground }]}>
+                  {season.coGMMode ? "ON" : "OFF"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* Next game */}
         {myGame && (
@@ -444,6 +477,15 @@ const st = StyleSheet.create({
   newsCatText:    { fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:1 },
   newsHeadline:   { fontSize:13, fontFamily:"Inter_700Bold", marginBottom:3 },
   newsBody:       { fontSize:12, fontFamily:"Inter_400Regular", lineHeight:17 },
+  // Co-GM card
+  coGMCard:       { borderRadius:14, borderWidth:1, overflow:"hidden", marginBottom:18 },
+  coGMAccent:     { height:3 },
+  coGMInner:      { flexDirection:"row", alignItems:"center", gap:12, padding:14 },
+  coGMIconWrap:   { width:44, height:44, borderRadius:12, alignItems:"center", justifyContent:"center" },
+  coGMTitle:      { fontSize:14, fontFamily:"Inter_700Bold", marginBottom:2 },
+  coGMSub:        { fontSize:11, fontFamily:"Inter_400Regular", lineHeight:15 },
+  coGMToggleBtn:  { paddingHorizontal:14, paddingVertical:8, borderRadius:8, borderWidth:1, minWidth:46, alignItems:"center" },
+  coGMToggleTxt:  { fontSize:11, fontFamily:"Inter_700Bold", letterSpacing:0.5 },
   // Standings
   standingsCard:  { borderRadius:14, borderWidth:1, overflow:"hidden" },
   standingRow:    { flexDirection:"row", alignItems:"center", gap:9, paddingVertical:9, paddingHorizontal:12, borderBottomWidth:1 },

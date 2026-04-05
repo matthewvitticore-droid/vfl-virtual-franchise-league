@@ -124,23 +124,23 @@ const COMBINE_RANGES: Record<NFLPosition, {
   broad: [number,number]; shuttle: [number,number]; cone: [number,number];
   height: [number,number]; weight: [number,number]; arm: [number,number]; hand: [number,number];
 }> = {
-  QB:  { forty:[4.55,5.05], bench:[16,26],  vert:[28,40], broad:[102,122], shuttle:[4.15,4.50], cone:[6.90,7.50], height:[71,77], weight:[205,240], arm:[30,34], hand:[9.0,10.5] },
-  RB:  { forty:[4.30,4.65], bench:[18,32],  vert:[30,44], broad:[108,130], shuttle:[4.02,4.30], cone:[6.55,7.10], height:[67,73], weight:[185,230], arm:[29,33], hand:[8.5,10.0] },
-  WR:  { forty:[4.28,4.65], bench:[9,20],   vert:[32,46], broad:[118,136], shuttle:[3.98,4.28], cone:[6.50,7.10], height:[68,76], weight:[170,220], arm:[30,34], hand:[8.5,10.5] },
-  TE:  { forty:[4.50,4.90], bench:[20,32],  vert:[27,40], broad:[100,126], shuttle:[4.10,4.45], cone:[6.80,7.40], height:[73,79], weight:[240,275], arm:[31,35], hand:[9.0,11.0] },
-  OL:  { forty:[4.85,5.40], bench:[24,40],  vert:[23,34], broad:[96,118],  shuttle:[4.40,4.90], cone:[7.20,8.20], height:[74,80], weight:[285,340], arm:[32,37], hand:[9.5,11.5] },
-  DE:  { forty:[4.50,4.90], bench:[22,36],  vert:[27,40], broad:[102,124], shuttle:[4.10,4.50], cone:[6.70,7.30], height:[74,79], weight:[245,280], arm:[32,36], hand:[9.0,11.0] },
-  DT:  { forty:[4.75,5.20], bench:[28,42],  vert:[22,35], broad:[90,114],  shuttle:[4.30,4.80], cone:[7.00,8.00], height:[72,78], weight:[290,340], arm:[31,36], hand:[9.5,12.0] },
-  LB:  { forty:[4.45,4.85], bench:[22,35],  vert:[28,42], broad:[104,128], shuttle:[4.05,4.40], cone:[6.65,7.30], height:[72,76], weight:[225,255], arm:[30,34], hand:[8.5,10.5] },
-  CB:  { forty:[4.28,4.60], bench:[12,22],  vert:[32,46], broad:[116,136], shuttle:[3.95,4.25], cone:[6.45,7.00], height:[69,75], weight:[175,205], arm:[29,33], hand:[8.5,10.5] },
-  S:   { forty:[4.35,4.65], bench:[14,26],  vert:[30,44], broad:[110,130], shuttle:[3.98,4.30], cone:[6.55,7.15], height:[70,75], weight:[195,220], arm:[29,33], hand:[8.5,10.5] },
-  K:   { forty:[4.80,5.20], bench:[10,20],  vert:[25,36], broad:[98,118],  shuttle:[4.30,4.70], cone:[7.00,7.80], height:[70,76], weight:[175,215], arm:[28,33], hand:[8.5,10.5] },
-  P:   { forty:[4.90,5.30], bench:[10,18],  vert:[24,34], broad:[96,114],  shuttle:[4.40,4.80], cone:[7.10,7.90], height:[72,77], weight:[195,230], arm:[29,34], hand:[8.5,10.5] },
+  QB:  { forty:[4.60,5.00], bench:[15,28],  vert:[28,42], broad:[100,120], shuttle:[4.12,4.45], cone:[6.80,7.40], height:[71,77], weight:[205,240], arm:[30,34], hand:[9.0,10.5] },
+  RB:  { forty:[4.28,4.55], bench:[18,34],  vert:[32,45], broad:[110,132], shuttle:[4.00,4.28], cone:[6.55,7.10], height:[67,73], weight:[185,228], arm:[29,33], hand:[8.5,10.0] },
+  WR:  { forty:[4.28,4.55], bench:[9,22],   vert:[34,45], broad:[118,135], shuttle:[3.98,4.25], cone:[6.50,7.10], height:[68,76], weight:[170,215], arm:[30,34], hand:[8.5,10.5] },
+  TE:  { forty:[4.50,4.85], bench:[20,34],  vert:[28,42], broad:[102,126], shuttle:[4.08,4.42], cone:[6.75,7.35], height:[73,79], weight:[240,272], arm:[31,35], hand:[9.0,11.0] },
+  OL:  { forty:[4.90,5.40], bench:[24,40],  vert:[23,34], broad:[96,118],  shuttle:[4.40,4.88], cone:[7.20,8.10], height:[74,80], weight:[285,340], arm:[32,37], hand:[9.5,11.5] },
+  DE:  { forty:[4.60,5.05], bench:[22,37],  vert:[28,41], broad:[104,124], shuttle:[4.08,4.48], cone:[6.70,7.30], height:[74,79], weight:[245,278], arm:[32,36], hand:[9.0,11.0] },
+  DT:  { forty:[4.70,5.10], bench:[28,42],  vert:[22,36], broad:[90,114],  shuttle:[4.28,4.75], cone:[6.95,7.90], height:[72,78], weight:[290,340], arm:[31,36], hand:[9.5,12.0] },
+  LB:  { forty:[4.46,4.75], bench:[22,36],  vert:[30,43], broad:[106,130], shuttle:[4.04,4.38], cone:[6.60,7.25], height:[72,76], weight:[225,255], arm:[30,34], hand:[8.5,10.5] },
+  CB:  { forty:[4.28,4.55], bench:[12,22],  vert:[34,45], broad:[116,135], shuttle:[3.95,4.22], cone:[6.45,7.00], height:[69,75], weight:[175,202], arm:[29,33], hand:[8.5,10.5] },
+  S:   { forty:[4.28,4.55], bench:[14,27],  vert:[32,44], broad:[112,133], shuttle:[3.97,4.28], cone:[6.50,7.10], height:[70,75], weight:[195,218], arm:[29,33], hand:[8.5,10.5] },
+  K:   { forty:[4.80,5.20], bench:[10,20],  vert:[25,36], broad:[98,116],  shuttle:[4.28,4.68], cone:[6.95,7.75], height:[70,76], weight:[175,215], arm:[28,33], hand:[8.5,10.5] },
+  P:   { forty:[4.88,5.28], bench:[10,18],  vert:[24,34], broad:[96,114],  shuttle:[4.38,4.78], cone:[7.05,7.85], height:[72,77], weight:[195,228], arm:[29,34], hand:[8.5,10.5] },
 };
 
 function generateCombine(pos: NFLPosition, grade: number, dnp = false): CombineMeasurables {
   if (dnp) return {
-    fortyYardDash: 0, benchPress: 0, verticalJump: 0, broadJump: 0,
+    fortyYardDash: 0, tenYardSplit: 0, benchPress: 0, verticalJump: 0, broadJump: 0,
     shuttleRun: 0, threeCone: 0, height: 72, weight: 220, armLength: 32, handSize: 9.5, didNotParticipate: true,
   };
   const r = COMBINE_RANGES[pos];
@@ -151,9 +151,13 @@ function generateCombine(pos: NFLPosition, grade: number, dnp = false): CombineM
     const adjusted = base + (invert ? gradeBonus : -gradeBonus) * spread;
     return Math.round(clamp(adjusted, range[0] * 0.9, range[1] * 1.05) * 100) / 100;
   }
+  const forty = adj(r.forty, true);
+  // 10-yd split is ~41-43% of the 40-yd time with realistic variance
+  const tenSplit = Math.round(clamp(forty * 0.415 + rng(-0.02, 0.03), 1.44, 1.75) * 100) / 100;
   return {
-    fortyYardDash: adj(r.forty, true),     // lower = better
-    benchPress: Math.round(adj(r.bench)),   // higher = better
+    fortyYardDash: forty,
+    tenYardSplit: tenSplit,
+    benchPress: Math.round(adj(r.bench)),
     verticalJump: Math.round(adj(r.vert) * 2) / 2,
     broadJump: Math.round(adj(r.broad)),
     shuttleRun: adj(r.shuttle, true),

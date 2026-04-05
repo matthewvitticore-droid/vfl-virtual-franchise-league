@@ -14,7 +14,7 @@ import { CombineMeasurables } from "@/context/types";
 
 type Tab = "freeAgency" | "draft" | "trades";
 type DraftView = "board" | "combine" | "warRoom";
-type SortKey = "grade" | "fortyYardDash" | "benchPress" | "verticalJump" | "broadJump" | "shuttleRun" | "threeCone";
+type SortKey = "grade" | "fortyYardDash" | "tenYardSplit" | "benchPress" | "verticalJump" | "broadJump" | "shuttleRun" | "threeCone" | "speed" | "acceleration" | "agility" | "strength";
 
 const ALL_POS: NFLPosition[] = ["QB","RB","WR","TE","OL","DE","DT","LB","CB","S","K","P"];
 const POS_COLOR: Record<NFLPosition, string> = {
@@ -67,18 +67,32 @@ export default function FrontOfficeScreen() {
 
   // ── Draft data ────────────────────────────────────────────────────────────
 
+  const derivedVal = (p: DraftProspect, key: SortKey): number => {
+    const c = p.combine;
+    if (!c || c.didNotParticipate) return -999;
+    switch (key) {
+      case "speed":        return Math.round(Math.max(40, Math.min(99, 115 - c.fortyYardDash * 18)));
+      case "acceleration": return Math.round(Math.max(40, Math.min(99, 130 - (c.tenYardSplit ?? c.fortyYardDash * 0.41) * 72)));
+      case "agility":      return Math.round(Math.max(40, Math.min(99, 162 - c.threeCone * 18)));
+      case "strength":     return Math.round(Math.max(40, Math.min(99, c.benchPress * 1.6 + 22)));
+      default:             return (c as any)[key] ?? 0;
+    }
+  };
+
   const prospects = useMemo(() => {
     if (!season) return [];
     let list = season.draftProspects.filter(p => !p.isPickedUp);
     if (posFilter !== "ALL") list = list.filter(p => p.position === posFilter);
+    const DERIVED_KEYS = ["speed", "acceleration", "agility", "strength"];
+    const TIME_KEYS = ["fortyYardDash", "tenYardSplit", "shuttleRun", "threeCone"];
     return list.sort((a, b) => {
       if (sortKey === "grade") return sortAsc ? a.overallGrade - b.overallGrade : b.overallGrade - a.overallGrade;
       const getVal = (p: DraftProspect) => {
-        if (!p.combine || p.combine.didNotParticipate) return sortAsc ? 999 : -999;
+        if (!p.combine || p.combine.didNotParticipate) return sortAsc ? 9999 : -9999;
+        if (DERIVED_KEYS.includes(sortKey)) return derivedVal(p, sortKey);
         return (p.combine as any)[sortKey] ?? 0;
       };
-      // For times (forty, shuttle, cone), lower = better, so invert direction
-      const invertSort = ["fortyYardDash","shuttleRun","threeCone"].includes(sortKey);
+      const invertSort = TIME_KEYS.includes(sortKey);
       const aVal = getVal(a), bVal = getVal(b);
       return (sortAsc !== invertSort) ? aVal - bVal : bVal - aVal;
     });
@@ -250,11 +264,16 @@ export default function FrontOfficeScreen() {
                     <Text style={[st.colFix, { color: colors.mutedForeground }]}>#  PLAYER</Text>
                     <SortHeader label="GRD" sortKey="grade" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
                     <SortHeader label="40yd" sortKey="fortyYardDash" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
+                    <SortHeader label="10yd" sortKey="tenYardSplit" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
                     <SortHeader label="Bench" sortKey="benchPress" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
                     <SortHeader label="Vert" sortKey="verticalJump" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
                     <SortHeader label="Broad" sortKey="broadJump" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
                     <SortHeader label="Shuttle" sortKey="shuttleRun" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
                     <SortHeader label="3-Cone" sortKey="threeCone" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
+                    <SortHeader label="SPD" sortKey="speed" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
+                    <SortHeader label="ACC" sortKey="acceleration" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
+                    <SortHeader label="AGI" sortKey="agility" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
+                    <SortHeader label="STR" sortKey="strength" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
                   </View>
                   {prospects.slice(0, 60).map((p, idx) => (
                     <CombineRow key={p.id} p={p} rank={idx+1} colors={colors} teamColor={teamColor}
@@ -658,22 +677,41 @@ function CombineStat({ label, value }: { label: string; value: string }) {
   );
 }
 
+function deriveCombineRating(key: "speed"|"acceleration"|"agility"|"strength", c: CombineMeasurables): number {
+  switch (key) {
+    case "speed":        return Math.round(Math.max(40, Math.min(99, 115 - c.fortyYardDash * 18)));
+    case "acceleration": return Math.round(Math.max(40, Math.min(99, 130 - (c.tenYardSplit ?? c.fortyYardDash * 0.41) * 72)));
+    case "agility":      return Math.round(Math.max(40, Math.min(99, 162 - c.threeCone * 18)));
+    case "strength":     return Math.round(Math.max(40, Math.min(99, c.benchPress * 1.6 + 22)));
+  }
+}
+
 function CombineRow({ p, rank, colors, teamColor, isUserTurn, isGM, onDraft, onTap }: {
   p: DraftProspect; rank: number; colors: any; teamColor: string; isUserTurn: boolean; isGM: boolean; onDraft: () => void; onTap?: () => void;
 }) {
   const c = p.combine;
   const dnp = c.didNotParticipate;
+  const spd  = dnp ? 0 : deriveCombineRating("speed", c);
+  const acc  = dnp ? 0 : deriveCombineRating("acceleration", c);
+  const agi  = dnp ? 0 : deriveCombineRating("agility", c);
+  const str  = dnp ? 0 : deriveCombineRating("strength", c);
+  const ratingColor = (v: number) => v >= 90 ? "#FFD700" : v >= 80 ? colors.success : v >= 70 ? colors.foreground : colors.mutedForeground;
   return (
     <TouchableOpacity onPress={onTap} activeOpacity={onTap ? 0.7 : 1}
       style={[st.combineRowContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
       <Text style={[st.colFix2, { color: colors.mutedForeground }]}>{rank}. {p.name.split(" ")[1]}</Text>
-      <ColCell value={`${p.overallGrade}`}    color={colors.nflGold} />
+      <ColCell value={`${p.overallGrade}`} color={colors.nflGold} />
       <ColCell value={dnp ? "—" : `${c.fortyYardDash}`} color={!dnp && c.fortyYardDash < 4.4 ? colors.success : colors.foreground} />
-      <ColCell value={dnp ? "—" : `${c.benchPress}`}    color={!dnp && c.benchPress > 28 ? colors.success : colors.foreground} />
-      <ColCell value={dnp ? "—" : `${c.verticalJump}"`}  color={!dnp && c.verticalJump > 38 ? colors.success : colors.foreground} />
-      <ColCell value={dnp ? "—" : `${c.broadJump}"`}     color={colors.foreground} />
-      <ColCell value={dnp ? "—" : `${c.shuttleRun}"`}    color={!dnp && c.shuttleRun < 4.1 ? colors.success : colors.foreground} />
-      <ColCell value={dnp ? "—" : `${c.threeCone}"`}     color={!dnp && c.threeCone < 6.8 ? colors.success : colors.foreground} />
+      <ColCell value={dnp ? "—" : `${c.tenYardSplit ?? "—"}`} color={!dnp && (c.tenYardSplit ?? 99) < 1.52 ? colors.success : colors.foreground} />
+      <ColCell value={dnp ? "—" : `${c.benchPress}`} color={!dnp && c.benchPress > 28 ? colors.success : colors.foreground} />
+      <ColCell value={dnp ? "—" : `${c.verticalJump}"`} color={!dnp && c.verticalJump > 38 ? colors.success : colors.foreground} />
+      <ColCell value={dnp ? "—" : `${c.broadJump}"`} color={colors.foreground} />
+      <ColCell value={dnp ? "—" : `${c.shuttleRun}`} color={!dnp && c.shuttleRun < 4.1 ? colors.success : colors.foreground} />
+      <ColCell value={dnp ? "—" : `${c.threeCone}`} color={!dnp && c.threeCone < 6.8 ? colors.success : colors.foreground} />
+      <ColCell value={dnp ? "—" : `${spd}`} color={ratingColor(spd)} />
+      <ColCell value={dnp ? "—" : `${acc}`} color={ratingColor(acc)} />
+      <ColCell value={dnp ? "—" : `${agi}`} color={ratingColor(agi)} />
+      <ColCell value={dnp ? "—" : `${str}`} color={ratingColor(str)} />
       {isGM && isUserTurn && (
         <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); onDraft(); }} style={[st.draftBtnSm, { backgroundColor: teamColor }]}>
           <Text style={st.draftBtnSmText}>Draft</Text>

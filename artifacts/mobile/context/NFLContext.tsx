@@ -70,10 +70,9 @@ function rn() { return `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`; }
 // ─── Rating & Salary Generators ───────────────────────────────────────────────
 
 function genRating(teamBase: number, isStarter: boolean, isElite: boolean): number {
-  const base = Math.min(teamBase, 88);
-  if (isElite) return gaussian(base + 5, 2, 85, 97);
-  if (isStarter) return gaussian(base, 4, 60, 95);
-  return gaussian(base - 17, 4, 48, 82);
+  if (isElite) return gaussian(teamBase + 4, 3, 88, 99);
+  if (isStarter) return gaussian(teamBase, 7, 73, 95);
+  return gaussian(teamBase - 13, 6, 62, 79);
 }
 
 function genSalary(overall: number, pos: NFLPosition): number {
@@ -282,10 +281,22 @@ const ROSTER_TEMPLATE: PositionSlot[] = [
 ];
 
 function generateRoster(teamOverall: number): Player[] {
+  const usedOveralls = new Set<number>();
   return ROSTER_TEMPLATE.map((slot) => {
     const isStarter = slot.depth === 1;
     const isElite = slot.isElite === true && Math.random() < 0.15;
-    const overall = genRating(teamOverall, isStarter, isElite);
+    let overall: number;
+    if (isElite) {
+      overall = gaussian(teamOverall + 4, 3, 88, 99);
+    } else if (slot.depth === 1) {
+      overall = gaussian(teamOverall, 7, 73, 95);
+    } else if (slot.depth === 2) {
+      overall = gaussian(teamOverall - 13, 6, 62, 78);
+    } else {
+      overall = gaussian(teamOverall - 23, 5, 52, 65);
+    }
+    while (usedOveralls.has(overall)) overall = clamp(overall + (Math.random() < 0.5 ? 1 : -1), 45, 99);
+    usedOveralls.add(overall);
     const pos = slot.pos;
     const exp = isStarter ? irng(2, 12) : irng(0, 6);
     const age = 21 + exp + irng(0, 4);
@@ -1092,6 +1103,15 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
     setSeason(s);
   }, [membership]);
 
+  const toggleCoGMMode = useCallback(async () => {
+    setSeason(s => {
+      if (!s) return s;
+      const updated = { ...s, coGMMode: !s.coGMMode };
+      AsyncStorage.setItem(CACHE_KEY, JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
+  }, []);
+
   return (
     <NFLContext.Provider value={{
       season, isLoading, isSyncing, syncError,
@@ -1103,6 +1123,7 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       proposeTrade, respondToTrade,
       advancePhase, addNews, resetSeason,
       teamCustomization, saveCustomization, setGameDayUniform,
+      toggleCoGMMode,
     }}>
       {children}
     </NFLContext.Provider>

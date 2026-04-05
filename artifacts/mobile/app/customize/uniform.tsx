@@ -132,7 +132,7 @@ export default function UniformScreen() {
         ))}
       </View>
 
-      <ScrollView contentContainerStyle={[st.content, { paddingBottom: 100 }]} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[st.content, { paddingBottom: 140 }]} showsVerticalScrollIndicator={false}>
 
         {/* Live Preview */}
         <View style={[st.previewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -215,6 +215,15 @@ export default function UniformScreen() {
 
       </ScrollView>
 
+      {/* Floating Save Button */}
+      <View style={[st.floatSaveWrap, { bottom: insets.bottom + 16 }]}>
+        <TouchableOpacity onPress={handleSave} disabled={saving}
+          style={[st.floatSaveBtn, { backgroundColor: colors.nflBlue, opacity: saving ? 0.6 : 1 }]}>
+          <Feather name="save" size={17} color="#fff" />
+          <Text style={st.floatSaveTxt}>{saving ? "Saving…" : "Save Uniforms"}</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Color picker */}
       <ColorPickerModal
         visible={pickerTarget !== null}
@@ -296,4 +305,7 @@ const st = StyleSheet.create({
   colorHex:      { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   colorSwatch:   { width: 28, height: 28, borderRadius: 7, borderWidth: 1, borderColor: "rgba(255,255,255,0.15)" },
   divider:       { height: 1, marginHorizontal: 16 },
+  floatSaveWrap: { position: "absolute", left: 16, right: 16 },
+  floatSaveBtn:  { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 16, borderRadius: 14 },
+  floatSaveTxt:  { fontSize: 15, fontFamily: "Inter_700Bold", color: "#fff" },
 });

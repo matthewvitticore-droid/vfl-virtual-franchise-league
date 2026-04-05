@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
 import React, { useMemo, useState } from "react";
 import {
   Alert, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View,
@@ -98,6 +99,29 @@ export default function RosterScreen() {
     );
   }
 
+  async function handleExportCSV() {
+    if (!team) return;
+    const header = "Name,Position,Overall,Age,Exp,Salary,Dev\n";
+    const rows = [...team.roster]
+      .sort((a, b) => b.overall - a.overall)
+      .map(p => `${p.name},${p.position},${p.overall},${p.age},${p.experience},${p.salary.toFixed(1)},${p.development}`)
+      .join("\n");
+    const csv = header + rows;
+    if (Platform.OS === "web") {
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${team.city}_${team.name}_roster.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      Alert.alert("Exported!", "Roster CSV downloaded.");
+    } else {
+      await Clipboard.setStringAsync(csv);
+      Alert.alert("Copied!", "Roster CSV copied to clipboard. Paste into any spreadsheet app.");
+    }
+  }
+
   if (!team) return null;
 
   return (
@@ -105,14 +129,20 @@ export default function RosterScreen() {
       {/* Header */}
       <View style={[st.header, { paddingTop: topPad + 8, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <View style={st.headerTop}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={[st.headerTitle, { color: colors.foreground }]}>{team.city} {team.name}</Text>
             <Text style={[st.headerSub, { color: colors.mutedForeground }]}>
               Cap: ${capUsed}M used · ${capLeft}M avail · ${deadCap}M dead
             </Text>
           </View>
-          <View style={[st.roleBadge, { backgroundColor: teamColor + "25", borderColor: teamColor }]}>
-            <Text style={[st.roleText, { color: teamColor }]}>{role}</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <TouchableOpacity onPress={handleExportCSV} style={[st.exportBtn, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+              <Feather name="download" size={13} color={colors.mutedForeground} />
+              <Text style={[st.exportBtnText, { color: colors.mutedForeground }]}>Export</Text>
+            </TouchableOpacity>
+            <View style={[st.roleBadge, { backgroundColor: teamColor + "25", borderColor: teamColor }]}>
+              <Text style={[st.roleText, { color: teamColor }]}>{role}</Text>
+            </View>
           </View>
         </View>
         {/* Tab bar */}
@@ -395,6 +425,8 @@ const st = StyleSheet.create({
   headerTitle:    { fontSize: 18, fontFamily: "Inter_700Bold" },
   headerSub:      { fontSize: 11, fontFamily: "Inter_400Regular" },
   roleBadge:      { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1 },
+  exportBtn:      { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
+  exportBtnText:  { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   roleText:       { fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
   tabScroll:      {},
   tabBtn:         { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1 },

@@ -32,6 +32,7 @@ export interface PlayerInjury {
 
 export interface CombineMeasurables {
   fortyYardDash: number;   // seconds e.g. 4.38
+  tenYardSplit: number;    // seconds e.g. 1.52
   benchPress: number;      // reps at 225 lbs e.g. 24
   verticalJump: number;    // inches e.g. 38.5
   broadJump: number;       // inches e.g. 130
@@ -403,6 +404,7 @@ export interface Season {
   isPlayoffs: boolean;
   news: NewsItem[];
   tradeOffers: TradeOffer[];
+  coGMMode?: boolean;
 }
 
 // ─── Uniform & Customization ──────────────────────────────────────────────────
@@ -499,4 +501,6 @@ export interface NFLContextValue {
   teamCustomization: TeamCustomization | null;
   saveCustomization: (data: TeamCustomization) => Promise<void>;
   setGameDayUniform: (gameId: string, uniform: "home" | "away" | "alternate") => Promise<void>;
+  // Co-GM mode
+  toggleCoGMMode: () => Promise<void>;
 }
