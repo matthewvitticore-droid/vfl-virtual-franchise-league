@@ -316,7 +316,7 @@ function generateRoster(teamOverall: number): Player[] {
       status: isStarter ? "Starter" : slot.depth === 3 ? "Practice Squad" : "Backup",
       depthOrder: slot.depth,
       stats: emptyStats(2025),
-      careerStats: genCareerStats(pos, overall, exp),
+      careerStats: [],
       fatigue: 0,
       morale: irng(60, 95),
       faInterestLevel: irng(1, 5),

@@ -187,7 +187,7 @@ export default function StatsScreen() {
           if (v > bv) { bv = v; bn = p.name; bt = p.teamAbbr; bSeason = cs.season; }
         }
         const cv = get(p.stats);
-        if (cv > bv) { bv = cv; bn = p.name; bt = p.teamAbbr; bSeason = p.stats.season; }
+        if (cv > bv && gamesPlayed > 0) { bv = cv; bn = p.name; bt = p.teamAbbr; bSeason = p.stats.season; }
       }
       return { category, value: bv > 0 ? fmt(bv) : "—", playerName: bn, team: bt, season: bSeason };
     }
@@ -339,7 +339,15 @@ export default function StatsScreen() {
               <Feather name="award" size={14} color={colors.nflGold} />
               <Text style={[st.recordsTitle, { color: colors.foreground }]}>All-Time Single Season Records</Text>
             </View>
-            {records.map((r, i) => <RecordRow key={i} r={r} idx={i} colors={colors} />)}
+            {gamesPlayed === 0 ? (
+              <View style={st.emptyBox}>
+                <Feather name="clock" size={32} color={colors.mutedForeground} />
+                <Text style={[st.emptyTitle, { color: colors.foreground }]}>No records yet</Text>
+                <Text style={[st.emptySub, { color: colors.mutedForeground }]}>Start simming games to build VFL history</Text>
+              </View>
+            ) : (
+              records.map((r, i) => <RecordRow key={i} r={r} idx={i} colors={colors} />)
+            )}
           </View>
         )}
 

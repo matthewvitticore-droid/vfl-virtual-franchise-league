@@ -95,7 +95,7 @@ export default function FrontOfficeScreen() {
 
   function handleSort(key: SortKey) {
     if (sortKey === key) setSortAsc(a => !a);
-    else { setSortKey(key); setSortAsc(key !== "grade"); }
+    else { setSortKey(key); setSortAsc(false); }
   }
 
   async function handleSimulateAllAI() {

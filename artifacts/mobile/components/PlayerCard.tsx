@@ -120,8 +120,8 @@ export function PlayerCard({
   const devIcon  = DEV_ICON[player.developmentTrait]  ?? "user";
   const ovrC     = ovrColor(player.overall);
 
-  const figW = expanded ? 108 : 94;
-  const figH = expanded ? 240 : 206;
+  const figW = expanded ? 116 : 104;
+  const figH = expanded ? 155 : 139;
 
   return (
     // Outer chrome border container
