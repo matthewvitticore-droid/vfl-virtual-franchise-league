@@ -425,7 +425,14 @@ export function PlayerStatsModal({ player, visible, onClose, teamPrimaryColor, g
           {/* Header */}
           <View style={modal.header}>
             <View style={{ flex:1 }}>
-              <Text style={[modal.name, { color: colors.foreground }]}>{player.name}</Text>
+              <View style={{ flexDirection:"row", alignItems:"center", gap:7, marginBottom:4 }}>
+                <Text style={[modal.name, { color: colors.foreground }]}>{player.name}</Text>
+                {player.yearsExperience === 0 && (
+                  <View style={modal.rookieBadge}>
+                    <Text style={modal.rookieTxt}>R</Text>
+                  </View>
+                )}
+              </View>
               <View style={{ flexDirection:"row", alignItems:"center", gap:6 }}>
                 <View style={[modal.posBadge, { backgroundColor: posColor+"25", borderColor: posColor+"60" }]}>
                   <Text style={[modal.posText, { color: posColor }]}>{player.position}</Text>
@@ -434,6 +441,11 @@ export function PlayerStatsModal({ player, visible, onClose, teamPrimaryColor, g
                   {player.age}yo · {player.yearsExperience}yr exp · {player.overall} OVR
                 </Text>
               </View>
+              {!!player.draftYear && (
+                <Text style={[modal.draftBio, { color: colors.mutedForeground }]}>
+                  Drafted {player.draftYear} · Round {player.draftRound} · Pick #{player.draftPick}
+                </Text>
+              )}
             </View>
             <TouchableOpacity onPress={onClose} style={modal.closeBtn}>
               <Feather name="x" size={18} color={colors.mutedForeground} />
@@ -487,6 +499,9 @@ const modal = StyleSheet.create({
   posBadge: { paddingHorizontal:7, paddingVertical:2, borderRadius:5, borderWidth:1 },
   posText:  { fontSize:10, fontFamily:"Inter_700Bold" },
   meta:     { fontSize:11, fontFamily:"Inter_400Regular" },
+  rookieBadge: { backgroundColor:"#FF6B35", paddingHorizontal:6, paddingVertical:2, borderRadius:5, alignSelf:"flex-start" },
+  rookieTxt:   { fontSize:9, fontFamily:"Inter_700Bold", color:"#fff", letterSpacing:0.5 },
+  draftBio:    { fontSize:10, fontFamily:"Inter_500Medium", marginTop:4, opacity:0.7 },
   closeBtn: { padding:6, marginTop:2 },
   tabBar:   { flexDirection:"row", marginHorizontal:14, marginBottom:6,
               borderRadius:10, borderWidth:1, padding:3, gap:3 },
