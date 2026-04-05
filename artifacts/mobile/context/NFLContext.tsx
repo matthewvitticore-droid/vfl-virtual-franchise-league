@@ -101,6 +101,25 @@ function emptyStats(): PlayerSeasonStats {
   };
 }
 
+const COLLEGES = [
+  "Alabama","Ohio State","Georgia","Clemson","LSU","Oklahoma","Michigan","Notre Dame","Penn State","Texas",
+  "Oregon","USC","Florida","Florida State","Auburn","Tennessee","Ole Miss","Arkansas","Nebraska","Iowa",
+  "Wisconsin","Michigan State","TCU","Baylor","Texas Tech","Kansas State","Iowa State","Utah","Washington",
+  "Miami","Pittsburgh","Virginia Tech","NC State","Louisville","Duke","Syracuse","Fresno State","Boise State",
+  "BYU","SMU","Memphis","Appalachian State","Coastal Carolina","Liberty","UCLA","Stanford","Cincinnati","UCF",
+];
+
+const JERSEY_RANGES: Record<NFLPosition, [number, number]> = {
+  QB: [1,  17], RB: [20, 49], WR: [10, 49], TE: [80, 89],
+  OL: [50, 79], DE: [90, 99], DT: [90, 99], LB: [40, 59],
+  CB: [20, 39], S:  [20, 39], K:  [1,  17], P:  [1,  17],
+};
+
+function genJerseyNumber(pos: NFLPosition, seed: number): number {
+  const [lo, hi] = JERSEY_RANGES[pos];
+  return lo + (seed % (hi - lo + 1));
+}
+
 // ─── Roster Template ──────────────────────────────────────────────────────────
 
 interface PositionSlot { pos: NFLPosition; depth: number; isElite?: boolean }
@@ -144,6 +163,7 @@ function generateRoster(teamOverall: number): Player[] {
     const salary = genSalary(overall, pos);
     const sigBonus = Math.round(salary * rng2(0.1, 0.4) * 10) / 10;
     const guaranteed = Math.round(salary * rng2(0.3, 0.7) * 10) / 10;
+    const seed = irng(0, 99);
     return {
       id: uid(),
       name: rn(),
@@ -168,6 +188,8 @@ function generateRoster(teamOverall: number): Player[] {
       morale: irng(60, 95),
       faInterestLevel: irng(1, 5),
       developmentTrait: genDevTrait(overall, age),
+      college: pick(COLLEGES),
+      jerseyNumber: genJerseyNumber(pos, seed),
     };
   });
 }
@@ -206,6 +228,8 @@ function generateFreeAgents(count = 60): Player[] {
       morale: irng(50, 85),
       faInterestLevel: interest,
       developmentTrait: genDevTrait(overall, 22 + exp),
+      college: pick(COLLEGES),
+      jerseyNumber: genJerseyNumber(pos, irng(0, 99)),
     };
   });
 }
@@ -760,6 +784,8 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       morale: 90,
       faInterestLevel: 5,
       developmentTrait: genDevTrait(Math.round(prospect.overallGrade * 0.85), 21),
+      college: prospect.college,
+      jerseyNumber: genJerseyNumber(prospect.position, irng(0, 99)),
     };
 
     const newsItem: Omit<NewsItem,"id"|"timestamp"> = {

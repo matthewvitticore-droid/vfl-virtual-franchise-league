@@ -9,6 +9,7 @@ import { useAuth } from "@/context/AuthContext";
 import {
   GamePlan, Formation, NFLPosition, OffenseScheme, Player, useNFL,
 } from "@/context/NFLContext";
+import { PlayerCard } from "@/components/PlayerCard";
 
 const ALL_POS: NFLPosition[] = ["QB","RB","WR","TE","OL","DE","DT","LB","CB","S","K","P"];
 const POS_COLOR: Record<NFLPosition, string> = {
@@ -185,54 +186,23 @@ export default function RosterScreen() {
             </ScrollView>
             {roster.map(p => (
               <TouchableOpacity key={p.id} onPress={() => setExpanded(expanded === p.id ? null : p.id)}
-                activeOpacity={0.8} style={[st.playerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={st.playerRow}>
-                  <View style={[st.posCircle, { backgroundColor: POS_COLOR[p.position] + "25" }]}>
-                    <Text style={[st.posCircleText, { color: POS_COLOR[p.position] }]}>{p.position}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <View style={st.playerNameRow}>
-                      <Text style={[st.playerName, { color: colors.foreground }]}>{p.name}</Text>
-                      {p.developmentTrait !== "Normal" && (
-                        <Feather name={DEV_ICONS[p.developmentTrait]} size={12} color={DEV_COLORS[p.developmentTrait]} />
-                      )}
-                      {p.injury && <Feather name="alert-circle" size={12} color={colors.danger} />}
-                    </View>
-                    <Text style={[st.playerMeta, { color: colors.mutedForeground }]}>
-                      Age {p.age} · {p.yearsExperience}yr · ${p.salary}M/yr · {p.contractYears}yr left
-                    </Text>
-                  </View>
-                  <OvrBadge value={p.overall} color={POS_COLOR[p.position]} />
-                  <Feather name={expanded === p.id ? "chevron-up" : "chevron-down"} size={16} color={colors.mutedForeground} style={{ marginLeft: 8 }} />
-                </View>
-
+                activeOpacity={0.88}>
+                <PlayerCard
+                  player={p}
+                  teamPrimaryColor={teamColor}
+                  teamSecondaryColor={team?.secondaryColor}
+                  expanded={expanded === p.id}
+                  showInjury
+                />
                 {expanded === p.id && (
-                  <View style={[st.playerExpanded, { borderTopColor: colors.border }]}>
-                    {/* Ratings */}
-                    <View style={st.ratingsRow}>
-                      <RatingBar label="SPD" value={p.speed} color="#3FB950" />
-                      <RatingBar label="STR" value={p.strength} color="#FB4F14" />
-                      <RatingBar label="AWR" value={p.awareness} color="#00B5E2" />
-                      <RatingBar label="POS" value={p.specific} color={POS_COLOR[p.position]} />
-                    </View>
+                  <View style={[st.expandedActions, { backgroundColor: colors.card, borderColor: colors.border }]}>
                     {/* Contract details */}
                     <View style={[st.contractBlock, { backgroundColor: colors.secondary }]}>
-                      <ContractRow label="APY" value={`$${p.salary}M`} />
                       <ContractRow label="Signing Bonus" value={`$${p.signingBonus?.toFixed(1)}M`} />
                       <ContractRow label="Guaranteed" value={`$${p.guaranteedMoney?.toFixed(1)}M`} />
                       <ContractRow label="Dead Cap" value={`$${p.deadCap?.toFixed(1)}M`} color={colors.danger} />
-                      <ContractRow label="Yrs Remaining" value={`${p.contractYears}`} />
+                      <ContractRow label="Years Remaining" value={`${p.contractYears}`} />
                     </View>
-                    {/* Injury */}
-                    {p.injury && (
-                      <View style={[st.injBlock, { backgroundColor: colors.danger + "15", borderColor: colors.danger + "40" }]}>
-                        <Feather name="alert-circle" size={14} color={colors.danger} />
-                        <Text style={[st.injBlockText, { color: colors.danger }]}>
-                          {p.injury.location} ({p.injury.severity}) — {p.injury.weeksRemaining} wk{p.injury.weeksRemaining !== 1 ? "s" : ""} remaining
-                        </Text>
-                      </View>
-                    )}
-                    {/* Actions */}
                     {isGM && (
                       <View style={st.actionRow}>
                         {p.contractYears >= 2 && (
@@ -269,31 +239,21 @@ export default function RosterScreen() {
         {tab === "freeAgency" && (
           <View style={{ padding: 16, gap: 12 }}>
             <Text style={[st.faNote, { color: colors.mutedForeground }]}>
-              Tap a player to negotiate a contract. Interest level shows how much they want to play for your team.
+              Tap a player to negotiate a contract. Interest level shows how much they want to join your team.
             </Text>
             {(season?.freeAgents ?? []).sort((a, b) => b.overall - a.overall).slice(0, 30).map(p => (
               <TouchableOpacity key={p.id} onPress={() => setExpanded(expanded === p.id ? null : p.id)}
-                activeOpacity={0.8}
-                style={[st.playerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={st.playerRow}>
-                  <View style={[st.posCircle, { backgroundColor: POS_COLOR[p.position] + "25" }]}>
-                    <Text style={[st.posCircleText, { color: POS_COLOR[p.position] }]}>{p.position}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[st.playerName, { color: colors.foreground }]}>{p.name}</Text>
-                    <Text style={[st.playerMeta, { color: colors.mutedForeground }]}>Age {p.age} · {p.yearsExperience}yr exp · Market: ${p.salary}M/yr</Text>
-                    <InterestBar level={p.faInterestLevel} teamColor={teamColor} />
-                  </View>
-                  <OvrBadge value={p.overall} color={POS_COLOR[p.position]} />
-                </View>
+                activeOpacity={0.88}>
+                <PlayerCard
+                  player={p}
+                  teamPrimaryColor={teamColor}
+                  teamSecondaryColor={team?.secondaryColor}
+                  expanded={expanded === p.id}
+                  showInjury={false}
+                />
                 {expanded === p.id && (
-                  <View style={[st.playerExpanded, { borderTopColor: colors.border }]}>
-                    <View style={st.ratingsRow}>
-                      <RatingBar label="SPD" value={p.speed} color="#3FB950" />
-                      <RatingBar label="STR" value={p.strength} color="#FB4F14" />
-                      <RatingBar label="AWR" value={p.awareness} color="#00B5E2" />
-                      <RatingBar label="POS" value={p.specific} color={POS_COLOR[p.position]} />
-                    </View>
+                  <View style={[st.expandedActions, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <InterestBar level={p.faInterestLevel} teamColor={teamColor} />
                     {isGM && (
                       <View style={st.signBtnRow}>
                         {[1, 2, 3].map(yrs => (
@@ -446,4 +406,5 @@ const st = StyleSheet.create({
   signBtn:        { flex: 1, alignItems: "center", paddingVertical: 8, borderRadius: 8, borderWidth: 1 },
   signBtnText:    { fontSize: 12, fontFamily: "Inter_700Bold" },
   faNote:         { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
+  expandedActions: { borderWidth: 1, borderTopWidth: 0, borderBottomLeftRadius: 16, borderBottomRightRadius: 16, padding: 14, gap: 10 },
 });

@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
 import { DraftProspect, NFLPosition, Player, TradeOffer, useNFL } from "@/context/NFLContext";
+import { PlayerCard } from "@/components/PlayerCard";
 import { CombineMeasurables } from "@/context/types";
 
 type Tab = "freeAgency" | "draft" | "trades";
@@ -447,43 +448,24 @@ function FAPlayerCard({ p, expanded, teamColor, isGM, colors, onToggle, onSign }
   onToggle: () => void; onSign: (yrs: number, sal: number) => void;
 }) {
   return (
-    <TouchableOpacity onPress={onToggle} activeOpacity={0.8}
-      style={[st.playerCard, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-      <View style={st.playerRow}>
-        <View style={[st.posCircle, { backgroundColor: POS_COLOR[p.position] + "25" }]}>
-          <Text style={[st.posCircleText, { color: POS_COLOR[p.position] }]}>{p.position}</Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[st.playerName, { color: colors.foreground }]}>{p.name}</Text>
-          <Text style={[st.playerMeta, { color: colors.mutedForeground }]}>Age {p.age} · {p.yearsExperience}yr exp · Market: ${p.salary}M/yr</Text>
+    <TouchableOpacity onPress={onToggle} activeOpacity={0.88}>
+      <PlayerCard
+        player={p}
+        teamPrimaryColor={teamColor}
+        expanded={expanded}
+        showInjury={false}
+      />
+      {expanded && (
+        <View style={[st.expandedSection, { backgroundColor: colors.card, borderColor: colors.border, borderTopWidth: 0, borderWidth: 1, borderBottomLeftRadius: 16, borderBottomRightRadius: 16, padding: 12 }]}>
+          {/* Interest meter */}
           <View style={st.interestRow}>
             {[1,2,3,4,5].map(i => <View key={i} style={[st.interestDot, { backgroundColor: i <= p.faInterestLevel ? teamColor : "#ffffff15" }]} />)}
             <Text style={[st.interestLabel, { color: colors.mutedForeground }]}>
               {p.faInterestLevel >= 5 ? "Very Interested" : p.faInterestLevel >= 4 ? "Interested" : p.faInterestLevel >= 3 ? "Open" : p.faInterestLevel >= 2 ? "Low Interest" : "Not Interested"}
             </Text>
           </View>
-        </View>
-        <View style={[st.ovrBadge, { backgroundColor: POS_COLOR[p.position]+"22", borderColor: POS_COLOR[p.position]+"55" }]}>
-          <Text style={[st.ovrText, { color: POS_COLOR[p.position] }]}>{p.overall}</Text>
-        </View>
-      </View>
-      {expanded && (
-        <View style={[st.expandedSection, { borderTopColor: colors.border }]}>
-          <View style={st.ratingsRow}>
-            {[{l:"SPD",v:p.speed,c:"#3FB950"},{l:"STR",v:p.strength,c:"#FB4F14"},{l:"AWR",v:p.awareness,c:"#00B5E2"},{l:"POS",v:p.specific,c:POS_COLOR[p.position]}].map(r => (
-              <View key={r.l} style={{ flex:1, gap:3 }}>
-                <View style={{flexDirection:"row",justifyContent:"space-between"}}>
-                  <Text style={{fontSize:9,fontFamily:"Inter_600SemiBold",color:colors.mutedForeground}}>{r.l}</Text>
-                  <Text style={{fontSize:9,fontFamily:"Inter_700Bold",color:r.c}}>{r.v}</Text>
-                </View>
-                <View style={{height:4,backgroundColor:colors.secondary,borderRadius:2}}>
-                  <View style={{height:"100%",width:`${r.v}%`,backgroundColor:r.c,borderRadius:2}} />
-                </View>
-              </View>
-            ))}
-          </View>
           {isGM && (
-            <View style={{ flexDirection:"row", gap:8 }}>
+            <View style={{ flexDirection:"row", gap:8, marginTop: 8 }}>
               {[1,2,3].map(yrs => {
                 const sal = parseFloat((p.salary * (1 + (yrs-1)*0.03)).toFixed(1));
                 return (

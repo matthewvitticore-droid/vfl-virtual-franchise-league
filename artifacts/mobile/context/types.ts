@@ -109,6 +109,8 @@ export interface Player {
   morale: number;           // 0–100
   faInterestLevel: number;  // 1–5 (as a FA, interest in your team)
   developmentTrait: DevelopmentTrait;
+  college?: string;
+  jerseyNumber?: number;
 }
 
 // ─── Draft Prospect ───────────────────────────────────────────────────────────
