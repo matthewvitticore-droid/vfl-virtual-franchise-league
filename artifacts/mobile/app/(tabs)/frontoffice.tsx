@@ -78,7 +78,7 @@ export default function FrontOfficeScreen() {
       case "acceleration": {
         // Lower shuttle + 3-cone = higher ACC (both equally weighted)
         const sRtg = Math.max(40, Math.min(99, 99 - (c.shuttleRun - 3.9) * 57));
-        const cRtg = Math.max(40, Math.min(99, 99 - (c.threeCone - 6.4) * 33));
+        const cRtg = Math.max(40, Math.min(99, 99 - (c.threeCone - 6.5) * 33));
         return Math.round((sRtg + cRtg) / 2);
       }
       case "agility": {
@@ -700,7 +700,7 @@ function deriveCombineRating(key: "speed"|"acceleration"|"agility"|"strength", c
     case "acceleration": {
       // Lower shuttle + lower 3-cone = higher ACC (equally weighted)
       const sRtg = Math.max(40, Math.min(99, 99 - (c.shuttleRun - 3.9) * 57));
-      const cRtg = Math.max(40, Math.min(99, 99 - (c.threeCone - 6.4) * 33));
+      const cRtg = Math.max(40, Math.min(99, 99 - (c.threeCone - 6.5) * 33));
       return Math.round((sRtg + cRtg) / 2);
     }
     case "agility": {
