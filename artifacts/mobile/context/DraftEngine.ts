@@ -342,7 +342,7 @@ export function generateDraftClass(year: number, count = 252): DraftProspect[] {
       strengths: picks(strPool, numStrengths),
       weaknesses: picks(wkPool, numWeaknesses),
       isPickedUp: false,
-      scoutingUnlocked: grade >= 80,
+      scoutingUnlocked: true,
     });
   }
 

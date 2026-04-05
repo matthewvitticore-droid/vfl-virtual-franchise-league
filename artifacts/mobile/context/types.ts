@@ -12,6 +12,14 @@ export type PlayType = "run" | "pass" | "punt" | "fieldGoal" | "kickoff" | "extr
 export type PlayResult = "gain" | "loss" | "touchdown" | "interception" | "fumble" | "incomplete" | "sack" | "fieldGoalGood" | "fieldGoalMiss" | "punt" | "spike" | "kneel" | "safety";
 export type GamePhase = "pregame" | "q1" | "q2" | "halftime" | "q3" | "q4" | "overtime" | "final";
 export type SeasonPhase = "preseason" | "regular" | "playoffs" | "offseason" | "freeAgency" | "draft";
+export type PlayoffRound = "wildCard" | "divisional" | "conference" | "vflBowl";
+
+export interface PlayoffSeed {
+  teamId: string;
+  seed: number;
+  conference: Conference;
+  isDivisionWinner: boolean;
+}
 export type WeatherCondition = "Clear" | "Cloudy" | "Wind" | "Rain" | "Snow" | "Dome";
 export type InjurySeverity = "DTD" | "IR" | "Season";
 export type InjuryLocation = "Knee" | "Hamstring" | "Shoulder" | "Ankle" | "Concussion" | "Back" | "Foot" | "Elbow" | "Hip" | "Wrist" | "Ribs" | "Quad" | "Groin";
@@ -357,7 +365,12 @@ export interface NFLGame {
   phase: GamePhase;
   stats: { home: TeamGameStats; away: TeamGameStats };
   weather: GameWeather;
-  location: string; // e.g. "Arrowhead Stadium"
+  location: string;
+  isPlayoffGame?: boolean;
+  playoffRound?: PlayoffRound;
+  playoffConference?: Conference;
+  playoffSeedHome?: number;
+  playoffSeedAway?: number;
 }
 
 // ─── Team ─────────────────────────────────────────────────────────────────────
@@ -405,6 +418,10 @@ export interface Season {
   news: NewsItem[];
   tradeOffers: TradeOffer[];
   coGMMode?: boolean;
+  byeWeeks?: Record<string, number>;
+  playoffSeeds?: PlayoffSeed[];
+  playoffRound?: PlayoffRound;
+  vflBowlWinnerId?: string;
 }
 
 // ─── Uniform & Customization ──────────────────────────────────────────────────

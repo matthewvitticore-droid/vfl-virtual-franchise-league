@@ -9,7 +9,7 @@ import type {
   TradeOffer, NFLContextValue, NFLPosition, ContractStatus, GamePlan, Formation,
   OffenseScheme, Conference, Division, PlayerSeasonStats, DevelopmentTrait,
   DraftState, CompletedDraftPick, TeamCustomization, PosRatings,
-  EthnicityCode, FaceVariant,
+  EthnicityCode, FaceVariant, PlayoffSeed, PlayoffRound,
 } from "./types";
 
 export type { Season, NFLTeam, Player, DraftProspect, DraftPick, NFLGame, NewsItem,
@@ -17,7 +17,7 @@ export type { Season, NFLTeam, Player, DraftProspect, DraftPick, NFLGame, NewsIt
   OffenseScheme, Conference, Division, PlayerSeasonStats, DevelopmentTrait,
   TeamCustomization, UniformSet, TeamLogo, JerseyStyle, NumberFont, PantStripeStyle,
   HelmetLogoPlacement, LogoType, AnimalMascot, ShieldStyle, LogoFontStyle,
-  PosRatings, EthnicityCode, FaceVariant } from "./types";
+  PosRatings, EthnicityCode, FaceVariant, PlayoffSeed, PlayoffRound } from "./types";
 export { POS_RATING_KEYS, POS_RATING_LABELS } from "./types";
 
 const CACHE_KEY   = "vfl_season_v1";
@@ -437,38 +437,225 @@ const NFL_TEAMS: TeamTemplate[] = [
 
 // ─── Schedule Generation ──────────────────────────────────────────────────────
 
-function generateSchedule(teams: NFLTeam[]): NFLGame[] {
-  const games: NFLGame[] = [];
-  const teamsById = new Map(teams.map(t => [t.id, t]));
+function makeBlankGameStats() {
+  return { passingYards:0,rushingYards:0,totalYards:0,turnovers:0,thirdDownConversions:0,thirdDownAttempts:0,sacks:0,firstDowns:0,timeOfPossession:0,penalties:0,penaltyYards:0,redZoneAttempts:0,redZoneTDs:0 };
+}
 
+function makeGame(week: number, home: NFLTeam, away: NFLTeam, overrides: Partial<NFLGame> = {}): NFLGame {
+  const conditions: NFLGame["weather"]["condition"][] = ["Clear","Clear","Cloudy","Wind","Rain","Snow","Dome"];
+  const temp = irng(28, 82);
+  return {
+    id: uid(),
+    week,
+    homeTeamId: home.id,
+    awayTeamId: away.id,
+    homeScore: 0, awayScore: 0,
+    status: "upcoming",
+    plays: [], drives: [],
+    phase: "pregame",
+    stats: { home: makeBlankGameStats(), away: makeBlankGameStats() },
+    weather: { condition: conditions[irng(0, conditions.length - 1)], temperature: temp, windSpeed: irng(0, 20), windDirection: "N" },
+    location: home.stadium,
+    ...overrides,
+  };
+}
+
+function generateSchedule(teams: NFLTeam[]): { games: NFLGame[]; byeWeeks: Record<string, number> } {
+  // Assign each team 1 bye week in weeks 6-13 (4 teams per week × 8 weeks = 32)
+  const shuffled = [...teams].sort(() => Math.random() - 0.5);
+  const byeWeeks: Record<string, number> = {};
+  shuffled.forEach((t, i) => { byeWeeks[t.id] = 6 + Math.floor(i / 4); });
+
+  const games: NFLGame[] = [];
   for (let week = 1; week <= 18; week++) {
-    const shuffled = [...teams].sort(() => Math.random() - 0.5);
-    const paired: Set<string> = new Set();
-    for (let i = 0; i < shuffled.length - 1; i += 2) {
-      const home = shuffled[i];
-      const away = shuffled[i + 1];
-      if (paired.has(home.id) || paired.has(away.id)) continue;
-      paired.add(home.id);
-      paired.add(away.id);
-      games.push({
-        id: uid(),
-        week,
-        homeTeamId: home.id,
-        awayTeamId: away.id,
-        homeScore: 0, awayScore: 0,
-        status: "upcoming",
-        plays: [], drives: [],
-        phase: "pregame",
-        stats: {
-          home: { passingYards:0,rushingYards:0,totalYards:0,turnovers:0,thirdDownConversions:0,thirdDownAttempts:0,sacks:0,firstDowns:0,timeOfPossession:0,penalties:0,penaltyYards:0,redZoneAttempts:0,redZoneTDs:0 },
-          away: { passingYards:0,rushingYards:0,totalYards:0,turnovers:0,thirdDownConversions:0,thirdDownAttempts:0,sacks:0,firstDowns:0,timeOfPossession:0,penalties:0,penaltyYards:0,redZoneAttempts:0,redZoneTDs:0 },
-        },
-        weather: { condition:"Clear", temperature:72, windSpeed:5, windDirection:"N" },
-        location: home.stadium,
-      });
+    const available = [...teams.filter(t => byeWeeks[t.id] !== week)].sort(() => Math.random() - 0.5);
+    for (let i = 0; i < available.length - 1; i += 2) {
+      games.push(makeGame(week, available[i], available[i + 1]));
     }
   }
-  return games;
+  return { games, byeWeeks };
+}
+
+// ─── Playoff helpers ──────────────────────────────────────────────────────────
+
+function computePlayoffSeeds(teams: NFLTeam[], conference: Conference): PlayoffSeed[] {
+  const confTeams = teams.filter(t => t.conference === conference);
+  const divisions: ("North"|"South"|"East"|"West")[] = ["North","South","East","West"];
+  const byRecord = (a: NFLTeam, b: NFLTeam) => {
+    const aPct = a.wins / Math.max(1, a.wins + a.losses);
+    const bPct = b.wins / Math.max(1, b.wins + b.losses);
+    return bPct - aPct || b.pointsFor - a.pointsFor;
+  };
+  // Division winners
+  const divWinners = divisions.map(div =>
+    [...confTeams.filter(t => t.division === div)].sort(byRecord)[0]
+  ).filter(Boolean) as NFLTeam[];
+  divWinners.sort(byRecord);
+
+  // Wild cards
+  const divWinnerIds = new Set(divWinners.map(t => t.id));
+  const wildcards = confTeams.filter(t => !divWinnerIds.has(t.id)).sort(byRecord).slice(0, 3);
+
+  const result: PlayoffSeed[] = [];
+  [...divWinners, ...wildcards].forEach((t, i) => {
+    result.push({ teamId: t.id, seed: i + 1, conference, isDivisionWinner: i < 4 });
+  });
+  return result;
+}
+
+function makePlayoffGame(week: number, homeSeed: PlayoffSeed, awaySeed: PlayoffSeed, teams: NFLTeam[], round: PlayoffRound): NFLGame {
+  const homeTeam = teams.find(t => t.id === homeSeed.teamId)!;
+  const awayTeam = teams.find(t => t.id === awaySeed.teamId)!;
+  return makeGame(week, homeTeam, awayTeam, {
+    isPlayoffGame: true,
+    playoffRound: round,
+    playoffConference: homeSeed.conference,
+    playoffSeedHome: homeSeed.seed,
+    playoffSeedAway: awaySeed.seed,
+  });
+}
+
+function beginPlayoffs(s: Season): Season {
+  const ironcladSeeds = computePlayoffSeeds(s.teams, "Ironclad");
+  const gridironSeeds = computePlayoffSeeds(s.teams, "Gridiron");
+  const allSeeds = [...ironcladSeeds, ...gridironSeeds];
+
+  // Wild Card: seeds 2v7, 3v6, 4v5 (seed 1 gets bye)
+  const wcWeek = s.totalWeeks + 1;
+  const wcGames: NFLGame[] = [];
+  for (const seeds of [ironcladSeeds, gridironSeeds]) {
+    const matchups: [number, number][] = [[2,7],[3,6],[4,5]];
+    for (const [hSeed, aSeed] of matchups) {
+      const home = seeds.find(s => s.seed === hSeed);
+      const away = seeds.find(s => s.seed === aSeed);
+      if (home && away) wcGames.push(makePlayoffGame(wcWeek, home, away, s.teams, "wildCard"));
+    }
+  }
+
+  const news: NewsItem = {
+    id: uid(), timestamp: Date.now(),
+    headline: "🏆 VFL PLAYOFFS BEGIN! Wild Card Weekend",
+    body: `The ${s.year} VFL Playoffs are underway! Top seeds Ironclad & Gridiron receive first-round byes. Six Wild Card matchups this weekend.`,
+    category: "general", week: wcWeek,
+  };
+
+  return {
+    ...s,
+    isPlayoffs: true,
+    phase: "playoffs",
+    playoffSeeds: allSeeds,
+    playoffRound: "wildCard",
+    totalWeeks: s.totalWeeks + 4, // add 4 playoff weeks
+    games: [...s.games, ...wcGames],
+    news: [news, ...s.news].slice(0, 50),
+  };
+}
+
+function getWinner(game: NFLGame): string {
+  return game.homeScore >= game.awayScore ? game.homeTeamId : game.awayTeamId;
+}
+
+function advancePlayoffRound(s: Season): Season {
+  const { playoffRound, playoffSeeds, teams } = s;
+  if (!playoffSeeds) return s;
+
+  const seedByTeamId = new Map(playoffSeeds.map(ps => [ps.teamId, ps]));
+  const seedByNum = (conf: Conference, n: number) => playoffSeeds.find(ps => ps.conference === conf && ps.seed === n)!;
+
+  const wcGames = s.games.filter(g => g.isPlayoffGame && g.playoffRound === "wildCard" && g.status === "final");
+  const divGames = s.games.filter(g => g.isPlayoffGame && g.playoffRound === "divisional" && g.status === "final");
+  const confGames = s.games.filter(g => g.isPlayoffGame && g.playoffRound === "conference" && g.status === "final");
+
+  let nextRound: PlayoffRound;
+  let newGames: NFLGame[] = [];
+  const nextWeek = s.currentWeek + 1;
+  let newsText = "";
+
+  if (playoffRound === "wildCard" && wcGames.length === 6) {
+    nextRound = "divisional";
+    // Winners from WC: 
+    // Each conference: winners of 2v7, 3v6, 4v5 + seed 1 bye = 4 teams
+    for (const conf of ["Ironclad", "Gridiron"] as Conference[]) {
+      const confWCGames = wcGames.filter(g => g.playoffConference === conf);
+      const wcWinners = confWCGames.map(g => ({
+        teamId: getWinner(g),
+        seed: seedByTeamId.get(getWinner(g))?.seed ?? 9,
+        conference: conf as Conference,
+        isDivisionWinner: false,
+      })).sort((a, b) => a.seed - b.seed);
+      // Seed 1 (bye) + 3 WC winners, sorted by seed
+      const seed1 = seedByNum(conf, 1);
+      const fourTeams = [seed1, ...wcWinners].sort((a, b) => a.seed - b.seed);
+      // Divisional: 1 vs lowest, 2nd vs 3rd
+      if (fourTeams.length === 4) {
+        newGames.push(makePlayoffGame(nextWeek, fourTeams[0], fourTeams[3], teams, "divisional"));
+        newGames.push(makePlayoffGame(nextWeek, fourTeams[1], fourTeams[2], teams, "divisional"));
+      }
+    }
+    newsText = "Divisional Round: The top seeds enter the bracket!";
+  } else if (playoffRound === "divisional" && divGames.length === 4) {
+    nextRound = "conference";
+    for (const conf of ["Ironclad", "Gridiron"] as Conference[]) {
+      const confDivGames = divGames.filter(g => g.playoffConference === conf);
+      const divWinners = confDivGames.map(g => ({
+        teamId: getWinner(g),
+        seed: seedByTeamId.get(getWinner(g))?.seed ?? 9,
+        conference: conf as Conference,
+        isDivisionWinner: false,
+      })).sort((a, b) => a.seed - b.seed);
+      if (divWinners.length === 2) {
+        newGames.push(makePlayoffGame(nextWeek, divWinners[0], divWinners[1], teams, "conference"));
+      }
+    }
+    newsText = "Conference Championships: Final step before the VFL Bowl!";
+  } else if (playoffRound === "conference" && confGames.length === 2) {
+    nextRound = "vflBowl";
+    const confWinnerIds = confGames.map(g => getWinner(g));
+    const [tc1, tc2] = confWinnerIds;
+    const t1Seed = playoffSeeds.find(ps => ps.teamId === tc1);
+    const t2Seed = playoffSeeds.find(ps => ps.teamId === tc2);
+    const homeId = (t1Seed?.seed ?? 1) <= (t2Seed?.seed ?? 2) ? tc1 : tc2;
+    const awayId = homeId === tc1 ? tc2 : tc1;
+    const homeTeamObj = teams.find(t => t.id === homeId)!;
+    const awayTeamObj = teams.find(t => t.id === awayId)!;
+    newGames.push(makeGame(nextWeek, homeTeamObj, awayTeamObj, {
+      isPlayoffGame: true, playoffRound: "vflBowl",
+    }));
+    newsText = "🏆 VFL BOWL! The championship is set!";
+  } else {
+    return s;
+  }
+
+  const news: NewsItem = {
+    id: uid(), timestamp: Date.now(),
+    headline: newsText,
+    body: `${newGames.length} game${newGames.length !== 1 ? "s" : ""} scheduled for the next playoff round.`,
+    category: "general", week: nextWeek,
+  };
+
+  return {
+    ...s,
+    playoffRound: nextRound,
+    games: [...s.games, ...newGames],
+    news: [news, ...s.news].slice(0, 50),
+  };
+}
+
+function endPlayoffs(s: Season, vflBowlGame: NFLGame): Season {
+  const winnerId = getWinner(vflBowlGame);
+  const winnerTeam = s.teams.find(t => t.id === winnerId);
+  const news: NewsItem = {
+    id: uid(), timestamp: Date.now(),
+    headline: `🏆 ${winnerTeam?.city} ${winnerTeam?.name} WIN THE VFL BOWL!`,
+    body: `${winnerTeam?.city} ${winnerTeam?.name} defeat their opponent ${vflBowlGame.homeScore}–${vflBowlGame.awayScore} to claim the VFL Championship!`,
+    category: "general", week: s.currentWeek,
+  };
+  return {
+    ...s,
+    vflBowlWinnerId: winnerId,
+    phase: "offseason",
+    news: [news, ...s.news].slice(0, 50),
+  };
 }
 
 function generateDraftPicks(teamId: string): DraftPick[] {
@@ -508,7 +695,7 @@ function initSeason(playerTeamId?: string): Season {
   });
 
   const finalPlayerTeamId = playerTeamId ?? teams[13].id; // Reno Royals default
-  const games = generateSchedule(teams);
+  const { games, byeWeeks } = generateSchedule(teams);
   const draftProspects = generateDraftClass(2025, 252);
   const teamIds = teams.map(t => t.id);
   const draftState = initDraftState(teamIds, finalPlayerTeamId);
@@ -519,6 +706,7 @@ function initSeason(playerTeamId?: string): Season {
     totalWeeks: 18,
     phase: "regular",
     games,
+    byeWeeks,
     teams,
     playerTeamId: finalPlayerTeamId,
     draftProspects,
@@ -760,25 +948,46 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       const awayTeam = current.teams.find(t => t.id === game.awayTeamId)!;
       const result = simulateFullGame(homeTeam, awayTeam, game.week);
 
-      current.teams = current.teams.map(t => {
-        if (t.id === homeTeam.id) {
-          const won = result.homeScore > result.awayScore;
-          const tied = result.homeScore === result.awayScore;
-          return { ...t, wins: t.wins + (won?1:0), losses: t.losses + (!won&&!tied?1:0), ties: t.ties + (tied?1:0), pointsFor: t.pointsFor + result.homeScore, pointsAgainst: t.pointsAgainst + result.awayScore };
-        }
-        if (t.id === awayTeam.id) {
-          const won = result.awayScore > result.homeScore;
-          const tied = result.homeScore === result.awayScore;
-          return { ...t, wins: t.wins + (won?1:0), losses: t.losses + (!won&&!tied?1:0), ties: t.ties + (tied?1:0), pointsFor: t.pointsFor + result.awayScore, pointsAgainst: t.pointsAgainst + result.homeScore };
-        }
-        return t;
-      });
+      // Playoff games don't count toward regular season W/L
+      if (!game.isPlayoffGame) {
+        current.teams = current.teams.map(t => {
+          if (t.id === homeTeam.id) {
+            const won = result.homeScore > result.awayScore;
+            const tied = result.homeScore === result.awayScore;
+            return { ...t, wins: t.wins + (won?1:0), losses: t.losses + (!won&&!tied?1:0), ties: t.ties + (tied?1:0), pointsFor: t.pointsFor + result.homeScore, pointsAgainst: t.pointsAgainst + result.awayScore };
+          }
+          if (t.id === awayTeam.id) {
+            const won = result.awayScore > result.homeScore;
+            const tied = result.homeScore === result.awayScore;
+            return { ...t, wins: t.wins + (won?1:0), losses: t.losses + (!won&&!tied?1:0), ties: t.ties + (tied?1:0), pointsFor: t.pointsFor + result.awayScore, pointsAgainst: t.pointsAgainst + result.homeScore };
+          }
+          return t;
+        });
+      }
       current.games = current.games.map(g => g.id === game.id ? { ...g, ...result, id: g.id, week: g.week } : g);
     }
 
     const nextWeek = current.currentWeek + 1;
-    const newS = { ...current, currentWeek: Math.min(nextWeek, current.totalWeeks) };
-    await save(newS);
+    current = { ...current, currentWeek: nextWeek };
+
+    // After regular season week 18: start playoffs
+    if (!current.isPlayoffs && current.currentWeek > 18) {
+      current = beginPlayoffs(current) as typeof current;
+      await save(current);
+      return;
+    }
+
+    // After each playoff week: advance bracket or end season
+    if (current.isPlayoffs && weekGames.some(g => g.isPlayoffGame)) {
+      const vflBowl = current.games.filter(g => g.isPlayoffGame && g.playoffRound === "vflBowl");
+      if (vflBowl.length > 0 && vflBowl.every(g => g.status === "final")) {
+        current = endPlayoffs(current, vflBowl[0]) as typeof current;
+      } else {
+        current = advancePlayoffRound(current) as typeof current;
+      }
+    }
+
+    await save(current);
   }, [season, save]);
 
   // ── Roster Actions ─────────────────────────────────────────────────────────
@@ -1076,6 +1285,44 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
     const phases: Season["phase"][] = ["regular","playoffs","offseason","freeAgency","draft","preseason","regular"];
     const currentIdx = phases.indexOf(season.phase);
     const next = phases[currentIdx + 1] ?? "regular";
+
+    // When starting a new regular season from preseason
+    if (next === "regular" && season.phase === "preseason") {
+      const newTeams = season.teams.map(t => ({
+        ...t,
+        wins: 0, losses: 0, ties: 0,
+        pointsFor: 0, pointsAgainst: 0,
+      }));
+      const { games: newGames, byeWeeks: newBye } = generateSchedule(newTeams);
+      const newDraftProspects = generateDraftClass(season.year + 1, 252);
+      const newDraftState = initDraftState(newTeams.map(t => t.id), season.playerTeamId);
+      const nextYearSeason: Season = {
+        ...season,
+        year: season.year + 1,
+        phase: "regular",
+        currentWeek: 1,
+        totalWeeks: 18,
+        teams: newTeams,
+        games: newGames,
+        byeWeeks: newBye,
+        isPlayoffs: false,
+        playoffSeeds: undefined,
+        playoffRound: undefined,
+        vflBowlWinnerId: undefined,
+        draftProspects: newDraftProspects,
+        draftState: newDraftState,
+        freeAgents: generateFreeAgents(60),
+        news: [{
+          id: uid(), timestamp: Date.now(),
+          headline: `VFL ${season.year + 1} Season Kicks Off!`,
+          body: "A new year, new hopes. All 32 teams chase the VFL Bowl.",
+          category: "general", week: 1,
+        }],
+      };
+      await save(nextYearSeason);
+      return;
+    }
+
     await save({ ...season, phase: next });
   }, [season, save]);
 

@@ -1,7 +1,7 @@
-# Gridiron GM — Co-GM Football Franchise Simulator
+# VFL — Virtual Franchise League
 
 ## Overview
-An original football franchise simulator built in Expo React Native. 32 fully fictional teams across two conferences (Ironclad / Gridiron), Co-GM multiplayer via Supabase realtime, broadcast-style play-by-play simulation, free agency, draft war room, trade builder, injury system, and depth chart management. App name: Gridiron GM. League name: GFL (Gridiron Football League).
+An original football franchise simulator built in Expo React Native. 32 fully fictional teams across two conferences (Ironclad / Gridiron), Co-GM multiplayer via Supabase realtime, broadcast-style play-by-play simulation, free agency, draft war room, trade builder, injury system, depth chart management, bye weeks, and full playoff bracket (Wild Card → Divisional → Conference → VFL Bowl). App name: VFL / Virtual Franchise League.
 
 ## Architecture
 

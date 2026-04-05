@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { NFLTeamBadge } from "@/components/NFLTeamBadge";
 import { useColors } from "@/hooks/useColors";
 import { Conference, Division, NFLTeam, useNFL } from "@/context/NFLContext";
+import type { PlayoffSeed } from "@/context/types";
 
 const CONFERENCES: Conference[] = ["Ironclad", "Gridiron"];
 const DIVISIONS: Division[] = ["East", "North", "South", "West"];
@@ -85,6 +86,11 @@ export default function StandingsScreen() {
     return buildRecords(season.teams, season.games);
   }, [season]);
 
+  const playoffSeeds = useMemo(() => {
+    if (!season?.playoffSeeds) return new Map<string, PlayoffSeed>();
+    return new Map(season.playoffSeeds.map(ps => [ps.teamId, ps]));
+  }, [season]);
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPad + 12 }]}>
@@ -144,7 +150,7 @@ export default function StandingsScreen() {
                       <Text style={[styles.divHeaderText, { color: colors.nflGold }]}>{activeConf} {div}</Text>
                     </View>
                     {divTeams.map((t, idx) => (
-                      <TeamRow key={t.id} team={t} rank={idx + 1} myTeamId={season?.playerTeamId} rec={records.get(t.id)} colors={colors} />
+                      <TeamRow key={t.id} team={t} rank={idx + 1} myTeamId={season?.playerTeamId} rec={records.get(t.id)} colors={colors} playoffSeed={playoffSeeds.get(t.id)} />
                     ))}
                   </View>
                 );
@@ -152,7 +158,7 @@ export default function StandingsScreen() {
             ) : (
               <View>
                 {confTeams.map((t, idx) => (
-                  <TeamRow key={t.id} team={t} rank={idx + 1} myTeamId={season?.playerTeamId} showDivision rec={records.get(t.id)} colors={colors} />
+                  <TeamRow key={t.id} team={t} rank={idx + 1} myTeamId={season?.playerTeamId} showDivision rec={records.get(t.id)} colors={colors} playoffSeed={playoffSeeds.get(t.id)} />
                 ))}
               </View>
             )}
@@ -167,8 +173,8 @@ function ColH({ label, color, w }: { label: string; color: string; w: number }) 
   return <Text style={{ width: w, textAlign: "center", fontSize: 9, fontFamily: "Inter_700Bold", letterSpacing: 0.5, color }}>{label}</Text>;
 }
 
-function TeamRow({ team, rank, myTeamId, showDivision, rec, colors }: {
-  team: NFLTeam; rank: number; myTeamId?: string; showDivision?: boolean; rec?: TeamRecord; colors: any;
+function TeamRow({ team, rank, myTeamId, showDivision, rec, colors, playoffSeed }: {
+  team: NFLTeam; rank: number; myTeamId?: string; showDivision?: boolean; rec?: TeamRecord; colors: any; playoffSeed?: PlayoffSeed;
 }) {
   const isMe = team.id === myTeamId;
   const total = team.wins + team.losses + team.ties;
@@ -176,6 +182,7 @@ function TeamRow({ team, rank, myTeamId, showDivision, rec, colors }: {
   const diff = team.pointsFor - team.pointsAgainst;
   const diffStr = diff > 0 ? `+${diff}` : `${diff}`;
   const rankColor = rank === 1 ? "#FFD700" : rank <= 4 ? colors.success : colors.mutedForeground;
+  const isByeTeam = playoffSeed && playoffSeed.seed === 1;
 
   const streakColor = (s: string) => {
     if (!s || s === "—") return colors.mutedForeground;
@@ -203,6 +210,16 @@ function TeamRow({ team, rank, myTeamId, showDivision, rec, colors }: {
           )}
         </View>
         {isMe && <View style={[styles.youBadge, { backgroundColor: team.primaryColor }]}><Text style={styles.youBadgeText}>YOU</Text></View>}
+        {playoffSeed && (
+          <View style={[styles.seedBadge, {
+            backgroundColor: playoffSeed.isDivisionWinner ? colors.nflGold + "25" : colors.success + "20",
+            borderColor: playoffSeed.isDivisionWinner ? colors.nflGold + "80" : colors.success + "60",
+          }]}>
+            <Text style={[styles.seedBadgeText, { color: playoffSeed.isDivisionWinner ? colors.nflGold : colors.success }]}>
+              {isByeTeam ? "🏆" : ""}{playoffSeed.seed}
+            </Text>
+          </View>
+        )}
       </View>
       <ColV value={`${team.wins}`}   color={colors.success} w={30} bold />
       <ColV value={`${team.losses}`} color={colors.danger}  w={30} bold />
@@ -250,6 +267,8 @@ const styles = StyleSheet.create({
   teamCell:       { width: 148, flexDirection: "row", alignItems: "center", gap: 6, paddingRight: 4 },
   teamName:       { fontSize: 11, fontFamily: "Inter_600SemiBold", flexShrink: 1 },
   divisionLabel:  { fontSize: 9, fontFamily: "Inter_400Regular" },
+  seedBadge:      { borderRadius: 6, borderWidth: 1, paddingHorizontal: 5, paddingVertical: 2, marginLeft: 2 },
+  seedBadgeText:  { fontSize: 9, fontFamily: "Inter_700Bold" },
   youBadge:       { paddingHorizontal: 4, paddingVertical: 1, borderRadius: 3 },
   youBadgeText:   { fontSize: 7, fontFamily: "Inter_700Bold", color: "#000" },
 });

@@ -26,9 +26,10 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { membership, signOut } = useAuth();
-  const { season, isLoading, isSyncing, syncError, getPlayerTeam, getWeekGames, simulateWeek, getStandings, toggleCoGMMode } = useNFL();
+  const { season, isLoading, isSyncing, syncError, getPlayerTeam, getWeekGames, simulateWeek, getStandings, toggleCoGMMode, advancePhase } = useNFL();
   const [simulating, setSimulating] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
+  const [advancing, setAdvancing] = useState(false);
   const tickerX = useRef(new Animated.Value(0)).current;
   const tickerWidth = useRef(0);
   const screenWidth = 400;
@@ -64,6 +65,33 @@ export default function HomeScreen() {
     setSimulating(true);
     try { await simulateWeek(); } finally { setSimulating(false); }
   };
+
+  const handleAdvancePhase = async () => {
+    if (role === "Scout") { Alert.alert("Permission Denied", "Only the GM or Coach can advance the phase."); return; }
+    setAdvancing(true);
+    try { await advancePhase(); } finally { setAdvancing(false); }
+  };
+
+  const PHASE_LABELS: Record<string, string> = {
+    regular: "Regular Season",
+    playoffs: "Playoffs",
+    offseason: "Offseason",
+    freeAgency: "Free Agency",
+    draft: "VFL Draft",
+    preseason: "Preseason",
+  };
+  const NEXT_PHASE_LABELS: Record<string, string> = {
+    playoffs: "Begin Offseason",
+    offseason: "Open Free Agency",
+    freeAgency: "Go to Draft",
+    draft: "Enter Preseason",
+    preseason: "Start New Season",
+  };
+  const currentPhase = season?.phase ?? "regular";
+  const isOffseasonPhase = ["offseason","freeAgency","draft","preseason"].includes(currentPhase);
+  const isPlayoffsPhase = currentPhase === "playoffs";
+  const allPlayoffGamesDone = season?.isPlayoffs && !!season.vflBowlWinnerId;
+  const vflChamp = season?.vflBowlWinnerId ? season.teams.find(t => t.id === season.vflBowlWinnerId) : null;
 
   if (isLoading) return (
     <View style={[st.center, { backgroundColor: colors.background }]}>
@@ -272,6 +300,27 @@ export default function HomeScreen() {
           </View>
         )}
 
+        {/* Phase banner for non-regular phases */}
+        {season && currentPhase !== "regular" && (
+          <View style={[st.phaseBanner, {
+            backgroundColor: isPlayoffsPhase ? colors.nflGold + "18" : colors.nflBlue + "18",
+            borderColor: isPlayoffsPhase ? colors.nflGold + "60" : colors.nflBlue + "50",
+          }]}>
+            <Feather name={isPlayoffsPhase ? "award" : "calendar"} size={14} color={isPlayoffsPhase ? colors.nflGold : colors.nflBlue} />
+            <Text style={[st.phaseLabel, { color: isPlayoffsPhase ? colors.nflGold : colors.nflBlue }]}>
+              {PHASE_LABELS[currentPhase]} — {season.year}
+            </Text>
+          </View>
+        )}
+
+        {/* VFL Bowl Champion banner */}
+        {vflChamp && (
+          <View style={[st.champBanner, { backgroundColor: colors.nflGold + "18", borderColor: colors.nflGold + "60" }]}>
+            <Text style={[st.champTitle, { color: colors.nflGold }]}>🏆 VFL BOWL CHAMPIONS</Text>
+            <Text style={[st.champName, { color: colors.foreground }]}>{vflChamp.city} {vflChamp.name}</Text>
+          </View>
+        )}
+
         {/* Sim Week button */}
         {season && season.currentWeek <= season.totalWeeks && weekGames.some(g => g.status === "upcoming") && (
           <TouchableOpacity
@@ -285,6 +334,23 @@ export default function HomeScreen() {
               : <Feather name="fast-forward" size={18} color={simulating || role === "Scout" ? colors.mutedForeground : "#fff"} />}
             <Text style={[st.simBtnText, { color: simulating || role === "Scout" ? colors.mutedForeground : "#fff" }]}>
               {simulating ? "Simulating Week..." : role === "Scout" ? "Sim Week (GM/Coach only)" : `Simulate Week ${season.currentWeek}`}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Advance Phase button for offseason / post-VFL Bowl */}
+        {season && (isOffseasonPhase || allPlayoffGamesDone) && NEXT_PHASE_LABELS[currentPhase] && (
+          <TouchableOpacity
+            onPress={handleAdvancePhase}
+            disabled={advancing || role === "Scout"}
+            activeOpacity={0.8}
+            style={[st.advanceBtn, { backgroundColor: advancing ? colors.secondary : colors.nflBlue, borderColor: colors.nflBlue + "80" }]}
+          >
+            {advancing
+              ? <ActivityIndicator color={colors.mutedForeground} size="small" />
+              : <Feather name="chevrons-right" size={18} color={advancing ? colors.mutedForeground : "#fff"} />}
+            <Text style={[st.simBtnText, { color: advancing ? colors.mutedForeground : "#fff" }]}>
+              {advancing ? "Advancing..." : NEXT_PHASE_LABELS[currentPhase]}
             </Text>
           </TouchableOpacity>
         )}
@@ -469,8 +535,14 @@ const st = StyleSheet.create({
   gameFooter:     { flexDirection:"row", alignItems:"center", justifyContent:"center", gap:6, padding:10, borderTopWidth:1 },
   gameFooterText: { fontSize:12, fontFamily:"Inter_600SemiBold" },
   // Sim button
-  simBtn:         { flexDirection:"row", alignItems:"center", justifyContent:"center", gap:10, paddingVertical:14, borderRadius:14, marginBottom:18 },
+  simBtn:         { flexDirection:"row", alignItems:"center", justifyContent:"center", gap:10, paddingVertical:14, borderRadius:14, marginBottom:12 },
   simBtnText:     { fontSize:15, fontFamily:"Inter_700Bold" },
+  advanceBtn:     { flexDirection:"row", alignItems:"center", justifyContent:"center", gap:10, paddingVertical:14, borderRadius:14, marginBottom:18, borderWidth:1 },
+  phaseBanner:    { flexDirection:"row", alignItems:"center", gap:10, borderRadius:12, borderWidth:1, paddingHorizontal:16, paddingVertical:12, marginBottom:12 },
+  phaseLabel:     { fontSize:14, fontFamily:"Inter_700Bold", letterSpacing:0.3 },
+  champBanner:    { borderRadius:14, borderWidth:1, padding:16, marginBottom:14, alignItems:"center", gap:4 },
+  champTitle:     { fontSize:11, fontFamily:"Inter_700Bold", letterSpacing:1.5 },
+  champName:      { fontSize:22, fontFamily:"Inter_700Bold" },
   // News
   newsItem:       { borderRadius:12, borderWidth:1, padding:12, marginBottom:8 },
   newsCat:        { alignSelf:"flex-start", paddingHorizontal:7, paddingVertical:2, borderRadius:5, marginBottom:5 },
