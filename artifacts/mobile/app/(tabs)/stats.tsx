@@ -301,10 +301,14 @@ const tf = StyleSheet.create({
 
 type RecordGroup = "pass" | "rush" | "rec" | "def";
 
-interface RecordEntry { rank:number; value:string; rawVal:number; playerName:string; team:string; season?:number; pos:NFLPosition; }
+interface RecordEntry { rank:number; value:string; rawVal:number; playerName:string; team:string; season?:number; pos:NFLPosition; playerId:string; }
 interface RecordCategory { title:string; entries:RecordEntry[]; }
 
-function RecordList({ cats, accentColor }: { cats:RecordCategory[]; accentColor:string }) {
+function RecordList({ cats, accentColor, onPlayerPress }: {
+  cats: RecordCategory[];
+  accentColor: string;
+  onPlayerPress?: (playerId: string) => void;
+}) {
   const colors = useColors();
   return (
     <View style={{ paddingBottom:20 }}>
@@ -331,10 +335,15 @@ function RecordList({ cats, accentColor }: { cats:RecordCategory[]; accentColor:
             const pc = POS_COLOR[e.pos];
             const medals = ["🥇","🥈","🥉"];
             return (
-              <View key={i} style={[rc.row, {
-                backgroundColor: i % 2 === 0 ? colors.card : colors.background,
-                borderBottomColor: colors.border,
-              }]}>
+              <TouchableOpacity
+                key={i}
+                activeOpacity={0.7}
+                onPress={() => onPlayerPress?.(e.playerId)}
+                style={[rc.row, {
+                  backgroundColor: i % 2 === 0 ? colors.card : colors.background,
+                  borderBottomColor: colors.border,
+                }]}
+              >
                 <Text style={[rc.rank, { color: i<3 ? ["#FFD700","#C0C0C0","#CD7F32"][i] : colors.mutedForeground }]}>
                   {i < 3 ? medals[i] : e.rank}
                 </Text>
@@ -345,7 +354,8 @@ function RecordList({ cats, accentColor }: { cats:RecordCategory[]; accentColor:
                 <Text style={[rc.team,   { color: colors.mutedForeground }]}>{e.team}</Text>
                 <Text style={[rc.season, { color: colors.mutedForeground }]}>{e.season ?? "—"}</Text>
                 <Text style={[rc.val,    { color: accentColor }]}>{e.value}</Text>
-              </View>
+                <Feather name="chevron-right" size={12} color={colors.border} style={{ marginLeft:2 }} />
+              </TouchableOpacity>
             );
           })}
         </View>
@@ -461,29 +471,27 @@ export default function StatsScreen() {
   // ── Records ────────────────────────────────────────────────────────────────
 
   const recordCats = useMemo((): Record<RecordGroup, RecordCategory[]> => {
-    type RawEntry = RecordEntry;
     function top25(
       filter: (p:PlayerWithTeam)=>boolean,
       get: (s:PlayerSeasonStats)=>number,
       fmt: (v:number)=>string,
-      pos?: NFLPosition,
     ): RecordEntry[] {
-      const entries: { val:number; name:string; team:string; season?:number; pos:NFLPosition }[] = [];
+      const entries: { val:number; name:string; team:string; season?:number; pos:NFLPosition; id:string }[] = [];
       for (const p of allPlayers) {
         if (!filter(p)) continue;
         // Current season
         const cv = get(p.stats);
-        if (cv > 0) entries.push({ val:cv, name:p.name, team:p.teamAbbr, season:p.stats.season, pos:p.position });
+        if (cv > 0) entries.push({ val:cv, name:p.name, team:p.teamAbbr, season:p.stats.season, pos:p.position, id:p.id });
         // Career seasons
         for (const cs of p.careerStats) {
           const v = get(cs);
-          if (v > 0) entries.push({ val:v, name:p.name, team:p.teamAbbr, season:cs.season, pos:p.position });
+          if (v > 0) entries.push({ val:v, name:p.name, team:p.teamAbbr, season:cs.season, pos:p.position, id:p.id });
         }
       }
       return entries
         .sort((a,b) => b.val - a.val)
         .slice(0, 25)
-        .map((e,i) => ({ rank:i+1, value:fmt(e.val), rawVal:e.val, playerName:e.name, team:e.team, season:e.season, pos:e.pos }));
+        .map((e,i) => ({ rank:i+1, value:fmt(e.val), rawVal:e.val, playerName:e.name, team:e.team, season:e.season, pos:e.pos, playerId:e.id }));
     }
 
     return {
@@ -635,7 +643,14 @@ export default function StatsScreen() {
             {gamesPlayed === 0 ? (
               <EmptyMsg message="Start simming games to build VFL history" />
             ) : (
-              <RecordList cats={recordCats[recordGroup]} accentColor={teamColor} />
+              <RecordList
+                cats={recordCats[recordGroup]}
+                accentColor={teamColor}
+                onPlayerPress={id => {
+                  const p = allPlayers.find(pl => pl.id === id);
+                  if (p) setModalPlayer(p);
+                }}
+              />
             )}
           </View>
         )}

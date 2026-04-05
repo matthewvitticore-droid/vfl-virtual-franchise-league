@@ -58,8 +58,8 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.101.1",
     "expo-clipboard": "^8.0.8",
-    "expo-file-system": "^55.0.14",
-    "expo-sharing": "^55.0.16",
+    "expo-file-system": "^19.0.21",
+    "expo-sharing": "^14.0.8",
     "xlsx": "^0.18.5"
   }
 }
