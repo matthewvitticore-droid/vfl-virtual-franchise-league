@@ -76,16 +76,14 @@ export default function FrontOfficeScreen() {
         return Math.round(Math.max(40, Math.min(99, 99 - (c.fortyYardDash - 4.3) * 65)));
       }
       case "acceleration": {
-        // Lower shuttle + 3-cone = higher ACC (both equally weighted)
-        const sRtg = Math.max(40, Math.min(99, 99 - (c.shuttleRun - 3.9) * 57));
-        const cRtg = Math.max(40, Math.min(99, 99 - (c.threeCone - 6.5) * 33));
-        return Math.round((sRtg + cRtg) / 2);
+        // 3-cone only — ≤6.50s = 99, <7.00s = 90s
+        return Math.round(Math.max(40, Math.min(99, 99 - (c.threeCone - 6.5) * 18)));
       }
       case "agility": {
-        // Vertical + broad jump for explosiveness/athleticism
-        const vertRtg  = Math.max(40, Math.min(99, 40 + (c.verticalJump - 22) * 2.565));
-        const broadRtg = Math.max(40, Math.min(99, 40 + (c.broadJump - 90) * 1.311));
-        return Math.round((vertRtg + broadRtg) / 2);
+        // Shuttle + 3-cone — shuttle <4.0 = 99, cone ≤6.50 = 99
+        const sRtg = Math.max(40, Math.min(99, 99 - (c.shuttleRun - 4.0) * 58));
+        const cRtg = Math.max(40, Math.min(99, 99 - (c.threeCone - 6.5) * 18));
+        return Math.round((sRtg + cRtg) / 2);
       }
       case "strength":
         return Math.round(Math.max(40, Math.min(99, c.benchPress * 1.6 + 22)));
@@ -698,16 +696,14 @@ function deriveCombineRating(key: "speed"|"acceleration"|"agility"|"strength", c
       // 4.3s = 99; each 0.01s slower ≈ -0.65 pts
       return Math.round(Math.max(40, Math.min(99, 99 - (c.fortyYardDash - 4.3) * 65)));
     case "acceleration": {
-      // Lower shuttle + lower 3-cone = higher ACC (equally weighted)
-      const sRtg = Math.max(40, Math.min(99, 99 - (c.shuttleRun - 3.9) * 57));
-      const cRtg = Math.max(40, Math.min(99, 99 - (c.threeCone - 6.5) * 33));
-      return Math.round((sRtg + cRtg) / 2);
+      // 3-cone only — ≤6.50s = 99, <7.00s = 90s
+      return Math.round(Math.max(40, Math.min(99, 99 - (c.threeCone - 6.5) * 18)));
     }
     case "agility": {
-      // Vertical + broad jump for explosiveness
-      const vertRtg  = Math.max(40, Math.min(99, 40 + (c.verticalJump - 22) * 2.565));
-      const broadRtg = Math.max(40, Math.min(99, 40 + (c.broadJump - 90) * 1.311));
-      return Math.round((vertRtg + broadRtg) / 2);
+      // Shuttle + 3-cone — shuttle <4.0 = 99, cone ≤6.50 = 99
+      const sRtg = Math.max(40, Math.min(99, 99 - (c.shuttleRun - 4.0) * 58));
+      const cRtg = Math.max(40, Math.min(99, 99 - (c.threeCone - 6.5) * 18));
+      return Math.round((sRtg + cRtg) / 2);
     }
     case "strength":
       return Math.round(Math.max(40, Math.min(99, c.benchPress * 1.6 + 22)));

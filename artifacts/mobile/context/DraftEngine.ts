@@ -275,7 +275,7 @@ function combineAthlScore(pos: NFLPosition, c: CombineMeasurables): number {
   const broadR = clamp(40 + (c.broadJump - 90) * 1.311, 40, 99);
   const ath = (vertR + broadR) / 2;
   const shutR = clamp(99 - (c.shuttleRun - 3.9) * 57, 40, 99);
-  const coneR = clamp(99 - (c.threeCone - 6.5) * 33, 40, 99);
+  const coneR = clamp(99 - (c.threeCone - 6.5) * 18, 40, 99);
   const qck = (shutR + coneR) / 2;
   const str = clamp(c.benchPress * 1.6 + 22, 40, 99);
   // Arm-length proxy for throw power (QB only, range ~29–37 inches → 40–99)
