@@ -71,11 +71,26 @@ export default function FrontOfficeScreen() {
     const c = p.combine;
     if (!c || c.didNotParticipate) return -999;
     switch (key) {
-      case "speed":        return Math.round(Math.max(40, Math.min(99, 115 - c.fortyYardDash * 18)));
-      case "acceleration": return Math.round(Math.max(40, Math.min(99, 130 - (c.tenYardSplit ?? c.fortyYardDash * 0.41) * 72)));
-      case "agility":      return Math.round(Math.max(40, Math.min(99, 162 - c.threeCone * 18)));
-      case "strength":     return Math.round(Math.max(40, Math.min(99, c.benchPress * 1.6 + 22)));
-      default:             return (c as any)[key] ?? 0;
+      case "speed": {
+        // 4.3s or lower = 99; linear scale down from there
+        return Math.round(Math.max(40, Math.min(99, 99 - (c.fortyYardDash - 4.3) * 65)));
+      }
+      case "acceleration": {
+        // Lower shuttle + 3-cone = higher ACC (both equally weighted)
+        const sRtg = Math.max(40, Math.min(99, 99 - (c.shuttleRun - 3.9) * 57));
+        const cRtg = Math.max(40, Math.min(99, 99 - (c.threeCone - 6.4) * 33));
+        return Math.round((sRtg + cRtg) / 2);
+      }
+      case "agility": {
+        // Vertical + broad jump for explosiveness/athleticism
+        const vertRtg  = Math.max(40, Math.min(99, 40 + (c.verticalJump - 22) * 2.565));
+        const broadRtg = Math.max(40, Math.min(99, 40 + (c.broadJump - 90) * 1.311));
+        return Math.round((vertRtg + broadRtg) / 2);
+      }
+      case "strength":
+        return Math.round(Math.max(40, Math.min(99, c.benchPress * 1.6 + 22)));
+      default:
+        return (c as any)[key] ?? 0;
     }
   };
 
@@ -261,7 +276,7 @@ export default function FrontOfficeScreen() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View>
                   <View style={[st.combineHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-                    <Text style={[st.colFix, { color: colors.mutedForeground }]}>#  PLAYER</Text>
+                    <Text style={[st.colFixHdr, { color: colors.mutedForeground }]}># POS PLAYER</Text>
                     <SortHeader label="GRD" sortKey="grade" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
                     <SortHeader label="40yd" sortKey="fortyYardDash" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
                     <SortHeader label="10yd" sortKey="tenYardSplit" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
@@ -679,10 +694,23 @@ function CombineStat({ label, value }: { label: string; value: string }) {
 
 function deriveCombineRating(key: "speed"|"acceleration"|"agility"|"strength", c: CombineMeasurables): number {
   switch (key) {
-    case "speed":        return Math.round(Math.max(40, Math.min(99, 115 - c.fortyYardDash * 18)));
-    case "acceleration": return Math.round(Math.max(40, Math.min(99, 130 - (c.tenYardSplit ?? c.fortyYardDash * 0.41) * 72)));
-    case "agility":      return Math.round(Math.max(40, Math.min(99, 162 - c.threeCone * 18)));
-    case "strength":     return Math.round(Math.max(40, Math.min(99, c.benchPress * 1.6 + 22)));
+    case "speed":
+      // 4.3s = 99; each 0.01s slower ≈ -0.65 pts
+      return Math.round(Math.max(40, Math.min(99, 99 - (c.fortyYardDash - 4.3) * 65)));
+    case "acceleration": {
+      // Lower shuttle + lower 3-cone = higher ACC (equally weighted)
+      const sRtg = Math.max(40, Math.min(99, 99 - (c.shuttleRun - 3.9) * 57));
+      const cRtg = Math.max(40, Math.min(99, 99 - (c.threeCone - 6.4) * 33));
+      return Math.round((sRtg + cRtg) / 2);
+    }
+    case "agility": {
+      // Vertical + broad jump for explosiveness
+      const vertRtg  = Math.max(40, Math.min(99, 40 + (c.verticalJump - 22) * 2.565));
+      const broadRtg = Math.max(40, Math.min(99, 40 + (c.broadJump - 90) * 1.311));
+      return Math.round((vertRtg + broadRtg) / 2);
+    }
+    case "strength":
+      return Math.round(Math.max(40, Math.min(99, c.benchPress * 1.6 + 22)));
   }
 }
 
@@ -699,7 +727,15 @@ function CombineRow({ p, rank, colors, teamColor, isUserTurn, isGM, onDraft, onT
   return (
     <TouchableOpacity onPress={onTap} activeOpacity={onTap ? 0.7 : 1}
       style={[st.combineRowContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-      <Text style={[st.colFix2, { color: colors.mutedForeground }]}>{rank}. {p.name.split(" ")[1]}</Text>
+      <View style={st.nameCell}>
+        <Text style={[st.rankNum, { color: colors.mutedForeground }]}>{rank}.</Text>
+        <View style={[st.posBubble, { backgroundColor: (POS_COLOR[p.position] ?? "#888") + "30" }]}>
+          <Text style={[st.posBubbleText, { color: POS_COLOR[p.position] ?? "#888" }]}>{p.position}</Text>
+        </View>
+        <Text style={[st.playerLastName, { color: colors.foreground }]} numberOfLines={1}>
+          {p.name.split(" ").slice(1).join(" ")}
+        </Text>
+      </View>
       <ColCell value={`${p.overallGrade}`} color={colors.nflGold} />
       <ColCell value={dnp ? "—" : `${c.fortyYardDash}`} color={!dnp && c.fortyYardDash < 4.4 ? colors.success : colors.foreground} />
       <ColCell value={dnp ? "—" : `${c.tenYardSplit ?? "—"}`} color={!dnp && (c.tenYardSplit ?? 99) < 1.52 ? colors.success : colors.foreground} />
@@ -798,7 +834,13 @@ const st = StyleSheet.create({
   combineHeader:    { flexDirection:"row", alignItems:"center", paddingHorizontal:12, paddingVertical:8, borderBottomWidth:1, gap:4 },
   combineRowContainer:{ flexDirection:"row", alignItems:"center", paddingHorizontal:12, paddingVertical:9, borderBottomWidth:1, gap:4 },
   colFix:           { width:120, fontSize:11, fontFamily:"Inter_500Medium" },
+  colFixHdr:        { width:140, fontSize:11, fontFamily:"Inter_600SemiBold" },
   colFix2:          { width:100, fontSize:11, fontFamily:"Inter_500Medium" },
+  nameCell:         { width:140, flexDirection:"row", alignItems:"center", gap:4 },
+  rankNum:          { fontSize:10, fontFamily:"Inter_400Regular", width:18 },
+  posBubble:        { borderRadius:4, paddingHorizontal:4, paddingVertical:1 },
+  posBubbleText:    { fontSize:9, fontFamily:"Inter_700Bold" },
+  playerLastName:   { flex:1, fontSize:11, fontFamily:"Inter_600SemiBold" },
   colHeader:        { width:60, alignItems:"center", flexDirection:"row", gap:2, justifyContent:"center" },
   colHeaderText:    { fontSize:11, fontFamily:"Inter_600SemiBold" },
   colCell:          { width:60, textAlign:"center", fontSize:12, fontFamily:"Inter_600SemiBold" },
