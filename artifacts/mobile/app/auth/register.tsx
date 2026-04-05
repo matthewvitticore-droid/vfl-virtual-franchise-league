@@ -48,8 +48,8 @@ export default function RegisterScreen() {
   if (success) {
     return (
       <View style={[styles.container, styles.center, { backgroundColor: colors.background }]}>
-        <View style={[styles.successBadge, { backgroundColor: colors.success + "20" }]}>
-          <Text style={{ fontSize: 48 }}>🏈</Text>
+        <View style={[styles.successBadge, { backgroundColor: colors.nflBlue + "20", borderColor: colors.nflBlue, borderWidth: 1.5 }]}>
+          <Text style={{ fontSize: 48 }}>🏆</Text>
         </View>
         <Text style={[styles.successTitle, { color: colors.foreground }]}>Account Created!</Text>
         <Text style={[styles.successSub, { color: colors.mutedForeground }]}>
@@ -57,7 +57,7 @@ export default function RegisterScreen() {
         </Text>
         <TouchableOpacity
           onPress={() => router.replace("/auth/login")}
-          style={[styles.submitBtn, { backgroundColor: colors.nflRed, marginTop: 24 }]}
+          style={[styles.submitBtn, { backgroundColor: colors.nflBlue, marginTop: 24 }]}
         >
           <Feather name="log-in" size={18} color="#fff" />
           <Text style={styles.submitText}>Go to Sign In</Text>
@@ -94,7 +94,7 @@ export default function RegisterScreen() {
                 style={[styles.input, { color: colors.foreground }]}
                 value={displayName}
                 onChangeText={setDisplayName}
-                placeholder="e.g. ChiefsGM2026"
+                placeholder="e.g. RoyalsGM2026"
                 placeholderTextColor={colors.mutedForeground}
                 autoCapitalize="none"
               />

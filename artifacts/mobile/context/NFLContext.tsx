@@ -15,7 +15,7 @@ export type { Season, NFLTeam, Player, DraftProspect, DraftPick, NFLGame, NewsIt
   TradeOffer, NFLContextValue, NFLPosition, ContractStatus, GamePlan, Formation,
   OffenseScheme, Conference, Division, PlayerSeasonStats, DevelopmentTrait } from "./types";
 
-const CACHE_KEY = "gfl_season_v1";
+const CACHE_KEY = "vfl_season_v1";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -207,7 +207,7 @@ function generateFreeAgents(count = 60): Player[] {
   });
 }
 
-// ─── All 32 GFL Teams ─────────────────────────────────────────────────────────
+// ─── All 32 VFL Teams ─────────────────────────────────────────────────────────
 
 interface TeamTemplate {
   city: string; name: string; abbreviation: string;
@@ -351,8 +351,8 @@ function initSeason(playerTeamId?: string): Season {
     isPlayoffs: false,
     news: [{
       id: uid(),
-      headline: "GFL 2025 Season Kicks Off!",
-      body: "All 32 teams launch their quest for the Gridiron Cup. Who will lift the trophy?",
+      headline: "VFL 2025 Season Kicks Off!",
+      body: "All 32 teams launch their quest for the Virtual Cup. Who will claim the championship?",
       category: "general",
       timestamp: Date.now(),
       week: 1,

@@ -17,7 +17,7 @@ import { NFLTeamBadge } from "@/components/NFLTeamBadge";
 import { useColors } from "@/hooks/useColors";
 import { FranchiseMemberRole, useAuth } from "@/context/AuthContext";
 
-const GFL_TEAMS = [
+const VFL_TEAMS = [
   // Ironclad Conference — East
   { id: "team-0",  city: "Hartford",      name: "Sentinels",    abbr: "HRT", color: "#1B3462" },
   { id: "team-1",  city: "Providence",    name: "Storm",        abbr: "PVS", color: "#7F1D1D" },
@@ -90,7 +90,7 @@ export default function FranchiseLobbyScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const selectedTeam = GFL_TEAMS.find(t => t.id === selectedTeamId) ?? GFL_TEAMS[13];
+  const selectedTeam = VFL_TEAMS.find(t => t.id === selectedTeamId) ?? VFL_TEAMS[13];
 
   const handleCreate = async () => {
     if (!franchiseName.trim()) { setError("Please enter a franchise name."); return; }
@@ -205,7 +205,7 @@ export default function FranchiseLobbyScreen() {
               <Text style={[styles.selectedTeamName, { color: colors.foreground }]}>{selectedTeam.city} {selectedTeam.name}</Text>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.teamPickerRow}>
-              {GFL_TEAMS.map(t => (
+              {VFL_TEAMS.map(t => (
                 <TouchableOpacity
                   key={t.id}
                   onPress={() => setSelectedTeamId(t.id)}

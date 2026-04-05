@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { NFLTeamBadge } from "@/components/NFLTeamBadge";
+import { VFLLogo } from "@/components/VFLLogo";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
 import { useNFL } from "@/context/NFLContext";
@@ -104,9 +105,12 @@ export default function HomeScreen() {
       >
         {/* Header */}
         <View style={st.headerRow}>
-          <View>
-            <Text style={[st.seasonLabel, { color: colors.mutedForeground }]}>GFL {season?.year} SEASON</Text>
-            <Text style={[st.weekLabel, { color: colors.foreground }]}>WEEK {season?.currentWeek}</Text>
+          <View style={st.headerLeft}>
+            <VFLLogo size="sm" />
+            <View>
+              <Text style={[st.seasonLabel, { color: colors.mutedForeground }]}>VFL {season?.year} SEASON</Text>
+              <Text style={[st.weekLabel, { color: colors.foreground }]}>WEEK {season?.currentWeek}</Text>
+            </View>
           </View>
           <View style={st.headerRight}>
             {isSyncing && <SyncBadge type="syncing" colors={colors} />}
@@ -376,6 +380,7 @@ const st = StyleSheet.create({
   tickerText:     { fontSize:11, fontFamily:"Inter_600SemiBold", color:"#fff", letterSpacing:0.3, width:3000 },
   liveTag:        { paddingHorizontal:6, paddingVertical:2, borderRadius:4, marginRight:8 },
   headerRow:      { flexDirection:"row", alignItems:"center", justifyContent:"space-between", marginBottom:14 },
+  headerLeft:     { flexDirection:"row", alignItems:"center", gap:10 },
   headerRight:    { flexDirection:"row", alignItems:"center", gap:8 },
   seasonLabel:    { fontSize:10, fontFamily:"Inter_600SemiBold", letterSpacing:1.5 },
   weekLabel:      { fontSize:26, fontFamily:"Inter_700Bold", letterSpacing:-0.5 },

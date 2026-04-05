@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
+import { VFLLogo } from "@/components/VFLLogo";
 
 export default function LoginScreen() {
   const colors = useColors();
@@ -38,7 +39,6 @@ export default function LoginScreen() {
     const err = await signIn(email.trim(), password);
     setLoading(false);
     if (err) setError(err);
-    // On success, AuthContext will update and _layout will redirect
   };
 
   return (
@@ -51,20 +51,15 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Logo */}
-        <View style={styles.logoRow}>
-          <View style={[styles.logoBadge, { backgroundColor: colors.nflRed }]}>
-            <Text style={styles.logoText}>🏈</Text>
-          </View>
-          <View>
-            <Text style={[styles.appName, { color: colors.foreground }]}>FootballSim</Text>
-            <Text style={[styles.tagline, { color: colors.mutedForeground }]}>Co-GM Franchise Mode</Text>
-          </View>
+        {/* VFL Logo + Wordmark */}
+        <View style={styles.logoSection}>
+          <VFLLogo size="lg" showWordmark />
+          <View style={[styles.dividerAccent, { backgroundColor: colors.nflGold }]} />
         </View>
 
         <Text style={[styles.heading, { color: colors.foreground }]}>Sign In</Text>
         <Text style={[styles.subheading, { color: colors.mutedForeground }]}>
-          Join your franchise and manage your team with your co-GMs in real time.
+          Join your franchise and manage your roster with your co-GMs in real time.
         </Text>
 
         {/* Form */}
@@ -114,7 +109,7 @@ export default function LoginScreen() {
           <TouchableOpacity
             onPress={handleLogin}
             disabled={loading}
-            style={[styles.submitBtn, { backgroundColor: loading ? colors.secondary : colors.nflRed }]}
+            style={[styles.submitBtn, { backgroundColor: loading ? colors.secondary : colors.nflBlue }]}
           >
             {loading ? (
               <ActivityIndicator color="#fff" size="small" />
@@ -135,13 +130,12 @@ export default function LoginScreen() {
 
         <TouchableOpacity
           onPress={() => router.push("/auth/register")}
-          style={[styles.secondaryBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
+          style={[styles.secondaryBtn, { borderColor: colors.nflBlue + "60", backgroundColor: colors.card }]}
         >
-          <Feather name="user-plus" size={16} color={colors.foreground} />
-          <Text style={[styles.secondaryText, { color: colors.foreground }]}>Create Account</Text>
+          <Feather name="user-plus" size={16} color={colors.nflBlue} />
+          <Text style={[styles.secondaryText, { color: colors.nflBlue }]}>Create Account</Text>
         </TouchableOpacity>
 
-        {/* Offline mode */}
         <TouchableOpacity onPress={() => router.replace("/(tabs)")} style={styles.offlineBtn}>
           <Text style={[styles.offlineText, { color: colors.mutedForeground }]}>
             Continue Offline (local only)
@@ -155,11 +149,8 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { paddingHorizontal: 24 },
-  logoRow: { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 40 },
-  logoBadge: { width: 52, height: 52, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  logoText: { fontSize: 26 },
-  appName: { fontSize: 22, fontFamily: "Inter_700Bold", letterSpacing: -0.3 },
-  tagline: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  logoSection: { alignItems: "flex-start", marginBottom: 36, gap: 16 },
+  dividerAccent: { height: 2, width: 40, borderRadius: 1 },
   heading: { fontSize: 30, fontFamily: "Inter_700Bold", letterSpacing: -0.5, marginBottom: 8 },
   subheading: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 20, marginBottom: 32 },
   form: { gap: 16, marginBottom: 24 },
@@ -174,7 +165,7 @@ const styles = StyleSheet.create({
   dividerRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 16 },
   divider: { flex: 1, height: 1 },
   dividerText: { fontSize: 12, fontFamily: "Inter_400Regular" },
-  secondaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 14, borderRadius: 14, borderWidth: 1, marginBottom: 20 },
+  secondaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, marginBottom: 20 },
   secondaryText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
   offlineBtn: { alignItems: "center", paddingVertical: 8 },
   offlineText: { fontSize: 12, fontFamily: "Inter_400Regular", textDecorationLine: "underline" },

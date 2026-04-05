@@ -1,43 +1,44 @@
 const colors = {
   light: {
     text: "#0d1117",
-    tint: "#013369",
+    tint: "#4F46E5",
 
-    background: "#0a0a0f",
-    foreground: "#f0f0f5",
+    background: "#07070F",
+    foreground: "#EEEEF8",
 
-    card: "#13131a",
-    cardForeground: "#f0f0f5",
+    card: "#0F0F1C",
+    cardForeground: "#EEEEF8",
 
-    primary: "#013369",
+    primary: "#4F46E5",
     primaryForeground: "#ffffff",
 
-    secondary: "#1c1c26",
-    secondaryForeground: "#c0c0d0",
+    secondary: "#14142A",
+    secondaryForeground: "#A8A8C8",
 
-    muted: "#1c1c26",
-    mutedForeground: "#7070a0",
+    muted: "#14142A",
+    mutedForeground: "#6060A0",
 
-    accent: "#d50a0a",
+    accent: "#0D9488",
     accentForeground: "#ffffff",
 
     destructive: "#f85149",
     destructiveForeground: "#ffffff",
 
-    border: "#252535",
-    input: "#1c1c26",
+    border: "#1E1E3A",
+    input: "#14142A",
 
-    success: "#00c853",
-    warning: "#ffd700",
-    danger: "#d50a0a",
+    success: "#10B981",
+    warning: "#D97706",
+    danger: "#E11D48",
 
-    nflBlue: "#013369",
-    nflRed: "#d50a0a",
-    nflGold: "#ffd700",
-    nflGreen: "#1a7a1a",
+    // VFL Brand Colors
+    nflBlue: "#4F46E5",   // VFL Indigo — primary brand
+    nflRed: "#0D9488",    // VFL Teal — secondary brand
+    nflGold: "#D97706",   // VFL Amber — highlight
+    nflGreen: "#10B981",  // VFL Emerald
 
-    gold: "#ffd700",
-    silver: "#a0a0b0",
+    gold: "#D97706",
+    silver: "#9090B0",
     bronze: "#cd7f32",
   },
 
