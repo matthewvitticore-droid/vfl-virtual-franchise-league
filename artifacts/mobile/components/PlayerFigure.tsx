@@ -1,7 +1,8 @@
 import React from "react";
 import Svg, {
-  Defs, LinearGradient, Stop,
-  Path, Rect, Ellipse, Line, Text as SvgText, G,
+  Defs, LinearGradient, RadialGradient, Stop,
+  Path, Rect, Ellipse, Line,
+  Text as SvgText, G,
 } from "react-native-svg";
 import type { NFLPosition, UniformSet } from "@/context/types";
 
@@ -15,33 +16,34 @@ function bodyClass(pos: NFLPosition): BodyClass {
   return "skill";
 }
 
-// Width scale: linemen are 35% wider, LBs 18% wider
 function scaleW(cls: BodyClass): number {
-  if (cls === "lineman") return 1.35;
-  if (cls === "lb") return 1.18;
+  if (cls === "lineman") return 1.30;
+  if (cls === "lb") return 1.15;
   return 1.0;
 }
 
 // ─── Color helpers ────────────────────────────────────────────────────────────
 
-function hex(h: string): [number, number, number] {
+function hexToRgb(h: string): [number, number, number] {
   const n = parseInt(h.replace("#", ""), 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
 function darken(h: string, amt: number): string {
-  const [r, g, b] = hex(h);
+  const [r, g, b] = hexToRgb(h);
   const c = (v: number) => Math.max(0, Math.min(255, v + amt)).toString(16).padStart(2, "0");
   return `#${c(r)}${c(g)}${c(b)}`;
 }
 
-// ─── Position-specific label ──────────────────────────────────────────────────
+function lighten(h: string, amt: number): string {
+  return darken(h, Math.abs(amt));
+}
 
-const POS_LABEL: Record<NFLPosition, string> = {
-  QB: "THP", RB: "BTK", WR: "CTH", TE: "CTH",
-  OL: "RBK", DE: "FSN", DT: "BTK", LB: "TAK",
-  CB: "MAN", S: "ZON", K: "KPW", P: "KPW",
-};
+function withAlpha(h: string, a: number): string {
+  const [r, g, b] = hexToRgb(h);
+  const alpha = Math.round(a * 255).toString(16).padStart(2, "0");
+  return `#${r.toString(16).padStart(2,"0")}${g.toString(16).padStart(2,"0")}${b.toString(16).padStart(2,"0")}${alpha}`;
+}
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -54,6 +56,10 @@ interface Props {
   height?: number;
 }
 
+// viewBox: 0 0 120 300
+const VB_W = 120;
+const VB_H = 300;
+
 export function PlayerFigure({
   uniform,
   position,
@@ -62,410 +68,545 @@ export function PlayerFigure({
   width = 120,
   height = 280,
 }: Props) {
-  const cls = bodyClass(position);
-  const sw = scaleW(cls);
-  const cx = 60;
+  const cls   = bodyClass(position);
+  const sw    = scaleW(cls);
+  const cx    = 60;
 
-  // Pull colors from the uniform set
-  const helmetColor   = uniform.helmetColor   || "#1E3A8A";
-  const helmetDark    = darken(helmetColor, -30);
-  const jerseyColor   = uniform.jerseyColor   || "#1E3A8A";
-  const jerseyDark    = darken(jerseyColor, -25);
-  const jerseyAccent  = uniform.jerseyAccentColor || "#ffffff";
-  const numberColor   = uniform.numberColor   || "#ffffff";
-  const numberOutline = uniform.numberOutlineColor || "#000000";
-  const pantColor     = uniform.pantColor     || "#1E3A8A";
-  const pantDark      = darken(pantColor, -30);
-  const stripeColor   = uniform.pantStripeColor   || "#ffffff";
-  const sockColor     = uniform.sockColor     || "#ffffff";
-  const sockAccent    = uniform.sockAccentColor   || jerseyColor;
-  const facemaskColor = "#8A9BB0";
-  const skinColor     = "#C09070";
-  const cleatColor    = "#1A1A2E";
+  // ── Colors from uniform ──────────────────────────────────────────────────
+  const helmetC   = uniform.helmetColor        || "#1E3A8A";
+  const helmetHi  = lighten(helmetC, 40);
+  const helmetDk  = darken(helmetC, -40);
+  const jerseyC   = uniform.jerseyColor        || "#1E3A8A";
+  const jerseyDk  = darken(jerseyC, -30);
+  const jerseyHi  = lighten(jerseyC, 20);
+  const accentC   = uniform.jerseyAccentColor  || "#ffffff";
+  const numC      = uniform.numberColor        || "#ffffff";
+  const numOut    = uniform.numberOutlineColor || "#000000";
+  const pantC     = uniform.pantColor          || "#1E3A8A";
+  const pantDk    = darken(pantC, -35);
+  const pantHi    = lighten(pantC, 15);
+  const stripeC   = uniform.pantStripeColor    || "#ffffff";
+  const sockC     = uniform.sockColor          || "#ffffff";
+  const sockAcc   = uniform.sockAccentColor    || jerseyC;
+  const maskC     = "#B0BEC5";
+  const maskDk    = "#78909C";
+  const skinC     = "#C9956A";
+  const skinDk    = darken(skinC, -20);
+  const cleatC    = "#1A1A2E";
+  const cleatSole = "#2D2D40";
+  const gloveC    = darken(jerseyC, -45);
 
-  // Body geometry (all relative to cx=60, viewBox 0 0 120 280)
-  const sL  = cx - 44 * sw;   // shoulder outer left
-  const sR  = cx + 44 * sw;   // shoulder outer right
-  const tL  = cx - 26 * sw;   // torso left
-  const tR  = cx + 26 * sw;   // torso right
-  const hL  = cx - 30 * sw;   // hip left
-  const hR  = cx + 30 * sw;   // hip right
-  const lLL = cx - 30 * sw;   // left leg left edge
-  const lLR = cx - 4  * sw;   // left leg right edge (inner)
-  const rLL = cx + 4  * sw;   // right leg left edge (inner)
-  const rLR = cx + 30 * sw;   // right leg right edge
+  // ── Geometry ─────────────────────────────────────────────────────────────
+  // Key x-coords (all scaled by sw from center)
+  const sL   = cx - 42 * sw;  // shoulder tip left
+  const sR   = cx + 42 * sw;  // shoulder tip right
+  const tL   = cx - 22 * sw;  // torso/chest left
+  const tR   = cx + 22 * sw;  // torso/chest right
+  const wL   = cx - 20 * sw;  // waist left
+  const wR   = cx + 20 * sw;  // waist right
+  const hL   = cx - 26 * sw;  // hip left
+  const hR   = cx + 26 * sw;  // hip right
 
-  // Vertical anchor points
-  const helmetTop    = 8;
-  const helmetBrim   = 55;
-  const neckTop      = 60;
-  const neckBot      = 73;
-  const shoulderTop  = 75;
-  const shoulderBot  = 98;
-  const torsoBot     = 170;
-  const beltBot      = 188;
-  const legBot       = 262;
-  const sockBot      = 276;
-  const cleatBot     = 288;
+  // Leg columns
+  const llL  = cx - 27 * sw;  // left leg outside
+  const llR  = cx - 3  * sw;  // left leg inside
+  const rlL  = cx + 3  * sw;  // right leg inside
+  const rlR  = cx + 27 * sw;  // right leg outside
 
-  // Last name for name plate
+  // Arm anchor from shoulder
+  const armW = 10 * sw;
+
+  // ── Vertical anchors ─────────────────────────────────────────────────────
+  const helmetTop   = 6;
+  const helmetMid   = 30;
+  const helmetBrim  = 52;
+  const chinY       = 72;   // chin / bottom of facemask
+  const neckT       = 56;
+  const neckB       = 69;
+  const padTop      = 70;   // shoulder pad top
+  const padBot      = 96;   // shoulder pad bottom
+  const torsoT      = padBot;
+  const torsoB      = 168;
+  const beltT       = torsoB;
+  const beltB       = 183;
+  const thighT      = beltB;
+  const legB        = 258;
+  const sockT       = legB;
+  const sockB       = 273;
+  const cleatT      = sockB;
+  const cleatB      = 289;
+
+  // ── Arm pose (elbows bent outward, forearms down) ──────────────────────
+  // Upper arm: shoulder → elbow
+  const lElbowX = sL - 8 * sw;
+  const lElbowY = padBot + 44;
+  const lHandX  = sL - 2 * sw;
+  const lHandY  = padBot + 88;
+  const rElbowX = sR + 8 * sw;
+  const rElbowY = padBot + 44;
+  const rHandX  = sR + 2 * sw;
+  const rHandY  = padBot + 88;
+
   const lastName = playerName ? playerName.split(" ").pop()!.toUpperCase() : "";
 
-  // Stripe rendering for pants
-  function pantStripes(legX1: number, legX2: number) {
-    const legCx = (legX1 + legX2) / 2;
+  // ── Pant stripes ──────────────────────────────────────────────────────
+  function pantStripes(x1: number, x2: number) {
+    const midX = (x1 + x2) / 2;
     const style = uniform.pantStripeStyle;
-    if (style === "none") return null;
-    const yTop = shoulderBot + (beltBot - shoulderBot);
-    const yBot = legBot;
-    if (style === "single") {
-      return <Line x1={legCx} y1={yTop} x2={legCx} y2={yBot} stroke={stripeColor} strokeWidth={3.5} />;
-    }
-    if (style === "double") {
-      return (<>
-        <Line x1={legCx - 4} y1={yTop} x2={legCx - 4} y2={yBot} stroke={stripeColor} strokeWidth={2.5} />
-        <Line x1={legCx + 4} y1={yTop} x2={legCx + 4} y2={yBot} stroke={stripeColor} strokeWidth={2.5} />
-      </>);
-    }
-    if (style === "triple") {
-      return (<>
-        <Line x1={legCx - 7} y1={yTop} x2={legCx - 7} y2={yBot} stroke={stripeColor} strokeWidth={2} />
-        <Line x1={legCx}     y1={yTop} x2={legCx}     y2={yBot} stroke={stripeColor} strokeWidth={2} />
-        <Line x1={legCx + 7} y1={yTop} x2={legCx + 7} y2={yBot} stroke={stripeColor} strokeWidth={2} />
-      </>);
-    }
+    const yT = thighT + 6;
+    const yB = legB - 4;
+    if (!style || style === "none") return null;
+    if (style === "single")
+      return <Line x1={midX} y1={yT} x2={midX} y2={yB} stroke={stripeC} strokeWidth={4} strokeLinecap="round" />;
+    if (style === "double")
+      return (<G>
+        <Line x1={midX-5} y1={yT} x2={midX-5} y2={yB} stroke={stripeC} strokeWidth={2.5} strokeLinecap="round" />
+        <Line x1={midX+5} y1={yT} x2={midX+5} y2={yB} stroke={stripeC} strokeWidth={2.5} strokeLinecap="round" />
+      </G>);
+    if (style === "triple")
+      return (<G>
+        <Line x1={midX-7} y1={yT} x2={midX-7} y2={yB} stroke={stripeC} strokeWidth={2} strokeLinecap="round" />
+        <Line x1={midX}   y1={yT} x2={midX}   y2={yB} stroke={stripeC} strokeWidth={2} strokeLinecap="round" />
+        <Line x1={midX+7} y1={yT} x2={midX+7} y2={yB} stroke={stripeC} strokeWidth={2} strokeLinecap="round" />
+      </G>);
     if (style === "lightning") {
-      const mid = (yTop + yBot) / 2;
+      const ym = (yT + yB) / 2;
       return (
         <Path
-          d={`M ${legCx + 6} ${yTop} L ${legCx - 6} ${mid} L ${legCx + 2} ${mid} L ${legCx - 6} ${yBot}`}
-          stroke={stripeColor} strokeWidth={3} fill="none" strokeLinecap="round" strokeLinejoin="round"
+          d={`M${midX+7} ${yT} L${midX-5} ${ym-6} L${midX+3} ${ym} L${midX-7} ${yB}`}
+          stroke={stripeC} strokeWidth={3} fill="none" strokeLinecap="round" strokeLinejoin="round"
         />
       );
     }
     return null;
   }
 
-  const vb = `0 0 120 ${cleatBot + 4}`;
-
   return (
-    <Svg width={width} height={height} viewBox={vb}>
+    <Svg width={width} height={height} viewBox={`0 0 ${VB_W} ${VB_H}`}>
       <Defs>
-        {/* Jersey gradient for depth */}
-        <LinearGradient id="jerseyGrad" x1="0" y1="0" x2="1" y2="0">
-          <Stop offset="0" stopColor={darken(jerseyColor, 10)} stopOpacity="1" />
-          <Stop offset="0.5" stopColor={jerseyColor} stopOpacity="1" />
-          <Stop offset="1" stopColor={darken(jerseyColor, -20)} stopOpacity="1" />
+        {/* Jersey body */}
+        <LinearGradient id="jGrad" x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0"   stopColor={jerseyHi} />
+          <Stop offset="0.4" stopColor={jerseyC} />
+          <Stop offset="1"   stopColor={jerseyDk} />
         </LinearGradient>
-        {/* Helmet gradient for 3D look */}
-        <LinearGradient id="helmetGrad" x1="0.2" y1="0" x2="0.8" y2="1">
-          <Stop offset="0" stopColor={darken(helmetColor, 25)} stopOpacity="1" />
-          <Stop offset="0.55" stopColor={helmetColor} stopOpacity="1" />
-          <Stop offset="1" stopColor={helmetDark} stopOpacity="1" />
+        {/* Shoulder pad */}
+        <LinearGradient id="spGrad" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0"   stopColor={lighten(jerseyC, 30)} />
+          <Stop offset="0.5" stopColor={jerseyC} />
+          <Stop offset="1"   stopColor={jerseyDk} />
         </LinearGradient>
-        {/* Pant gradient */}
-        <LinearGradient id="pantGrad" x1="0" y1="0" x2="1" y2="0">
-          <Stop offset="0" stopColor={darken(pantColor, 8)} stopOpacity="1" />
-          <Stop offset="1" stopColor={pantDark} stopOpacity="1" />
+        {/* Helmet dome */}
+        <LinearGradient id="hGrad" x1="0.25" y1="0" x2="0.85" y2="1">
+          <Stop offset="0"    stopColor={helmetHi} />
+          <Stop offset="0.45" stopColor={helmetC} />
+          <Stop offset="1"    stopColor={helmetDk} />
         </LinearGradient>
+        {/* Pants */}
+        <LinearGradient id="pGrad" x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0"   stopColor={pantHi} />
+          <Stop offset="0.5" stopColor={pantC} />
+          <Stop offset="1"   stopColor={pantDk} />
+        </LinearGradient>
+        {/* Arm / sleeve */}
+        <LinearGradient id="aGrad" x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0"   stopColor={lighten(jerseyC, 15)} />
+          <Stop offset="1"   stopColor={jerseyDk} />
+        </LinearGradient>
+        {/* Ground shadow */}
+        <RadialGradient id="gShadow" cx="50%" cy="50%" r="50%">
+          <Stop offset="0"   stopColor="#000000" stopOpacity="0.50" />
+          <Stop offset="1"   stopColor="#000000" stopOpacity="0" />
+        </RadialGradient>
       </Defs>
 
-      {/* ── LEFT ARM (drawn behind torso) ──────────────────────── */}
+      {/* ── GROUND SHADOW ──────────────────────────────────────── */}
+      <Ellipse cx={cx} cy={cleatB + 2} rx={38 * sw} ry={5} fill="url(#gShadow)" />
+
+      {/* ══════════════ LEFT ARM ═══════════════════════════════ */}
       {/* Upper arm */}
       <Path
-        d={`M ${sL + 6} ${shoulderTop + 4} Q ${sL - 14} ${shoulderBot + 16} ${sL - 8} ${shoulderBot + 30} Q ${sL + 2} ${shoulderBot + 34} ${sL + 12} ${shoulderBot + 24} Q ${sL + 4} ${shoulderBot + 8} ${tL - 2} ${shoulderBot - 4} Z`}
-        fill="url(#jerseyGrad)"
+        d={`M ${tL} ${padBot-2}
+            Q ${sL+2} ${padBot+4} ${lElbowX+4} ${lElbowY}
+            Q ${lElbowX-2} ${lElbowY+4} ${lElbowX-armW+2} ${lElbowY}
+            Q ${sL-8} ${padBot+4} ${tL-8} ${padBot+8} Z`}
+        fill="url(#aGrad)"
+      />
+      {/* Sleeve accent stripe */}
+      <Path
+        d={`M ${tL-2} ${padBot+16}
+            Q ${sL} ${padBot+22} ${lElbowX+2} ${lElbowY-8}
+            L ${lElbowX-1} ${lElbowY-5}
+            Q ${sL-4} ${padBot+24} ${tL-5} ${padBot+20} Z`}
+        fill={accentC} fillOpacity={0.65}
       />
       {/* Forearm */}
       <Path
-        d={`M ${sL - 8} ${shoulderBot + 30} Q ${sL - 18} ${shoulderBot + 48} ${sL - 10} ${shoulderBot + 62} Q ${sL + 2} ${shoulderBot + 66} ${sL + 10} ${shoulderBot + 54} Q ${sL + 2} ${shoulderBot + 38} ${sL + 12} ${shoulderBot + 24} Z`}
-        fill={jerseyAccent === "#ffffff" ? darken(jerseyColor, -10) : jerseyAccent}
+        d={`M ${lElbowX+4} ${lElbowY}
+            Q ${lElbowX+6} ${lElbowY+28} ${lHandX+6} ${lHandY-2}
+            L ${lHandX-4} ${lHandY}
+            Q ${lElbowX-6} ${lElbowY+26} ${lElbowX-armW+2} ${lElbowY} Z`}
+        fill={skinC}
       />
-      {/* Glove / hand */}
-      <Ellipse
-        cx={sL - 5}
-        cy={shoulderBot + 67}
-        rx={8}
-        ry={6}
-        fill={cls === "lineman" ? "#222" : darken(jerseyColor, -40)}
+      {/* Forearm tape / arm sleeve */}
+      <Path
+        d={`M ${lElbowX+4} ${lElbowY+2}
+            L ${lElbowX+3} ${lElbowY+9}
+            L ${lElbowX-armW+3} ${lElbowY+7}
+            L ${lElbowX-armW+2} ${lElbowY} Z`}
+        fill={accentC} fillOpacity={0.5}
       />
+      {/* Glove */}
+      <Ellipse cx={lHandX+1} cy={lHandY+4} rx={8*sw} ry={7} fill={gloveC} />
+      <Line x1={lHandX-4} y1={lHandY+2} x2={lHandX+6} y2={lHandY+2} stroke={darken(gloveC,15)} strokeWidth={1} />
 
-      {/* ── RIGHT ARM (drawn behind torso) ─────────────────────── */}
+      {/* ══════════════ RIGHT ARM ══════════════════════════════ */}
       <Path
-        d={`M ${sR - 6} ${shoulderTop + 4} Q ${sR + 14} ${shoulderBot + 16} ${sR + 8} ${shoulderBot + 30} Q ${sR - 2} ${shoulderBot + 34} ${sR - 12} ${shoulderBot + 24} Q ${sR - 4} ${shoulderBot + 8} ${tR + 2} ${shoulderBot - 4} Z`}
-        fill="url(#jerseyGrad)"
+        d={`M ${tR} ${padBot-2}
+            Q ${sR-2} ${padBot+4} ${rElbowX-4} ${rElbowY}
+            Q ${rElbowX+2} ${rElbowY+4} ${rElbowX+armW-2} ${rElbowY}
+            Q ${sR+8} ${padBot+4} ${tR+8} ${padBot+8} Z`}
+        fill="url(#aGrad)"
       />
       <Path
-        d={`M ${sR + 8} ${shoulderBot + 30} Q ${sR + 18} ${shoulderBot + 48} ${sR + 10} ${shoulderBot + 62} Q ${sR - 2} ${shoulderBot + 66} ${sR - 10} ${shoulderBot + 54} Q ${sR - 2} ${shoulderBot + 38} ${sR - 12} ${shoulderBot + 24} Z`}
-        fill={jerseyAccent === "#ffffff" ? darken(jerseyColor, -10) : jerseyAccent}
+        d={`M ${tR+2} ${padBot+16}
+            Q ${sR} ${padBot+22} ${rElbowX-2} ${rElbowY-8}
+            L ${rElbowX+1} ${rElbowY-5}
+            Q ${sR+4} ${padBot+24} ${tR+5} ${padBot+20} Z`}
+        fill={accentC} fillOpacity={0.65}
       />
-      <Ellipse
-        cx={sR + 5}
-        cy={shoulderBot + 67}
-        rx={8}
-        ry={6}
-        fill={cls === "lineman" ? "#222" : darken(jerseyColor, -40)}
+      <Path
+        d={`M ${rElbowX-4} ${rElbowY}
+            Q ${rElbowX-6} ${rElbowY+28} ${rHandX-6} ${rHandY-2}
+            L ${rHandX+4} ${rHandY}
+            Q ${rElbowX+6} ${rElbowY+26} ${rElbowX+armW-2} ${rElbowY} Z`}
+        fill={skinC}
       />
+      <Path
+        d={`M ${rElbowX-4} ${rElbowY+2}
+            L ${rElbowX-3} ${rElbowY+9}
+            L ${rElbowX+armW-3} ${rElbowY+7}
+            L ${rElbowX+armW-2} ${rElbowY} Z`}
+        fill={accentC} fillOpacity={0.5}
+      />
+      <Ellipse cx={rHandX-1} cy={rHandY+4} rx={8*sw} ry={7} fill={gloveC} />
+      <Line x1={rHandX+4} y1={rHandY+2} x2={rHandX-6} y2={rHandY+2} stroke={darken(gloveC,15)} strokeWidth={1} />
 
-      {/* ── SHOULDER PADS ─────────────────────────────────────────── */}
-      {/* Left cap shadow */}
+      {/* ══════════════ SHOULDER PADS ═══════════════════════════ */}
+      {/* Back pad drop shadow */}
       <Path
-        d={`M ${sL} ${shoulderTop + 2} L ${tL - 2} ${shoulderTop + 2} L ${tL} ${shoulderBot} L ${sL} ${shoulderBot - 10} Z`}
-        fill={darken(jerseyColor, -35)}
+        d={`M ${sL+4} ${padTop+4} L ${sR-4} ${padTop+4} L ${tR+4} ${padBot+4} L ${tL-4} ${padBot+4} Z`}
+        fill={darken(jerseyC, -50)} fillOpacity={0.5}
       />
-      {/* Right cap shadow */}
+      {/* Main pad trapezoid */}
       <Path
-        d={`M ${sR} ${shoulderTop + 2} L ${tR + 2} ${shoulderTop + 2} L ${tR} ${shoulderBot} L ${sR} ${shoulderBot - 10} Z`}
-        fill={darken(jerseyColor, -35)}
+        d={`M ${sL} ${padTop} L ${sR} ${padTop} L ${tR+2} ${padBot} L ${tL-2} ${padBot} Z`}
+        fill="url(#spGrad)"
       />
-      {/* Main pad (trapezoid) */}
+      {/* Shoulder pad collar ridge */}
       <Path
-        d={`M ${sL} ${shoulderTop} L ${sR} ${shoulderTop} L ${tR} ${shoulderBot} L ${tL} ${shoulderBot} Z`}
-        fill="url(#jerseyGrad)"
+        d={`M ${sL+6} ${padTop} L ${tL+4} ${padBot}
+            L ${tL+10} ${padBot} L ${sL+14} ${padTop} Z`}
+        fill={darken(jerseyC, -40)}
       />
-      {/* Shoulder pad seam line */}
-      <Line x1={sL + 4} y1={shoulderTop} x2={tL + 2} y2={shoulderBot} stroke={darken(jerseyColor, -40)} strokeWidth={1} />
-      <Line x1={sR - 4} y1={shoulderTop} x2={tR - 2} y2={shoulderBot} stroke={darken(jerseyColor, -40)} strokeWidth={1} />
-      {/* Shoulder accent stripe (team color) */}
-      {jerseyAccent !== "#ffffff" && (
-        <>
-          <Path
-            d={`M ${sL + 8} ${shoulderTop} L ${sL + 16} ${shoulderTop} L ${tL + 6} ${shoulderBot} L ${tL - 2} ${shoulderBot} Z`}
-            fill={jerseyAccent}
-            fillOpacity={0.6}
-          />
-          <Path
-            d={`M ${sR - 8} ${shoulderTop} L ${sR - 16} ${shoulderTop} L ${tR - 6} ${shoulderBot} L ${tR + 2} ${shoulderBot} Z`}
-            fill={jerseyAccent}
-            fillOpacity={0.6}
-          />
-        </>
-      )}
+      <Path
+        d={`M ${sR-6} ${padTop} L ${tR-4} ${padBot}
+            L ${tR-10} ${padBot} L ${sR-14} ${padTop} Z`}
+        fill={darken(jerseyC, -40)}
+      />
+      {/* Accent color shoulder stripes */}
+      <Path
+        d={`M ${sL+14} ${padTop} L ${sL+24} ${padTop} L ${tL+12} ${padBot} L ${tL+4} ${padBot} Z`}
+        fill={accentC} fillOpacity={0.55}
+      />
+      <Path
+        d={`M ${sR-14} ${padTop} L ${sR-24} ${padTop} L ${tR-12} ${padBot} L ${tR-4} ${padBot} Z`}
+        fill={accentC} fillOpacity={0.55}
+      />
+      {/* Pad bump / bolt */}
+      <Ellipse cx={cx - 18*sw} cy={padTop + 8} rx={3.5} ry={3} fill={lighten(jerseyC,35)} fillOpacity={0.7} />
+      <Ellipse cx={cx + 18*sw} cy={padTop + 8} rx={3.5} ry={3} fill={lighten(jerseyC,35)} fillOpacity={0.7} />
 
-      {/* ── TORSO / JERSEY BODY ───────────────────────────────────── */}
+      {/* ══════════════ JERSEY BODY ═════════════════════════════ */}
       <Path
-        d={`M ${tL} ${shoulderBot} L ${tR} ${shoulderBot} L ${tR - 4} ${torsoBot} L ${tL + 4} ${torsoBot} Z`}
-        fill="url(#jerseyGrad)"
+        d={`M ${tL-2} ${torsoT} L ${tR+2} ${torsoT}
+            L ${wR+2} ${torsoB} L ${wL-2} ${torsoB} Z`}
+        fill="url(#jGrad)"
       />
-      {/* Jersey side accent panels */}
-      {jerseyAccent !== "#ffffff" && (
-        <>
-          <Path
-            d={`M ${tL} ${shoulderBot} L ${tL + 8} ${shoulderBot} L ${tL + 6} ${torsoBot} L ${tL + 4} ${torsoBot} Z`}
-            fill={jerseyAccent} fillOpacity={0.5}
-          />
-          <Path
-            d={`M ${tR} ${shoulderBot} L ${tR - 8} ${shoulderBot} L ${tR - 6} ${torsoBot} L ${tR - 4} ${torsoBot} Z`}
-            fill={jerseyAccent} fillOpacity={0.5}
-          />
-        </>
-      )}
+      {/* Side panels */}
+      <Path
+        d={`M ${tL-2} ${torsoT} L ${tL+6} ${torsoT}
+            L ${wL+4} ${torsoB} L ${wL-2} ${torsoB} Z`}
+        fill={accentC} fillOpacity={0.35}
+      />
+      <Path
+        d={`M ${tR+2} ${torsoT} L ${tR-6} ${torsoT}
+            L ${wR-4} ${torsoB} L ${wR+2} ${torsoB} Z`}
+        fill={accentC} fillOpacity={0.35}
+      />
+      {/* Jersey front seam */}
+      <Line x1={cx} y1={torsoT+4} x2={cx} y2={torsoB-6} stroke={darken(jerseyC,-35)} strokeWidth={0.75} />
 
-      {/* ── PLAYER NUMBER ─────────────────────────────────────────── */}
+      {/* ── JERSEY NUMBER ──────────────────────────────────────── */}
       <SvgText
         x={cx}
-        y={torsoBot - 46}
+        y={torsoB - 50}
         fontSize={cls === "lineman" ? 34 : 38}
-        fontWeight="bold"
-        fill={numberColor}
-        stroke={numberOutline}
-        strokeWidth={cls === "lineman" ? 1.5 : 2}
+        fontWeight="900"
+        fill={numC}
+        stroke={numOut}
+        strokeWidth={cls === "lineman" ? 2 : 2.5}
         textAnchor="middle"
         fontFamily="System"
+        letterSpacing={-1}
       >
         {number}
       </SvgText>
 
-      {/* ── NAME PLATE ────────────────────────────────────────────── */}
+      {/* ── NAME PLATE ─────────────────────────────────────────── */}
       {lastName.length > 0 && (
         <>
           <Rect
-            x={tL + 4}
-            y={torsoBot - 18}
-            width={(tR - tL) - 8}
-            height={14}
-            fill={darken(jerseyColor, -40)}
-            rx={2}
+            x={wL - 2} y={torsoB - 16}
+            width={(wR - wL) + 4} height={13}
+            fill={darken(jerseyC, -45)} rx={2}
           />
           <SvgText
-            x={cx}
-            y={torsoBot - 8}
-            fontSize={7}
-            fontWeight="bold"
-            fill={numberColor}
-            textAnchor="middle"
-            fontFamily="System"
+            x={cx} y={torsoB - 7}
+            fontSize={6.5} fontWeight="bold"
+            fill={numC} textAnchor="middle" fontFamily="System"
+            letterSpacing={0.5}
           >
             {lastName.length > 9 ? lastName.slice(0, 9) : lastName}
           </SvgText>
         </>
       )}
 
-      {/* ── BELT / PANT TOP ───────────────────────────────────────── */}
+      {/* ── JERSEY COLLAR ──────────────────────────────────────── */}
       <Path
-        d={`M ${hL - 2} ${torsoBot} L ${hR + 2} ${torsoBot} L ${hR + 4} ${beltBot} L ${hL - 4} ${beltBot} Z`}
-        fill={darken(pantColor, -10)}
+        d={`M ${cx-10} ${neckB} Q ${cx} ${torsoT+6} ${cx+10} ${neckB} L ${cx+7} ${torsoT+2} Q ${cx} ${neckB-4} ${cx-7} ${torsoT+2} Z`}
+        fill={darken(jerseyC,-30)}
       />
-      {/* Belt buckle */}
-      <Rect
-        x={cx - 6}
-        y={torsoBot + 3}
-        width={12}
-        height={8}
-        fill={darken(pantColor, -50)}
-        rx={2}
+      <Path
+        d={`M ${cx-8} ${neckB-1} Q ${cx} ${torsoT+7} ${cx+8} ${neckB-1}`}
+        stroke={accentC} strokeWidth={1.5} fill="none" strokeLinecap="round"
       />
 
-      {/* ── PANTS LEGS ────────────────────────────────────────────── */}
+      {/* ══════════════ BELT ═════════════════════════════════════ */}
+      <Path
+        d={`M ${hL} ${beltT} L ${hR} ${beltT} L ${hR+2} ${beltB} L ${hL-2} ${beltB} Z`}
+        fill={darken(pantC, -20)}
+      />
+      {/* Belt buckle */}
+      <Rect x={cx-8} y={beltT+3} width={16} height={9} fill={darken(pantC,-55)} rx={2} />
+      <Rect x={cx-5} y={beltT+5} width={10} height={5} fill={darken(pantC,-35)} rx={1} />
+
+      {/* ══════════════ PANTS / THIGHS ═══════════════════════════ */}
       {/* Left leg */}
       <Path
-        d={`M ${lLL} ${beltBot} L ${lLR + 2} ${beltBot} L ${lLR} ${legBot} L ${lLL - 2} ${legBot} Z`}
-        fill="url(#pantGrad)"
+        d={`M ${llL-1} ${thighT} L ${llR+1} ${thighT}
+            L ${llR} ${legB} L ${llL-2} ${legB} Z`}
+        fill="url(#pGrad)"
       />
       {/* Right leg */}
       <Path
-        d={`M ${rLL - 2} ${beltBot} L ${rLR} ${beltBot} L ${rLR + 2} ${legBot} L ${rLL} ${legBot} Z`}
-        fill="url(#pantGrad)"
+        d={`M ${rlL-1} ${thighT} L ${rlR+1} ${thighT}
+            L ${rlR+2} ${legB} L ${rlL} ${legB} Z`}
+        fill="url(#pGrad)"
       />
-      {/* Pant stripe separating legs (inner seam shadow) */}
-      <Line x1={cx} y1={beltBot} x2={cx} y2={legBot} stroke={darken(pantColor, -40)} strokeWidth={2} />
+      {/* Inner seam shadow */}
+      <Line x1={cx} y1={thighT} x2={cx} y2={legB} stroke={darken(pantC,-45)} strokeWidth={2} />
 
-      {/* ── PANT STRIPES ──────────────────────────────────────────── */}
-      {pantStripes(lLL, lLR)}
-      {pantStripes(rLL, rLR)}
+      {/* Thigh pads (bumps on front of each thigh) */}
+      <Ellipse cx={(llL+llR)/2} cy={thighT+18} rx={(llR-llL)/2 - 3} ry={8} fill={lighten(pantC,10)} />
+      <Ellipse cx={(rlL+rlR)/2} cy={thighT+18} rx={(rlR-rlL)/2 - 3} ry={8} fill={lighten(pantC,10)} />
+      {/* Knee pads */}
+      <Ellipse cx={(llL+llR)/2} cy={thighT+60} rx={(llR-llL)/2 - 6} ry={7} fill={lighten(pantC,8)} />
+      <Ellipse cx={(rlL+rlR)/2} cy={thighT+60} rx={(rlR-rlL)/2 - 6} ry={7} fill={lighten(pantC,8)} />
 
-      {/* ── SOCKS ─────────────────────────────────────────────────── */}
-      {/* Left sock */}
-      <Rect x={lLL - 2} y={legBot} width={lLR - lLL + 4} height={14} fill={sockColor} />
-      <Line x1={lLL - 2} y1={legBot + 5} x2={lLR + 2} y2={legBot + 5} stroke={sockAccent} strokeWidth={2.5} />
-      <Line x1={lLL - 2} y1={legBot + 9} x2={lLR + 2} y2={legBot + 9} stroke={sockAccent} strokeWidth={1.5} />
-      {/* Right sock */}
-      <Rect x={rLL - 2} y={legBot} width={rLR - rLL + 4} height={14} fill={sockColor} />
-      <Line x1={rLL - 2} y1={legBot + 5} x2={rLR + 2} y2={legBot + 5} stroke={sockAccent} strokeWidth={2.5} />
-      <Line x1={rLL - 2} y1={legBot + 9} x2={rLR + 2} y2={legBot + 9} stroke={sockAccent} strokeWidth={1.5} />
+      {/* Pant stripes */}
+      {pantStripes(llL, llR)}
+      {pantStripes(rlL, rlR)}
 
-      {/* ── CLEATS ────────────────────────────────────────────────── */}
-      {/* Left cleat */}
+      {/* ══════════════ SOCKS ════════════════════════════════════ */}
+      {/* Left */}
+      <Rect x={llL-2} y={sockT} width={llR-llL+4} height={sockB-sockT} fill={sockC} />
+      <Rect x={llL-2} y={sockT+4} width={llR-llL+4} height={3} fill={sockAcc} />
+      <Rect x={llL-2} y={sockT+9} width={llR-llL+4} height={2} fill={sockAcc} fillOpacity={0.6} />
+      {/* Right */}
+      <Rect x={rlL-2} y={sockT} width={rlR-rlL+4} height={sockB-sockT} fill={sockC} />
+      <Rect x={rlL-2} y={sockT+4} width={rlR-rlL+4} height={3} fill={sockAcc} />
+      <Rect x={rlL-2} y={sockT+9} width={rlR-rlL+4} height={2} fill={sockAcc} fillOpacity={0.6} />
+
+      {/* ══════════════ CLEATS ═══════════════════════════════════ */}
+      {/* Left cleat: upper */}
       <Path
-        d={`M ${lLL - 6} ${sockBot} L ${lLR + 4} ${sockBot} L ${lLR + 6} ${cleatBot} L ${lLL - 8} ${cleatBot} Z`}
-        fill={cleatColor}
+        d={`M ${llL-5} ${cleatT+1}
+            L ${llR+4} ${cleatT}
+            Q ${llR+8} ${cleatT+4} ${llR+6} ${cleatB-6}
+            Q ${llL-4} ${cleatB-4} ${llL-8} ${cleatB-8} Z`}
+        fill={cleatC}
+      />
+      {/* Left sole */}
+      <Path
+        d={`M ${llL-8} ${cleatB-8}
+            Q ${llR+6} ${cleatB-4} ${llR+6} ${cleatB-4}
+            L ${llR+4} ${cleatB}
+            L ${llL-10} ${cleatB} Z`}
+        fill={cleatSole}
       />
       {/* Right cleat */}
       <Path
-        d={`M ${rLL - 4} ${sockBot} L ${rLR + 6} ${sockBot} L ${rLR + 8} ${cleatBot} L ${rLL - 6} ${cleatBot} Z`}
-        fill={cleatColor}
+        d={`M ${rlL-4} ${cleatT}
+            L ${rlR+5} ${cleatT+1}
+            Q ${rlR+8} ${cleatT+4} ${rlR+8} ${cleatB-8}
+            Q ${rlL+4} ${cleatB-4} ${rlL-6} ${cleatB-6} Z`}
+        fill={cleatC}
       />
-      {/* Cleat sole accent */}
-      <Line x1={lLL - 8} y1={cleatBot - 3} x2={lLR + 6} y2={cleatBot - 3} stroke={jerseyColor} strokeWidth={2} />
-      <Line x1={rLL - 6} y1={cleatBot - 3} x2={rLR + 8} y2={cleatBot - 3} stroke={jerseyColor} strokeWidth={2} />
+      <Path
+        d={`M ${rlL-6} ${cleatB-4}
+            Q ${rlR+8} ${cleatB-4} ${rlR+8} ${cleatB-8}
+            L ${rlR+10} ${cleatB}
+            L ${rlL-6} ${cleatB} Z`}
+        fill={cleatSole}
+      />
+      {/* Cleat team color accent on sole */}
+      <Line x1={llL-9} y1={cleatB-2} x2={llR+5} y2={cleatB-2} stroke={jerseyC} strokeWidth={2} strokeLinecap="round" />
+      <Line x1={rlL-6} y1={cleatB-2} x2={rlR+9} y2={cleatB-2} stroke={jerseyC} strokeWidth={2} strokeLinecap="round" />
 
-      {/* ── HELMET ────────────────────────────────────────────────── */}
-      {/* Dome (main shape) */}
+      {/* ══════════════ NECK ═════════════════════════════════════ */}
+      <Rect x={cx-7} y={neckT} width={14} height={neckB-neckT} fill={skinC} rx={3} />
+      {/* Neck shadow */}
+      <Rect x={cx-7} y={neckT} width={3} height={neckB-neckT} fill={skinDk} rx={2} />
+
+      {/* ══════════════ HELMET ═══════════════════════════════════ */}
+      {/* Helmet back shadow */}
       <Path
-        d={`M ${cx - 37} ${helmetBrim} A 37 ${helmetBrim - helmetTop} 0 1 1 ${cx + 37} ${helmetBrim} Z`}
-        fill="url(#helmetGrad)"
+        d={`M ${cx-36} ${helmetBrim}
+            A 36 ${helmetBrim - helmetTop} 0 1 1 ${cx+40} ${helmetBrim}
+            L ${cx+38} ${helmetBrim+5} A 38 ${helmetBrim-helmetTop+6} 0 1 0 ${cx-38} ${helmetBrim+5} Z`}
+        fill={helmetDk}
       />
-      {/* Helmet brim/earhole ridge */}
+      {/* Main dome */}
       <Path
-        d={`M ${cx - 38} ${helmetBrim - 2} L ${cx + 38} ${helmetBrim - 2} L ${cx + 36} ${helmetBrim + 4} L ${cx - 36} ${helmetBrim + 4} Z`}
-        fill={helmetDark}
+        d={`M ${cx-36} ${helmetBrim}
+            A 36 ${helmetBrim - helmetTop} 0 1 1 ${cx+36} ${helmetBrim} Z`}
+        fill="url(#hGrad)"
       />
-      {/* Ear hole (left) */}
-      <Ellipse
-        cx={cx - 32}
-        cy={helmetBrim - 4}
-        rx={6}
-        ry={8}
-        fill={darken(helmetColor, -50)}
-      />
-      {/* Ear hole (right) */}
-      <Ellipse
-        cx={cx + 32}
-        cy={helmetBrim - 4}
-        rx={6}
-        ry={8}
-        fill={darken(helmetColor, -50)}
-      />
-      {/* Helmet center ridge */}
+      {/* Helmet back extension (back of helmet) */}
       <Path
-        d={`M ${cx - 3} ${helmetTop + 2} A 3 3 0 0 1 ${cx + 3} ${helmetTop + 2} L ${cx + 3} ${helmetBrim - 2} L ${cx - 3} ${helmetBrim - 2} Z`}
-        fill={darken(helmetColor, 15)}
+        d={`M ${cx+20} ${helmetTop+4}
+            Q ${cx+44} ${helmetTop+8} ${cx+40} ${helmetBrim-4}
+            L ${cx+36} ${helmetBrim} A 36 ${helmetBrim-helmetTop} 0 0 0 ${cx+20} ${helmetTop+4} Z`}
+        fill={helmetDk} fillOpacity={0.5}
       />
-      {/* Team stripe on center ridge */}
+      {/* Helmet ear flap (left) */}
       <Path
-        d={`M ${cx - 1.5} ${helmetTop + 4} A 1.5 1.5 0 0 1 ${cx + 1.5} ${helmetTop + 4} L ${cx + 1.5} ${helmetBrim - 3} L ${cx - 1.5} ${helmetBrim - 3} Z`}
-        fill={jerseyAccent === "#ffffff" ? numberColor : jerseyAccent}
-        fillOpacity={0.8}
+        d={`M ${cx-34} ${helmetBrim-8}
+            Q ${cx-40} ${helmetBrim+2} ${cx-36} ${helmetBrim+16}
+            Q ${cx-30} ${helmetBrim+20} ${cx-26} ${helmetBrim+10}
+            Q ${cx-28} ${helmetBrim+2} ${cx-30} ${helmetBrim-2} Z`}
+        fill={helmetDk}
       />
-      {/* Helmet highlight (shine) */}
-      <Ellipse
-        cx={cx - 10}
-        cy={helmetTop + 14}
-        rx={8}
-        ry={6}
-        fill="#ffffff"
-        fillOpacity={0.18}
-      />
-      {/* Face opening (dark) */}
+      {/* Ear hole */}
+      <Ellipse cx={cx-31} cy={helmetBrim+2} rx={5} ry={6} fill={darken(helmetC,-55)} />
+      {/* Helmet brim / visor rim */}
       <Path
-        d={`M ${cx - 24} ${helmetBrim - 18} A 14 22 0 0 1 ${cx + 24} ${helmetBrim - 18} L ${cx + 22} ${helmetBrim} L ${cx - 22} ${helmetBrim} Z`}
-        fill="#0D0D1A"
+        d={`M ${cx-36} ${helmetBrim-2}
+            L ${cx+36} ${helmetBrim-2}
+            L ${cx+34} ${helmetBrim+5}
+            L ${cx-34} ${helmetBrim+5} Z`}
+        fill={helmetDk}
+      />
+      {/* Center ridge / mohawk */}
+      <Path
+        d={`M ${cx-3} ${helmetTop+2}
+            A 3 3 0 0 1 ${cx+3} ${helmetTop+2}
+            L ${cx+2.5} ${helmetBrim-3}
+            L ${cx-2.5} ${helmetBrim-3} Z`}
+        fill={lighten(helmetC, 25)}
+      />
+      {/* Team accent stripe on center ridge */}
+      <Path
+        d={`M ${cx-1.5} ${helmetTop+5}
+            A 1.5 1.5 0 0 1 ${cx+1.5} ${helmetTop+5}
+            L ${cx+1} ${helmetBrim-4}
+            L ${cx-1} ${helmetBrim-4} Z`}
+        fill={accentC === "#ffffff" ? numC : accentC}
         fillOpacity={0.85}
       />
-      {/* Visor tint (slight team color) */}
+      {/* Helmet team stripe (side - left of center) */}
       <Path
-        d={`M ${cx - 22} ${helmetBrim - 16} A 12 18 0 0 1 ${cx + 22} ${helmetBrim - 16} L ${cx + 20} ${helmetBrim - 2} L ${cx - 20} ${helmetBrim - 2} Z`}
-        fill={jerseyColor}
-        fillOpacity={0.15}
+        d={`M ${cx-12} ${helmetTop+3}
+            Q ${cx-18} ${helmetTop+18} ${cx-20} ${helmetBrim-4}
+            L ${cx-15} ${helmetBrim-4}
+            Q ${cx-12} ${helmetTop+18} ${cx-6} ${helmetTop+4} Z`}
+        fill={accentC} fillOpacity={0.5}
+      />
+      {/* Helmet highlight shine */}
+      <Ellipse
+        cx={cx-10} cy={helmetTop+13}
+        rx={10} ry={7}
+        fill="#ffffff" fillOpacity={0.20}
+        transform={`rotate(-20, ${cx-10}, ${helmetTop+13})`}
+      />
+      {/* Face opening (dark recessed area) */}
+      <Path
+        d={`M ${cx-24} ${helmetBrim-18}
+            A 14 20 0 0 1 ${cx+24} ${helmetBrim-18}
+            L ${cx+22} ${helmetBrim+3}
+            L ${cx-22} ${helmetBrim+3} Z`}
+        fill="#070710"
+        fillOpacity={0.92}
+      />
+      {/* Visor tint */}
+      <Path
+        d={`M ${cx-21} ${helmetBrim-16}
+            A 12 16 0 0 1 ${cx+21} ${helmetBrim-16}
+            L ${cx+19} ${helmetBrim+1}
+            L ${cx-19} ${helmetBrim+1} Z`}
+        fill={jerseyC}
+        fillOpacity={0.20}
       />
 
-      {/* ── FACEMASK ──────────────────────────────────────────────── */}
-      {/* Outer cage rails */}
+      {/* ══════════════ FACEMASK (cage) ══════════════════════════ */}
+      {/* Outer rails */}
       <Path
-        d={`M ${cx - 26} ${helmetBrim - 4} L ${cx - 28} ${helmetBrim + 20}`}
-        stroke={facemaskColor} strokeWidth={2.5} strokeLinecap="round"
+        d={`M ${cx-25} ${helmetBrim+1} Q ${cx-29} ${helmetBrim+12} ${cx-28} ${chinY}`}
+        stroke={maskC} strokeWidth={2.8} fill="none" strokeLinecap="round"
       />
       <Path
-        d={`M ${cx + 26} ${helmetBrim - 4} L ${cx + 28} ${helmetBrim + 20}`}
-        stroke={facemaskColor} strokeWidth={2.5} strokeLinecap="round"
+        d={`M ${cx+25} ${helmetBrim+1} Q ${cx+29} ${helmetBrim+12} ${cx+28} ${chinY}`}
+        stroke={maskC} strokeWidth={2.8} fill="none" strokeLinecap="round"
+      />
+      {/* Bottom rail */}
+      <Path
+        d={`M ${cx-28} ${chinY} Q ${cx} ${chinY+5} ${cx+28} ${chinY}`}
+        stroke={maskC} strokeWidth={2.8} fill="none" strokeLinecap="round"
       />
       {/* Horizontal bars */}
       <Path
-        d={`M ${cx - 27} ${helmetBrim + 4} Q ${cx} ${helmetBrim + 7} ${cx + 27} ${helmetBrim + 4}`}
-        stroke={facemaskColor} strokeWidth={2.5} fill="none" strokeLinecap="round"
+        d={`M ${cx-26} ${helmetBrim+7} Q ${cx} ${helmetBrim+11} ${cx+26} ${helmetBrim+7}`}
+        stroke={maskC} strokeWidth={2.5} fill="none" strokeLinecap="round"
       />
       <Path
-        d={`M ${cx - 27} ${helmetBrim + 12} Q ${cx} ${helmetBrim + 15} ${cx + 27} ${helmetBrim + 12}`}
-        stroke={facemaskColor} strokeWidth={2.5} fill="none" strokeLinecap="round"
+        d={`M ${cx-27} ${helmetBrim+16} Q ${cx} ${helmetBrim+20} ${cx+27} ${helmetBrim+16}`}
+        stroke={maskC} strokeWidth={2.5} fill="none" strokeLinecap="round"
       />
-      {/* Center bar */}
       <Path
-        d={`M ${cx - 4} ${helmetBrim + 4} L ${cx - 4} ${helmetBrim + 20} M ${cx + 4} ${helmetBrim + 4} L ${cx + 4} ${helmetBrim + 20}`}
-        stroke={facemaskColor} strokeWidth={2} strokeLinecap="round"
+        d={`M ${cx-27} ${helmetBrim+25} Q ${cx} ${helmetBrim+29} ${cx+27} ${helmetBrim+25}`}
+        stroke={maskC} strokeWidth={2} fill="none" strokeLinecap="round"
       />
-      {/* Chin strap */}
+      {/* Center vertical bars */}
       <Path
-        d={`M ${cx - 24} ${helmetBrim + 2} Q ${cx} ${helmetBrim + 24} ${cx + 24} ${helmetBrim + 2}`}
-        stroke={darken(helmetColor, -20)} strokeWidth={2.5} fill="none"
+        d={`M ${cx-5} ${helmetBrim+6} L ${cx-5} ${chinY}
+            M ${cx+5} ${helmetBrim+6} L ${cx+5} ${chinY}`}
+        stroke={maskDk} strokeWidth={2} strokeLinecap="round"
       />
-
-      {/* ── NECK ──────────────────────────────────────────────────── */}
-      <Rect
-        x={cx - 8}
-        y={neckTop}
-        width={16}
-        height={neckBot - neckTop}
-        fill={skinColor}
-        rx={3}
-      />
-      {/* Neck collar */}
-      <Rect
-        x={cx - 10}
-        y={neckBot - 4}
-        width={20}
-        height={8}
-        fill={jerseyColor}
-        rx={2}
+      {/* Chin cup */}
+      <Path
+        d={`M ${cx-12} ${chinY-2} Q ${cx} ${chinY+8} ${cx+12} ${chinY-2}`}
+        stroke={darken(helmetC,-20)} strokeWidth={3} fill="none" strokeLinecap="round"
       />
     </Svg>
   );

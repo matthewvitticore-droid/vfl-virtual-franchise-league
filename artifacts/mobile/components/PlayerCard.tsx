@@ -3,7 +3,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { PlayerFigure } from "@/components/PlayerFigure";
-import { useColors } from "@/hooks/useColors";
 import { useNFL } from "@/context/NFLContext";
 import type { NFLPosition, Player, UniformSet } from "@/context/types";
 
@@ -30,65 +29,68 @@ const DEV_ICON: Record<string, any> = {
   Normal: "user", "Late Bloomer": "trending-up",
 };
 
-// ─── Default uniform (falls back when no customization exists) ────────────────
+// ─── Color helpers ────────────────────────────────────────────────────────────
 
-function defaultUniform(primaryColor: string, secondaryColor: string): UniformSet {
+function hexRgb(h: string): [number, number, number] {
+  const n = parseInt(h.replace("#", ""), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function darken(h: string, amt: number): string {
+  const [r, g, b] = hexRgb(h);
+  const c = (v: number) => Math.max(0, Math.min(255, v + amt)).toString(16).padStart(2, "0");
+  return `#${c(r)}${c(g)}${c(b)}`;
+}
+
+// ─── OVR color ────────────────────────────────────────────────────────────────
+
+function ovrColor(ovr: number): string {
+  if (ovr >= 90) return "#FFD700";
+  if (ovr >= 80) return "#3FB950";
+  if (ovr >= 70) return "#FFC107";
+  return "#E31837";
+}
+
+// ─── Default uniform ─────────────────────────────────────────────────────────
+
+function defaultUniform(primary: string, secondary: string): UniformSet {
   return {
-    helmetColor: primaryColor,
+    helmetColor: primary,
     helmetLogoPlacement: "both",
     jerseyStyle: "traditional",
-    jerseyColor: primaryColor,
-    jerseyAccentColor: secondaryColor,
+    jerseyColor: primary,
+    jerseyAccentColor: secondary,
     numberFont: "block",
-    numberColor: secondaryColor === "#ffffff" ? "#ffffff" : secondaryColor,
+    numberColor: "#ffffff",
     numberOutlineColor: "#000000",
-    pantColor: primaryColor,
+    pantColor: primary,
     pantStripeStyle: "single",
-    pantStripeColor: secondaryColor,
-    sockColor: secondaryColor,
-    sockAccentColor: primaryColor,
+    pantStripeColor: secondary,
+    sockColor: secondary,
+    sockAccentColor: primary,
   };
 }
 
-// ─── Compact Rating Bar ───────────────────────────────────────────────────────
+// ─── Rating bar ───────────────────────────────────────────────────────────────
 
-function RatingBar({
-  label, value, color, barBg,
-}: { label: string; value: number; color: string; barBg: string }) {
+function RatingBar({ label, value, fill }: { label: string; value: number; fill: string }) {
+  const pct = `${Math.min(100, Math.max(0, value))}%` as any;
+  const valColor = value >= 85 ? ovrColor(value) : "#E5E7EB";
   return (
     <View style={rb.row}>
-      <Text style={[rb.label, { color: "#9CA3AF" }]}>{label}</Text>
-      <View style={[rb.track, { backgroundColor: barBg }]}>
-        <View style={[rb.fill, { width: `${value}%`, backgroundColor: color }]} />
+      <Text style={rb.label}>{label}</Text>
+      <View style={rb.track}>
+        <View style={[rb.fill, { width: pct, backgroundColor: fill }]} />
       </View>
-      <Text style={[rb.val, { color: "#F9FAFB" }]}>{value}</Text>
+      <Text style={[rb.val, { color: valColor }]}>{value}</Text>
     </View>
   );
 }
-
 const rb = StyleSheet.create({
-  row:   { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 3 },
-  label: { fontSize: 9, fontFamily: "Inter_700Bold", width: 26, letterSpacing: 0.3 },
-  track: { flex: 1, height: 5, borderRadius: 3, overflow: "hidden" },
+  row:   { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 3.5 },
+  label: { fontSize: 8.5, fontFamily: "Inter_700Bold", color: "rgba(255,255,255,0.45)", width: 27, letterSpacing: 0.4 },
+  track: { flex: 1, height: 5, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.10)", overflow: "hidden" },
   fill:  { height: 5, borderRadius: 3 },
-  val:   { fontSize: 10, fontFamily: "Inter_700Bold", width: 20, textAlign: "right" },
-});
-
-// ─── OVR Badge ────────────────────────────────────────────────────────────────
-
-function OvrBadge({ ovr, color }: { ovr: number; color: string }) {
-  return (
-    <View style={[badge.wrap, { borderColor: color }]}>
-      <Text style={[badge.num, { color }]}>{ovr}</Text>
-      <Text style={[badge.lbl, { color }]}>OVR</Text>
-    </View>
-  );
-}
-
-const badge = StyleSheet.create({
-  wrap: { alignItems: "center", borderRadius: 10, borderWidth: 2, paddingHorizontal: 8, paddingVertical: 4 },
-  num:  { fontSize: 22, fontFamily: "Inter_700Bold", lineHeight: 26 },
-  lbl:  { fontSize: 8,  fontFamily: "Inter_700Bold", letterSpacing: 1, marginTop: -4 },
+  val:   { fontSize: 10, fontFamily: "Inter_700Bold", width: 21, textAlign: "right" },
 });
 
 // ─── Main PlayerCard ──────────────────────────────────────────────────────────
@@ -97,9 +99,7 @@ interface Props {
   player: Player;
   teamPrimaryColor?: string;
   teamSecondaryColor?: string;
-  /** When true, shows a taller card with more contract/stat detail */
   expanded?: boolean;
-  /** Show injury banner if present */
   showInjury?: boolean;
 }
 
@@ -110,303 +110,418 @@ export function PlayerCard({
   expanded = false,
   showInjury = true,
 }: Props) {
-  const colors   = useColors();
-  const { teamCustomization, season } = useNFL();
+  const { teamCustomization } = useNFL();
 
-  // Resolve team colors
   const primary   = teamPrimaryColor   ?? teamCustomization?.primaryColor   ?? "#1E3A8A";
-  const secondary = teamSecondaryColor ?? teamCustomization?.secondaryColor ?? "#ffffff";
+  const secondary = teamSecondaryColor ?? teamCustomization?.secondaryColor ?? "#C0A030";
+  const uniform: UniformSet = teamCustomization?.uniforms?.home ?? defaultUniform(primary, secondary);
 
-  // Resolve uniform (customization → default)
-  const uniformKey = "home";
-  const uniform: UniformSet =
-    teamCustomization?.uniforms?.[uniformKey] ?? defaultUniform(primary, secondary);
+  const primaryDk  = darken(primary,  -52);
+  const primaryMid = darken(primary,  -26);
+  const secDk      = darken(secondary, -40);
 
-  const posColor  = POS_COLOR[player.position];
-  const posLabel  = POS_SPECIFIC_LABEL[player.position];
-  const devColor  = DEV_COLOR[player.developmentTrait] ?? "#8B949E";
-  const devIcon   = DEV_ICON[player.developmentTrait]  ?? "user";
+  const posColor = POS_COLOR[player.position];
+  const posLabel = POS_SPECIFIC_LABEL[player.position];
+  const devColor = DEV_COLOR[player.developmentTrait] ?? "#8B949E";
+  const devIcon  = DEV_ICON[player.developmentTrait]  ?? "user";
+  const ovrC     = ovrColor(player.overall);
 
-  const barBg = "rgba(255,255,255,0.12)";
-
-  // OVR color gradient: red < 70, yellow < 80, green < 90, gold >= 90
-  const ovrColor =
-    player.overall >= 90 ? "#FFD700" :
-    player.overall >= 80 ? "#3FB950" :
-    player.overall >= 70 ? "#FFC107" : "#E31837";
-
-  const lastName = player.name.split(" ").pop() ?? player.name;
+  const figW = expanded ? 108 : 94;
+  const figH = expanded ? 240 : 206;
 
   return (
-    <View style={[
-      card.container,
-      { borderColor: primary + "60" },
-      expanded && card.containerExpanded,
-    ]}>
-      {/* ── Gradient background ─────────────────────────────────── */}
+    // Outer chrome border container
+    <View style={[card.chrome, { borderColor: secondary + "90" }]}>
+      {/* Foil border gradient overlay */}
       <LinearGradient
-        colors={[primary + "CC", "#0D0D1A", "#0D0D1A"]}
+        colors={[secondary + "CC", primary + "88", secDk + "AA", primaryDk + "CC"]}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0.6 }}
-        style={StyleSheet.absoluteFill}
+        end={{ x: 1, y: 1 }}
+        style={card.borderGlow}
       />
+      {/* Inner card surface */}
+      <View style={card.inner}>
 
-      {/* Subtle grid texture lines */}
-      <View style={[card.gridLine, card.gridLine1, { backgroundColor: primary + "15" }]} />
-      <View style={[card.gridLine, card.gridLine2, { backgroundColor: primary + "10" }]} />
-
-      {/* ── Left: Player Figure ──────────────────────────────────── */}
-      <View style={card.figureCol}>
-        {/* Team color glow behind figure */}
-        <View style={[card.figureGlow, { backgroundColor: primary + "30" }]} />
-        <PlayerFigure
-          uniform={uniform}
-          position={player.position}
-          number={player.jerseyNumber != null
-            ? String(player.jerseyNumber).padStart(2, "0")
-            : "00"}
-          playerName={player.name}
-          width={expanded ? 105 : 90}
-          height={expanded ? 230 : 195}
+        {/* ── Background: rich team-color atmosphere ──── */}
+        <LinearGradient
+          colors={[primaryDk, primaryMid + "CC", "#08081A", "#08081A"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0.75 }}
+          style={StyleSheet.absoluteFill}
         />
-      </View>
+        {/* Secondary haze on far right */}
+        <LinearGradient
+          colors={["transparent", secondary + "20"]}
+          start={{ x: 0.4, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={StyleSheet.absoluteFill}
+        />
 
-      {/* ── Right: Stats & Info ──────────────────────────────────── */}
-      <View style={card.infoCol}>
+        {/* Decorative diagonal slash lines */}
+        <View style={[card.slash, { left: "34%", backgroundColor: secondary + "18" }]} />
+        <View style={[card.slash, { left: "55%", backgroundColor: primary   + "14" }]} />
+        <View style={[card.slash, { left: "72%", backgroundColor: secondary + "0C" }]} />
 
-        {/* Row 1: POS badge + OVR + DEV trait */}
-        <View style={card.topRow}>
-          <View style={[card.posBadge, { backgroundColor: posColor + "25", borderColor: posColor + "60" }]}>
-            <Text style={[card.posText, { color: posColor }]}>{player.position}</Text>
+        {/* ── Left: full-bleed player figure ─────────── */}
+        <View style={[card.figureCol, { width: figW + 4 }]}>
+          {/* Team-color spotlight column */}
+          <LinearGradient
+            colors={[primary + "50", primary + "20", "transparent"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={StyleSheet.absoluteFill}
+          />
+          {/* Ground glow at player feet */}
+          <LinearGradient
+            colors={[primary + "60", "transparent"]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={card.footGlow}
+          />
+          {/* OVR watermark number behind figure */}
+          <View style={card.ovrWater}>
+            <Text style={[card.ovrWaterText, { color: primary + "38" }]}>{player.overall}</Text>
           </View>
-          <OvrBadge ovr={player.overall} color={ovrColor} />
-          <View style={card.devChip}>
-            <Feather name={devIcon} size={9} color={devColor} />
-            <Text style={[card.devText, { color: devColor }]}>{player.developmentTrait}</Text>
+          {/* Player figure — overflows top intentionally */}
+          <View style={card.figureFrame}>
+            <PlayerFigure
+              uniform={uniform}
+              position={player.position}
+              number={player.jerseyNumber != null ? String(player.jerseyNumber) : "00"}
+              playerName={player.name}
+              width={figW}
+              height={figH}
+            />
           </View>
         </View>
 
-        {/* Player name */}
-        <Text style={card.playerName} numberOfLines={1}>{player.name.toUpperCase()}</Text>
+        {/* Thin glowing separator */}
+        <LinearGradient
+          colors={["transparent", secondary + "55", secondary + "88", secondary + "55", "transparent"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={card.sep}
+        />
 
-        {/* Meta row: age, experience, college */}
-        <Text style={card.metaRow}>
-          Age {player.age}  ·  {player.yearsExperience}yr exp
-          {player.college ? `  ·  ${player.college}` : ""}
-        </Text>
+        {/* ── Right: stats & info ────────────────────── */}
+        <View style={card.infoCol}>
 
-        {/* Injury banner */}
-        {showInjury && player.injury && (
-          <View style={card.injuryBanner}>
-            <Feather name="alert-circle" size={9} color="#F87171" />
-            <Text style={card.injuryText}>
-              {player.injury.location} · {player.injury.severity} · {player.injury.weeksRemaining}wk
-            </Text>
+          {/* Row 1: POS + OVR + DEV */}
+          <View style={card.topRow}>
+            <View style={[card.posBadge, { backgroundColor: posColor + "22", borderColor: posColor + "70" }]}>
+              <Text style={[card.posText, { color: posColor }]}>{player.position}</Text>
+            </View>
+            {/* OVR badge */}
+            <View style={[card.ovrBadge, { borderColor: ovrC + "80", backgroundColor: ovrC + "18" }]}>
+              <Text style={[card.ovrNum, { color: ovrC }]}>{player.overall}</Text>
+              <Text style={[card.ovrLbl, { color: ovrC + "AA" }]}>OVR</Text>
+            </View>
+            <View style={card.devRow}>
+              <Feather name={devIcon} size={8} color={devColor} />
+              <Text style={[card.devText, { color: devColor }]}>{player.developmentTrait}</Text>
+            </View>
           </View>
-        )}
 
-        {/* Rating bars */}
-        <View style={card.bars}>
-          <RatingBar label="SPD" value={player.speed}    color={primary} barBg={barBg} />
-          <RatingBar label="STR" value={player.strength} color={primary} barBg={barBg} />
-          <RatingBar label="AWR" value={player.awareness} color={primary} barBg={barBg} />
-          <RatingBar label={posLabel} value={player.specific} color={ovrColor} barBg={barBg} />
-        </View>
+          {/* Name */}
+          <Text style={card.playerName} numberOfLines={1}>{player.name.toUpperCase()}</Text>
 
-        {/* Contract info */}
-        <View style={card.contractRow}>
-          <View style={card.contractChip}>
-            <Text style={card.contractLabel}>APY</Text>
-            <Text style={card.contractVal}>${player.salary.toFixed(1)}M</Text>
-          </View>
-          <View style={card.contractChip}>
-            <Text style={card.contractLabel}>YRS</Text>
-            <Text style={card.contractVal}>{player.contractYears}</Text>
-          </View>
-          {expanded && (
-            <>
-              <View style={card.contractChip}>
-                <Text style={card.contractLabel}>GTD</Text>
-                <Text style={card.contractVal}>${player.guaranteedMoney.toFixed(1)}M</Text>
-              </View>
-              <View style={card.contractChip}>
-                <Text style={card.contractLabel}>DEAD</Text>
-                <Text style={[card.contractVal, { color: "#F87171" }]}>${(player.deadCap ?? 0).toFixed(1)}M</Text>
-              </View>
-            </>
+          {/* Accent underline */}
+          <LinearGradient
+            colors={[secondary, primary, "transparent"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={card.nameBar}
+          />
+
+          {/* Meta */}
+          <Text style={card.meta} numberOfLines={1}>
+            {player.age}yo · {player.yearsExperience}yr
+            {player.college ? ` · ${player.college}` : ""}
+          </Text>
+
+          {/* Injury */}
+          {showInjury && player.injury && (
+            <View style={card.injBanner}>
+              <Feather name="alert-circle" size={8} color="#F87171" />
+              <Text style={card.injText}>
+                {player.injury.location} · {player.injury.severity} · {player.injury.weeksRemaining}wk
+              </Text>
+            </View>
           )}
-          <View style={[card.statusChip, {
-            backgroundColor:
-              player.status === "Starter" ? "#3FB95025" :
-              player.status === "Practice Squad" ? "#FFC10725" : "#8B949E25",
-          }]}>
-            <Text style={[card.statusText, {
-              color:
-                player.status === "Starter" ? "#3FB950" :
-                player.status === "Practice Squad" ? "#FFC107" : "#8B949E",
-            }]}>{player.status}</Text>
+
+          {/* Rating bars */}
+          <View style={card.bars}>
+            <RatingBar label="SPD" value={player.speed}    fill={primary} />
+            <RatingBar label="STR" value={player.strength} fill={primary} />
+            <RatingBar label="AWR" value={player.awareness} fill={primary} />
+            <RatingBar label={posLabel} value={player.specific} fill={ovrC} />
           </View>
+
+          {/* Contract chips */}
+          <View style={card.chipRow}>
+            <View style={card.chip}>
+              <Text style={card.chipLbl}>APY</Text>
+              <Text style={card.chipVal}>${player.salary.toFixed(1)}M</Text>
+            </View>
+            <View style={card.chip}>
+              <Text style={card.chipLbl}>YRS</Text>
+              <Text style={card.chipVal}>{player.contractYears}</Text>
+            </View>
+            {expanded && (
+              <View style={card.chip}>
+                <Text style={card.chipLbl}>GTD</Text>
+                <Text style={card.chipVal}>${player.guaranteedMoney.toFixed(1)}M</Text>
+              </View>
+            )}
+            <View style={[card.statusChip, {
+              backgroundColor:
+                player.status === "Starter"        ? "#3FB95022" :
+                player.status === "Practice Squad" ? "#FFC10722" : "#8B949E22",
+            }]}>
+              <Text style={[card.statusText, {
+                color:
+                  player.status === "Starter"        ? "#3FB950" :
+                  player.status === "Practice Squad" ? "#FFC107" : "#8B949E",
+              }]}>{player.status}</Text>
+            </View>
+          </View>
+
         </View>
 
-      </View>
+        {/* ── Corner chrome brackets ─────────────────── */}
+        <View style={[card.corner, card.cTL, { borderColor: secondary + "99" }]} />
+        <View style={[card.corner, card.cTR, { borderColor: secondary + "99" }]} />
+        <View style={[card.corner, card.cBL, { borderColor: secondary + "99" }]} />
+        <View style={[card.corner, card.cBR, { borderColor: secondary + "99" }]} />
 
-      {/* ── Sheen overlay (top-left corner gloss) ───────────────── */}
-      <View style={card.sheen} />
+        {/* Top-left gloss sheen */}
+        <LinearGradient
+          colors={["rgba(255,255,255,0.10)", "transparent"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0.55, y: 0.55 }}
+          style={card.sheen}
+        />
+
+      </View>
     </View>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
+const CRN = 8;
+
 const card = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    borderRadius: 16,
+  chrome: {
+    borderRadius: 17,
     borderWidth: 1.5,
+    marginHorizontal: 12,
+    marginVertical: 5,
     overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.55,
+    shadowRadius: 12,
+    elevation: 10,
+    position: "relative",
+  },
+  borderGlow: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 16,
+  },
+  inner: {
+    borderRadius: 15.5,
+    overflow: "hidden",
+    flexDirection: "row",
     minHeight: 160,
     position: "relative",
   },
-  containerExpanded: {
-    minHeight: 210,
-  },
-  // Decorative grid lines
-  gridLine: {
+  slash: {
     position: "absolute",
-    top: 0, bottom: 0,
-    width: 1,
+    top: -40, bottom: -10,
+    width: 2,
+    transform: [{ rotate: "22deg" }],
   },
-  gridLine1: { left: "32%" },
-  gridLine2: { left: "65%" },
-  // Figure column
   figureCol: {
-    width: 95,
     alignItems: "center",
     justifyContent: "flex-end",
-    paddingBottom: 8,
-    position: "relative",
     overflow: "hidden",
+    position: "relative",
   },
-  figureGlow: {
+  footGlow: {
     position: "absolute",
     bottom: 0,
     left: 0, right: 0,
     height: 80,
     borderRadius: 999,
-    transform: [{ scaleX: 1.5 }],
+    transform: [{ scaleX: 1.8 }],
   },
-  // Info column
+  ovrWater: {
+    position: "absolute",
+    bottom: 0,
+    left: 0, right: 0,
+    alignItems: "center",
+  },
+  ovrWaterText: {
+    fontSize: 74,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: -4,
+  },
+  figureFrame: {
+    zIndex: 2,
+    marginBottom: -4,
+    marginTop: -20,
+  },
+  sep: {
+    width: 1,
+    alignSelf: "stretch",
+  },
   infoCol: {
     flex: 1,
     paddingVertical: 10,
-    paddingRight: 12,
-    paddingLeft: 4,
-    gap: 4,
+    paddingRight: 11,
+    paddingLeft: 8,
+    gap: 3,
+    justifyContent: "center",
   },
-  // Top row: pos + ovr + dev
   topRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 5,
     flexWrap: "wrap",
+    marginBottom: 1,
   },
   posBadge: {
-    paddingHorizontal: 7,
+    paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 6,
+    borderRadius: 5,
     borderWidth: 1,
   },
   posText: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.5,
   },
-  devChip: {
+  ovrBadge: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 2,
+    borderWidth: 1.5,
+    borderRadius: 7,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  ovrNum: {
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+    lineHeight: 21,
+  },
+  ovrLbl: {
+    fontSize: 7,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.8,
+    marginBottom: 1,
+  },
+  devRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
   },
   devText: {
-    fontSize: 9,
+    fontSize: 8,
     fontFamily: "Inter_500Medium",
   },
-  // Name
   playerName: {
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: "Inter_700Bold",
-    color: "#F9FAFB",
-    letterSpacing: -0.3,
-    marginTop: 1,
+    color: "#FFFFFF",
+    letterSpacing: -0.2,
+    lineHeight: 17,
   },
-  metaRow: {
-    fontSize: 10,
+  nameBar: {
+    height: 1.5,
+    borderRadius: 1,
+    marginBottom: 1,
+    width: "80%",
+  },
+  meta: {
+    fontSize: 9,
     fontFamily: "Inter_400Regular",
-    color: "#9CA3AF",
+    color: "rgba(255,255,255,0.42)",
+    marginBottom: 1,
   },
-  // Injury
-  injuryBanner: {
+  injBanner: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "#F8717120",
-    paddingHorizontal: 6,
+    backgroundColor: "rgba(248,113,113,0.12)",
+    paddingHorizontal: 5,
     paddingVertical: 2,
     borderRadius: 4,
     alignSelf: "flex-start",
+    borderWidth: 0.5,
+    borderColor: "rgba(248,113,113,0.3)",
   },
-  injuryText: {
-    fontSize: 9,
+  injText: {
+    fontSize: 8,
     fontFamily: "Inter_600SemiBold",
     color: "#F87171",
   },
-  // Rating bars
   bars: {
-    marginTop: 2,
+    marginTop: 1,
   },
-  // Contract
-  contractRow: {
+  chipRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
+    gap: 4,
     flexWrap: "wrap",
     marginTop: 2,
   },
-  contractChip: {
+  chip: {
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(255,255,255,0.07)",
     paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingVertical: 2.5,
+    borderRadius: 5,
+    borderWidth: 0.5,
+    borderColor: "rgba(255,255,255,0.12)",
   },
-  contractLabel: {
-    fontSize: 7,
+  chipLbl: {
+    fontSize: 6.5,
     fontFamily: "Inter_700Bold",
-    color: "#6B7280",
-    letterSpacing: 0.4,
+    color: "rgba(255,255,255,0.38)",
+    letterSpacing: 0.5,
   },
-  contractVal: {
-    fontSize: 11,
+  chipVal: {
+    fontSize: 10,
     fontFamily: "Inter_700Bold",
     color: "#F9FAFB",
   },
   statusChip: {
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 5,
   },
   statusText: {
-    fontSize: 8,
+    fontSize: 7.5,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.3,
   },
-  // Corner gloss sheen
+  // Corner chrome brackets
+  corner: {
+    position: "absolute",
+    width: CRN,
+    height: CRN,
+    borderWidth: 1.5,
+  },
+  cTL: { top: 5,    left: 5,  borderRightWidth: 0, borderBottomWidth: 0, borderTopLeftRadius: 3 },
+  cTR: { top: 5,    right: 5, borderLeftWidth: 0,  borderBottomWidth: 0, borderTopRightRadius: 3 },
+  cBL: { bottom: 5, left: 5,  borderRightWidth: 0, borderTopWidth: 0,    borderBottomLeftRadius: 3 },
+  cBR: { bottom: 5, right: 5, borderLeftWidth: 0,  borderTopWidth: 0,    borderBottomRightRadius: 3 },
   sheen: {
     position: "absolute",
-    top: 0,
-    left: 0,
-    width: 60,
-    height: 60,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderBottomRightRadius: 60,
+    top: 0, left: 0,
+    width: 80, height: 80,
+    borderBottomRightRadius: 80,
   },
 });
