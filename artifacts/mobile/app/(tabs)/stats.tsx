@@ -135,53 +135,74 @@ function EmptyMsg({ message }: { message: string }) {
   );
 }
 
-// Sticky sortable column header — mirrors RecordList's colRow
+// ── TableHeader ── matches RecordList colRow: # | PLAYER | TEAM | PRIMARY | CTX1 | CTX2
 function TableHeader({
-  cols, sortKey, sortDir, onSort, accentColor,
+  primaryCol, ctxCols, allCols, sortKey, sortDir, onSort, accentColor,
 }: {
-  cols: ColDef[]; sortKey: string; sortDir: SortDir; onSort:(k:string)=>void; accentColor:string;
+  primaryCol: ColDef; ctxCols: ColDef[]; allCols: ColDef[];
+  sortKey: string; sortDir: SortDir; onSort:(k:string)=>void; accentColor:string;
 }) {
   const colors = useColors();
+  // All sortable columns shown in a sub-row picker below the main header
   return (
-    <View style={[th.row, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-      <Text style={[th.rank,   { color: colors.mutedForeground }]}>#</Text>
-      <Text style={[th.pos,    { color: colors.mutedForeground }]}>POS</Text>
-      <Text style={[th.player, { color: colors.mutedForeground }]}>PLAYER</Text>
-      <Text style={[th.team,   { color: colors.mutedForeground }]}>TEAM</Text>
-      {cols.map(c => {
-        const active = c.key === sortKey;
-        return (
-          <TouchableOpacity key={c.key} onPress={() => onSort(c.key)}
-            style={[th.col, { width: c.width }]} activeOpacity={0.7}>
-            <Text style={[th.colText, { color: active ? accentColor : colors.mutedForeground }]}>
-              {c.header}
-            </Text>
-            {active && (
-              <Feather name={sortDir === "desc" ? "chevron-down" : "chevron-up"} size={9} color={accentColor} />
-            )}
-          </TouchableOpacity>
-        );
-      })}
+    <View style={{ backgroundColor: colors.card, borderBottomWidth:1, borderBottomColor:colors.border }}>
+      {/* Main header row — identical widths to StatRow */}
+      <View style={th.row}>
+        <Text style={[th.rank,   { color: colors.mutedForeground }]}>#</Text>
+        <Text style={[th.player, { color: colors.mutedForeground }]}>PLAYER</Text>
+        <Text style={[th.team,   { color: colors.mutedForeground }]}>TEAM</Text>
+        {/* Primary col — accent + chevron */}
+        <TouchableOpacity onPress={() => onSort(primaryCol.key)}
+          style={[th.primary, { width: COL_W.primary }]} activeOpacity={0.7}>
+          <Text style={[th.primaryText, { color: accentColor }]}>{primaryCol.header}</Text>
+          <Feather name={sortDir==="desc"?"chevron-down":"chevron-up"} size={9} color={accentColor} />
+        </TouchableOpacity>
+        {ctxCols.map(c => (
+          <Text key={c.key} style={[th.ctx, { width: COL_W.ctx, color: colors.mutedForeground }]}>{c.header}</Text>
+        ))}
+      </View>
+      {/* Sort picker sub-row — all available columns as small chips */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ gap:5, paddingHorizontal:12, paddingVertical:7 }}>
+        {allCols.map(c => {
+          const active = c.key === sortKey;
+          return (
+            <TouchableOpacity key={c.key} onPress={() => onSort(c.key)}
+              style={[th.chip, { backgroundColor: active ? accentColor+"22" : "transparent",
+                borderColor: active ? accentColor : colors.border }]}>
+              <Text style={[th.chipText, { color: active ? accentColor : colors.mutedForeground }]}>
+                {c.header}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 }
+
+// Fixed column widths — shared between header and rows
+const COL_W = { primary: 62, ctx: 46 };
+
 const th = StyleSheet.create({
-  row:    { flexDirection:"row", alignItems:"center", gap:6, paddingHorizontal:12, paddingVertical:7,
-            borderBottomWidth:1 },
-  rank:   { width:22, fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.3, textAlign:"center" },
-  pos:    { width:36, fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.3 },
-  player: { flex:1,  fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.3 },
-  team:   { width:34, fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.3 },
-  col:    { flexDirection:"row", alignItems:"center", justifyContent:"flex-end", gap:1 },
-  colText:{ fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.3 },
+  row:        { flexDirection:"row", alignItems:"center", paddingHorizontal:12, paddingVertical:8, gap:6 },
+  rank:       { width:22, fontSize:9, fontFamily:"Inter_700Bold", textAlign:"center", color:"#fff" },
+  player:     { flex:1,  fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.3 },
+  team:       { width:36, fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.3 },
+  primary:    { flexDirection:"row", alignItems:"center", justifyContent:"flex-end", gap:2 },
+  primaryText:{ fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.3 },
+  ctx:        { fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:0.3, textAlign:"right" },
+  chip:       { paddingHorizontal:8, paddingVertical:4, borderRadius:6, borderWidth:1 },
+  chipText:   { fontSize:9, fontFamily:"Inter_600SemiBold" },
 });
 
-// One player stat row — matches RecordRow layout exactly
+// ── StatRow ── identical structure to RecordRow: rank | [POS] Name | TEAM | BIG | sm | sm
 function StatRow({
-  rank, player, cols, sortKey, accentColor, onPress,
+  rank, player, primaryCol, ctxCols, accentColor, onPress,
 }: {
-  rank:number; player:PlayerWithTeam; cols:ColDef[];
-  sortKey:string; accentColor:string; onPress:()=>void;
+  rank:number; player:PlayerWithTeam;
+  primaryCol:ColDef; ctxCols:ColDef[];
+  accentColor:string; onPress:()=>void;
 }) {
   const colors  = useColors();
   const pc      = POS_COLOR[player.position];
@@ -189,60 +210,59 @@ function StatRow({
   const medalClr = ["#FFD700","#C0C0C0","#CD7F32"];
   const isOdd   = rank % 2 === 0;
 
+  const primaryVal = primaryCol.fmt(player.stats, player);
+  const ctxVals    = ctxCols.map(c => c.fmt(player.stats, player));
+
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.75}
-      style={[sr.row, {
-        backgroundColor: isOdd ? colors.card : colors.background,
-        borderBottomColor: colors.border,
-      }]}>
+      style={[sr.row, { backgroundColor: isOdd ? colors.card : colors.background,
+        borderBottomColor: colors.border }]}>
 
-      {/* Rank — same as RecordRow */}
+      {/* Rank medal — identical to RecordRow */}
       <Text style={[sr.rank, { color: rank<=3 ? medalClr[rank-1] : colors.mutedForeground,
-        fontFamily: rank<=3 ? "Inter_700Bold" : "Inter_500Medium" }]}>
+        fontFamily: rank<=3 ? "Inter_700Bold" : "Inter_400Regular" }]}>
         {rank <= 3 ? medals[rank-1] : rank}
       </Text>
 
-      {/* Position badge — identical to RecordRow posBadge */}
-      <View style={[sr.posBadge, { backgroundColor: pc+"22", borderColor: pc+"55" }]}>
-        <Text style={[sr.posText, { color: pc }]}>{player.position}</Text>
+      {/* [POS badge] Player Name — same as RecordRow [pos] player */}
+      <View style={sr.playerCell}>
+        <View style={[sr.badge, { backgroundColor: pc+"22", borderColor: pc+"55" }]}>
+          <Text style={[sr.badgeText, { color: pc }]}>{player.position}</Text>
+        </View>
+        <Text style={[sr.name, { color: colors.foreground }]} numberOfLines={1}>
+          {shortName(player.name)}
+        </Text>
       </View>
 
-      {/* Player name — flex:1, same as RecordRow player */}
-      <Text style={[sr.name, { color: colors.foreground }]} numberOfLines={1}>
-        {shortName(player.name)}
+      {/* Team — same as RecordRow team */}
+      <Text style={[sr.team, { color: colors.mutedForeground }]}>{player.teamAbbr}</Text>
+
+      {/* Primary stat — same as RecordRow val: large, bold, accent */}
+      <Text style={[sr.primary, { color: accentColor, width: COL_W.primary }]}>
+        {primaryVal}
       </Text>
 
-      {/* Team — fixed column, same as RecordRow team */}
-      <Text style={[sr.teamCol, { color: colors.mutedForeground }]}>{player.teamAbbr}</Text>
-
-      {/* Stat columns — primary (sorted) large + accent, rest smaller + muted */}
-      {cols.map(c => {
-        const isSorted = c.key === sortKey;
-        const val = c.fmt(player.stats, player);
-        return (
-          <Text key={c.key} style={[sr.stat, {
-            width: c.width,
-            fontSize:   isSorted ? 14 : 12,
-            color:      isSorted ? accentColor : (val === "—" ? colors.border : colors.mutedForeground),
-            fontFamily: isSorted ? "Inter_700Bold" : "Inter_500Medium",
-          }]}>
-            {val}
-          </Text>
-        );
-      })}
+      {/* Context stats — small, muted */}
+      {ctxVals.map((v, i) => (
+        <Text key={i} style={[sr.ctx, { color: v==="—" ? colors.border : colors.mutedForeground,
+          width: COL_W.ctx }]}>
+          {v}
+        </Text>
+      ))}
     </TouchableOpacity>
   );
 }
 const sr = StyleSheet.create({
-  row:     { flexDirection:"row", alignItems:"center", paddingHorizontal:12, paddingVertical:10,
-             borderBottomWidth:0.5, gap:6 },
-  rank:    { width:22, fontSize:12, textAlign:"center" },
-  posBadge:{ width:36, paddingVertical:3, borderRadius:5, borderWidth:1,
-             alignItems:"center", justifyContent:"center", flexShrink:0 },
-  posText: { fontSize:8, fontFamily:"Inter_700Bold", letterSpacing:0.5 },
-  name:    { flex:1, fontSize:13, fontFamily:"Inter_600SemiBold", letterSpacing:-0.2 },
-  teamCol: { width:34, fontSize:11, fontFamily:"Inter_500Medium" },
-  stat:    { textAlign:"right" },
+  row:        { flexDirection:"row", alignItems:"center", paddingHorizontal:12,
+                paddingVertical:11, borderBottomWidth:0.5, gap:6 },
+  rank:       { width:22, fontSize:12, textAlign:"center" },
+  playerCell: { flex:1, flexDirection:"row", alignItems:"center", gap:5, minWidth:0 },
+  badge:      { paddingHorizontal:5, paddingVertical:3, borderRadius:5, borderWidth:1, flexShrink:0 },
+  badgeText:  { fontSize:8, fontFamily:"Inter_700Bold", letterSpacing:0.5 },
+  name:       { flex:1, fontSize:13, fontFamily:"Inter_600SemiBold", letterSpacing:-0.2 },
+  team:       { width:36, fontSize:11, fontFamily:"Inter_500Medium" },
+  primary:    { fontSize:15, fontFamily:"Inter_700Bold", textAlign:"right" },
+  ctx:        { fontSize:12, fontFamily:"Inter_500Medium", textAlign:"right" },
 });
 
 // Team filter pill row
@@ -520,6 +540,21 @@ export default function StatsScreen() {
     tab==="receiving" ? receiving : tab==="defense" ? defense : specTeams;
   const currentSortKey = sortKey[tab];
 
+  // Context (secondary) columns per tab — always show these 2 regardless of sort
+  const CTX_KEYS: Record<StatTab, string[]> = {
+    passing:   ["cmpPct",     "passingTDs"],
+    rushing:   ["ypc",        "rushingTDs"],
+    receiving: ["receptions", "receivingTDs"],
+    defense:   ["sacks",      "defensiveINTs"],
+    specTeams: ["fgPct",      "puntsAverage"],
+    records:   [],
+  };
+  // Primary = the sorted col; ctx = the 2 fixed context cols (de-dupe if primary overlaps)
+  const primaryCol: ColDef = currentCols.find(c => c.key === currentSortKey) ?? currentCols[0];
+  const ctxKeys = CTX_KEYS[tab].filter(k => k !== primaryCol.key).slice(0, 2);
+  // If sorting by a ctx col already, show the other context + the first "extra" col
+  const ctxCols: ColDef[] = ctxKeys.map(k => currentCols.find(c => c.key === k)).filter((c): c is ColDef => !!c);
+
   return (
     <View style={{ flex:1, backgroundColor:colors.background }}>
 
@@ -562,7 +597,9 @@ export default function StatsScreen() {
           <>
             {/* Sticky sortable header */}
             <TableHeader
-              cols={currentCols}
+              primaryCol={primaryCol}
+              ctxCols={ctxCols}
+              allCols={currentCols}
               sortKey={currentSortKey}
               sortDir={sortDir}
               onSort={k => handleSort(tab, k)}
@@ -574,7 +611,8 @@ export default function StatsScreen() {
               : currentList.map((p,i) => (
                 <StatRow
                   key={p.id} rank={i+1} player={p}
-                  cols={currentCols} sortKey={currentSortKey}
+                  primaryCol={primaryCol}
+                  ctxCols={ctxCols}
                   accentColor={teamColor}
                   onPress={() => setModalPlayer(p)}
                 />
