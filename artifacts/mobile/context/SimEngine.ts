@@ -380,7 +380,9 @@ function decidePlay(state: GameState, attacker: NFLTeam, weather: GameWeather): 
   if (isEndOfHalf  && isLosingBig)  return Math.random() < 0.6 ? "pass" : "spike";
 
   const passModifier  = weatherPassModifier(weather) * gamePlanAggression(attacker);
-  const runPreference = attacker.offenseScheme === "run-heavy" ? 0.55 : attacker.offenseScheme === "air-raid" ? 0.22 : 0.42;
+  const runPreference = (
+    { "run-heavy": 0.48, "air-raid": 0.30, "spread": 0.37, "pro-set": 0.42 } as Record<string, number>
+  )[attacker.offenseScheme] ?? 0.40;
   if (down === 1 && yardsToGo >= 10) return Math.random() < runPreference ? "run" : "pass";
   if (down === 3 && yardsToGo >= 7)  return Math.random() < 0.82 * passModifier ? "pass" : "run";
   if (down === 2 && yardsToGo <= 3)  return Math.random() < 0.6 ? "run" : "pass";
@@ -428,16 +430,22 @@ function resolvePlay(
   if (playType === "spike") return { result: "spike", yards: 0, isInjury: false };
   if (playType === "kneel") return { result: "kneel", yards: -1, isInjury: false };
 
-  // Run play — rating-aware: RB agility/BCV boost yards, OL runBlock adds to base
+  // Run play — base YPC driven by RB position ratings; OL and defense adjust; max 18 yds
   if (playType === "run") {
     const rb  = getPlayer(attacker, "RB");
     const ol1 = getPlayer(attacker, "OL");
-    const rbBonus = rb  ? (rb.posRatings.ballCarrierVision - 75) * 0.04 + (rb.posRatings.breakTackle - 75) * 0.03 : 0;
-    const olBonus = ol1 ? (ol1.posRatings.runBlock - 75) * 0.03 : 0;
-    const baseMean = (netAtk - netDef) * 12 + schemeRunBonus(attacker) * 0.1 + rbBonus + olBonus;
-    const mean = clamp(baseMean + 3.5, 1, 10);
-    const yards = Math.round(clamp(mean + (Math.random() - 0.5) * 3.5 * 3, -4, 25));
-    const fumbleProb = 0.008 * turnoverAdj;
+    // RB rating → target YPC: 60 OVR ≈ 2.8, 75 OVR ≈ 3.7, 95 OVR ≈ 4.8
+    const rbBCV = rb?.posRatings.ballCarrierVision ?? 70;
+    const rbBTK = rb?.posRatings.breakTackle       ?? 70;
+    const rbACC = rb?.posRatings.acceleration       ?? 70;
+    const rbYPC = 2.8 + (rbBCV - 60) * 0.04 + (rbBTK - 60) * 0.025 + (rbACC - 60) * 0.015;
+    // OL run-block helps, defense counters
+    const olAdj  = ol1 ? (ol1.posRatings.runBlock - 75) * 0.025 : 0;
+    const defAdj = (netDef - 0.72) * -4;   // strong D sheds ~0.4–0.8 yds
+    const schAdj = attacker.offenseScheme === "run-heavy" ? 0.35 : attacker.offenseScheme === "air-raid" ? -0.25 : 0;
+    const mean   = clamp(rbYPC + olAdj + defAdj + schAdj, 1.8, 6.5);
+    const yards  = Math.round(clamp(mean + (Math.random() - 0.5) * 2.8 * 3, -3, 18));
+    const fumbleProb = 0.007 * turnoverAdj;
     if (Math.random() < fumbleProb) return { result: "fumble", yards: -1, isInjury: false };
     if (state.yardLine + yards >= 100) return { result: "touchdown", yards, isInjury: false };
     return { result: yards >= 0 ? "gain" : "loss", yards, isInjury: Math.random() < 0.008 };
@@ -446,27 +454,32 @@ function resolvePlay(
   // Pass play — rating-aware: QB throw accuracy/power, WR catching/route running
   const qb  = getPlayer(attacker, "QB");
   const wr1 = getPlayer(attacker, "WR");
-  const qbThrowAcc  = qb  ? (qb.posRatings.throwAccMid  - 75) * 0.002 + (qb.posRatings.throwAccDeep - 75) * 0.001 : 0;
-  const wrCatchBonus = wr1 ? (wr1.posRatings.catching    - 75) * 0.002 + (wr1.posRatings.routeRunning - 75) * 0.001 : 0;
-  const sackProb = clamp((netDef - netAtk) * 0.15 + 0.04, 0.01, 0.18);
-  if (Math.random() < sackProb) return { result: "sack", yards: -irng(3, 12), isInjury: false };
+  // QB accuracy and WR skill each shift completion % meaningfully
+  const qbThrowAcc  = qb  ? (qb.posRatings.throwAccMid  - 75) * 0.003 + (qb.posRatings.throwAccDeep - 75) * 0.002 : 0;
+  const wrCatchBonus = wr1 ? (wr1.posRatings.catching    - 75) * 0.003 + (wr1.posRatings.routeRunning - 75) * 0.001 : 0;
+  const sackProb = clamp((netDef - netAtk) * 0.13 + 0.04, 0.015, 0.16);
+  if (Math.random() < sackProb) return { result: "sack", yards: -irng(3, 10), isInjury: false };
 
+  // Completion %: QB OVR dominates; 68 OVR ≈ 54%, 80 OVR ≈ 63%, 95 OVR ≈ 73%
   const completionProb = clamp(
-    qbOvr * passAdj * fatigueMult * 0.7 + netAtk * 0.3 - netDef * 0.2 + qbThrowAcc + wrCatchBonus,
-    0.35, 0.82,
+    qbOvr * passAdj * fatigueMult * 0.80 + netAtk * 0.15 - netDef * 0.15 + qbThrowAcc + wrCatchBonus,
+    0.30, 0.76,
   );
   if (Math.random() > completionProb) {
-    const intProb = clamp((1 - qbOvr) * 0.15 * turnoverAdj + (1 - completionProb) * 0.1, 0.02, 0.12);
+    // INT rate scales sharply with QB rating — bad QBs throw far more picks
+    const intProb = clamp(0.07 - (qbOvr - 0.60) * 0.10, 0.025, 0.11) * turnoverAdj;
     if (Math.random() < intProb) return { result: "interception", yards: -1, isInjury: false };
     return { result: "incomplete", yards: 0, isInjury: false };
   }
 
-  // Completed pass — deep ball weighted by throw power + aggression
-  const qbThrowPow = qb ? (qb.posRatings.throwPower - 75) * 0.005 : 0;
-  const deepBallProb = clamp(0.22 * gamePlanAggression(attacker) + qbThrowPow + schemePassBonus(attacker) * 0.01, 0.10, 0.45);
+  // Deep ball: elite arms go deep more; rate capped at 18% (real NFL ≈ 10–16%)
+  const qbThrowPow = qb ? (qb.posRatings.throwPower - 75) * 0.004 : 0;
+  const schDeepAdj = attacker.offenseScheme === "air-raid" ? 0.03 : attacker.offenseScheme === "run-heavy" ? -0.02 : 0;
+  const deepBallProb = clamp(0.08 + qbThrowPow + schDeepAdj, 0.05, 0.18);
   const isDeep = Math.random() < deepBallProb;
-  const mean   = isDeep ? irng(18, 35) : irng(5, 14);
-  const yards  = Math.round(clamp(mean + (Math.random() - 0.5) * 6, 1, 45));
+  // Short: avg ~9 yds/catch  |  Deep: avg ~21 yds/catch  (NFL realistic per completion)
+  const mean   = isDeep ? irng(15, 28) : irng(5, 13);
+  const yards  = Math.round(clamp(mean + (Math.random() - 0.5) * 5, 1, 35));
   if (state.yardLine + yards >= 100) return { result: "touchdown", yards, isInjury: false };
   return { result: "gain", yards, isInjury: Math.random() < 0.005 };
 }
