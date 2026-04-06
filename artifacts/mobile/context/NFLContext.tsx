@@ -245,7 +245,7 @@ function genPosRatings(pos: NFLPosition, overall: number, isStarter: boolean, is
     throwOnRun:      pos === "QB"                        ? g(lo)  : g(lo - 10),
     mobility:        pos === "QB"                        ? g(lo)  : ["WR","CB","RB","S"].includes(pos) ? g(mid) : g(lo - 5),
     agility:         ["WR","CB","RB","S"].includes(pos)  ? g(hi)  : ["QB","TE","LB"].includes(pos) ? g(mid) : g(lo),
-    acceleration:    ["WR","CB","RB"].includes(pos)      ? g(hi)  : ["QB","S","DE"].includes(pos)  ? g(mid) : g(lo),
+    acceleration:    ["WR","CB","RB","DE","LB"].includes(pos) ? g(hi) : ["QB","S","TE"].includes(pos)  ? g(mid) : g(lo),
     ballCarrierVision: pos === "RB"                      ? g(hi)  : g(lo - 5),
     breakTackle:     pos === "RB"                        ? g(hi)  : pos === "FB" ? g(mid) : g(lo - 5),
     carryRating:     pos === "RB"                        ? g(hi)  : pos === "QB" ? g(lo)  : pos === "WR" ? g(lo) : g(lo - 15),
@@ -362,13 +362,14 @@ function generateRoster(teamOverall: number): Player[] {
       overall,
       potential: Math.min(99, overall + irng(0, age < 26 ? 12 : 5)),
       speed: (() => {
-        // Speed is position-specific. Mean stays realistic; high std + high cap
+        // Position-specific ranges. Mean stays realistic; wide std + high cap
         // lets elite players reach the ceiling organically.
         if (["WR","CB"].includes(pos))  return gaussian(teamOverall + 5,  6, 80, 99); // elite speed
-        if (["RB","S"].includes(pos))   return gaussian(teamOverall + 2,  6, 74, 99); // elite speed + rare 99
+        if (pos === "RB")               return gaussian(teamOverall + 3,  5, 88, 99); // no slow RBs on a roster
+        if (pos === "S")                return gaussian(teamOverall + 2,  6, 78, 99); // safeties are athletes
         if (pos === "TE")               return gaussian(teamOverall - 5,  9, 62, 93); // elite TEs can fly
         if (pos === "QB")               return gaussian(teamOverall - 6, 10, 58, 95); // elite scramblers hit 90+
-        if (["DE","LB"].includes(pos))  return gaussian(teamOverall - 4,  7, 62, 90); // athletic edge/LB
+        if (["DE","LB"].includes(pos))  return gaussian(teamOverall - 4,  8, 65, 93); // elite edge/LB speed
         if (pos === "DT")               return gaussian(60,              10, 46, 92); // Aaron Donald tier tops
         if (pos === "OL")               return gaussian(56,               7, 43, 70); // linemen stay slow
         return gaussian(teamOverall - 5, 5, 58, 80);
