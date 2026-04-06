@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useMemo, useState } from "react";
 import {
-  Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  Alert, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from "react-native";
 import { exportRosterXLSX } from "@/utils/exportRoster";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -23,6 +23,17 @@ const POS_COLOR: Record<NFLPosition, string> = {
 const DEV_COLORS: Record<string, string> = {
   "X-Factor": "#FFD700", "Superstar": "#FF6B35", "Star": "#3FB950", "Normal": "#8B949E", "Late Bloomer": "#00B5E2",
 };
+
+function hexLuminance(hex: string): number {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.substr(0,2), 16);
+  const g = parseInt(h.substr(2,2), 16);
+  const b = parseInt(h.substr(4,2), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+}
+function pickAccent(primary: string, secondary: string): string {
+  return hexLuminance(primary) >= 0.18 ? primary : secondary;
+}
 
 type MainTab = "depth" | "roster" | "gamePlan";
 type RosterSortKey = "overall" | "age" | "speed" | "acceleration" | "agility" | "yearsExperience" | "salary";
@@ -64,9 +75,10 @@ export default function RosterScreen() {
   const [viewTeamId,    setViewTeamId]    = useState<string>("");
   const [rosterSortKey, setRosterSortKey] = useState<RosterSortKey>("overall");
   const [rosterSortAsc, setRosterSortAsc] = useState(false);
-  const [statsPlayer,   setStatsPlayer]   = useState<Player | null>(null);
-  const [selectedPlayer,setSelectedPlayer]= useState<Player | null>(null);
-  const [expanded,      setExpanded]      = useState<string | null>(null);
+  const [statsPlayer,    setStatsPlayer]    = useState<Player | null>(null);
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const [expanded,       setExpanded]       = useState<string | null>(null);
+  const [teamPickerOpen, setTeamPickerOpen] = useState(false);
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
   const gamesPlayed = season?.games.filter(g => g.status === "final").length ?? 0;
@@ -76,8 +88,14 @@ export default function RosterScreen() {
     [season, viewTeamId, team]
   );
   const isViewingOwnTeam = !viewTeamId || viewTeamId === team?.id;
-  const viewColor     = viewTeam?.primaryColor   ?? teamColor;
-  const viewSecondary = viewTeam?.secondaryColor ?? teamSecondary;
+  // For own team: use the active kit's jersey color (responds to Home/Away/Alt toggle)
+  // For scouted teams: pick whichever of primary/secondary is actually visible
+  const viewColor = isViewingOwnTeam
+    ? pickAccent(theme.kitJerseyColor, theme.secondary)
+    : pickAccent(viewTeam?.primaryColor ?? teamColor, viewTeam?.secondaryColor ?? teamSecondary);
+  const viewSecondary = isViewingOwnTeam
+    ? theme.secondary
+    : viewTeam?.secondaryColor ?? teamSecondary;
 
   const pageColor = tab === "roster" ? viewColor : teamColor;
 
@@ -293,25 +311,21 @@ export default function RosterScreen() {
         {/* ── Players (sortable table) ─────────────────────────────────────── */}
         {tab === "roster" && (
           <View>
-            {/* Team selector */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}
-              style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}
-              contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 10, gap: 6 }}>
-              {(season?.teams ?? []).map(t => {
-                const active = (viewTeamId === t.id) || (!viewTeamId && t.id === team?.id);
-                return (
-                  <TouchableOpacity key={t.id} onPress={() => setViewTeamId(active ? "" : t.id)}
-                    style={[st.teamChip, {
-                      backgroundColor: active ? t.primaryColor + "30" : colors.secondary,
-                      borderColor: active ? t.primaryColor : colors.border,
-                    }]}>
-                    <Text style={[st.teamChipText, { color: active ? t.primaryColor : colors.mutedForeground }]}>
-                      {t.abbreviation}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+            {/* Team selector — dropdown button */}
+            <TouchableOpacity onPress={() => setTeamPickerOpen(true)}
+              style={[st.teamDropBtn, { backgroundColor: colors.card, borderColor: viewColor + "60" }]}>
+              <View style={[st.teamDropSwatch, { backgroundColor: viewColor }]} />
+              <View style={{ flex: 1 }}>
+                <Text style={[st.teamDropLabel, { color: colors.mutedForeground }]}>
+                  {isViewingOwnTeam ? "MY TEAM" : "SCOUTING"}
+                </Text>
+                <Text style={[st.teamDropName, { color: colors.foreground }]} numberOfLines={1}>
+                  {viewTeam?.city} {viewTeam?.name}
+                  <Text style={{ color: viewColor }}> ({viewTeam?.abbreviation})</Text>
+                </Text>
+              </View>
+              <Feather name="chevron-down" size={16} color={viewColor} />
+            </TouchableOpacity>
 
             {/* Position filter pills */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false}
@@ -451,13 +465,91 @@ export default function RosterScreen() {
         </View>
       )}
 
+      {/* ── Team Picker Modal ── */}
+      <Modal visible={teamPickerOpen} animationType="slide" transparent onRequestClose={() => setTeamPickerOpen(false)}>
+        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.72)" }}>
+          <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={() => setTeamPickerOpen(false)} activeOpacity={1} />
+          <View style={[st.pickerSheet, { backgroundColor: colors.card }]}>
+            {/* Handle */}
+            <View style={[st.sheetHandle, { alignSelf: "center", marginBottom: 0 }]} />
+            <View style={[st.pickerHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[st.pickerTitle, { color: colors.foreground }]}>Select Team</Text>
+              <TouchableOpacity onPress={() => setTeamPickerOpen(false)}>
+                <Feather name="x" size={20} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+              {/* My Team row */}
+              <TouchableOpacity
+                onPress={() => { setViewTeamId(""); setTeamPickerOpen(false); }}
+                style={[st.pickerRow, {
+                  backgroundColor: isViewingOwnTeam ? viewColor + "18" : "transparent",
+                  borderBottomColor: colors.border,
+                }]}>
+                <View style={[st.pickerSwatch, { backgroundColor: teamColor }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[st.pickerRowName, { color: isViewingOwnTeam ? viewColor : colors.foreground }]}>
+                    {team?.city} {team?.name}
+                  </Text>
+                  <Text style={[st.pickerRowSub, { color: colors.mutedForeground }]}>
+                    {team?.abbreviation} · MY TEAM
+                  </Text>
+                </View>
+                {isViewingOwnTeam && <Feather name="check" size={16} color={viewColor} />}
+              </TouchableOpacity>
+
+              {/* Conference / division groups */}
+              {["Ironclad","Gridiron"].map(conf => (
+                <View key={conf}>
+                  <View style={[st.pickerConfHeader, { backgroundColor: colors.secondary }]}>
+                    <Text style={[st.pickerConfText, { color: colors.mutedForeground }]}>{conf.toUpperCase()} CONFERENCE</Text>
+                  </View>
+                  {["East","North","South","West"].map(div => {
+                    const divTeams = (season?.teams ?? []).filter(t => t.conference === conf && t.division === div && t.id !== team?.id);
+                    if (divTeams.length === 0) return null;
+                    return (
+                      <View key={div}>
+                        <View style={[st.pickerDivHeader, { borderBottomColor: colors.border }]}>
+                          <Text style={[st.pickerDivText, { color: colors.mutedForeground }]}>{div}</Text>
+                        </View>
+                        {divTeams.map(t => {
+                          const accent = pickAccent(t.primaryColor, t.secondaryColor);
+                          const isActive = viewTeamId === t.id;
+                          return (
+                            <TouchableOpacity key={t.id}
+                              onPress={() => { setViewTeamId(t.id); setTeamPickerOpen(false); }}
+                              style={[st.pickerRow, {
+                                backgroundColor: isActive ? accent + "15" : "transparent",
+                                borderBottomColor: colors.border,
+                              }]}>
+                              <View style={[st.pickerSwatch, { backgroundColor: accent }]} />
+                              <View style={{ flex: 1 }}>
+                                <Text style={[st.pickerRowName, { color: isActive ? accent : colors.foreground }]}>
+                                  {t.city} {t.name}
+                                </Text>
+                                <Text style={[st.pickerRowSub, { color: colors.mutedForeground }]}>{t.abbreviation}</Text>
+                              </View>
+                              {isActive && <Feather name="check" size={16} color={accent} />}
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    );
+                  })}
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       {/* ── Stats Modal ── */}
       <PlayerStatsModal
         player={statsPlayer}
         visible={!!statsPlayer}
         onClose={() => setStatsPlayer(null)}
-        teamPrimaryColor={isViewingOwnTeam ? teamColor : viewColor}
-        teamSecondaryColor={isViewingOwnTeam ? teamSecondary : viewSecondary}
+        teamPrimaryColor={viewColor}
+        teamSecondaryColor={viewSecondary}
         gamesPlayedThisSeason={gamesPlayed}
       />
     </View>
@@ -586,8 +678,10 @@ const st = StyleSheet.create({
   tabScroll:    { flexGrow: 0 },
   tabBtn:       { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
   tabLabel:     { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  teamChip:     { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1 },
-  teamChipText: { fontSize: 11, fontFamily: "Inter_700Bold" },
+  teamDropBtn:   { flexDirection: "row", alignItems: "center", gap: 12, margin: 12, padding: 14, borderRadius: 14, borderWidth: 1.5 },
+  teamDropSwatch:{ width: 14, height: 14, borderRadius: 7 },
+  teamDropLabel: { fontSize: 9, fontFamily: "Inter_700Bold", letterSpacing: 1, textTransform: "uppercase" },
+  teamDropName:  { fontSize: 16, fontFamily: "Inter_700Bold", marginTop: 2 },
   posPill:      { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1 },
   posPillText:  { fontSize: 10, fontFamily: "Inter_700Bold" },
 
@@ -639,6 +733,19 @@ const st = StyleSheet.create({
   actionRow:    { flexDirection: "row", gap: 8 },
   actionBtn:    { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1 },
   actionBtnText:{ fontSize: 12, fontFamily: "Inter_600SemiBold" },
+
+  // Team picker modal
+  pickerSheet:     { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, maxHeight: "85%" },
+  pickerHeader:    { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1 },
+  pickerTitle:     { fontSize: 17, fontFamily: "Inter_700Bold" },
+  pickerRow:       { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingVertical: 13, borderBottomWidth: StyleSheet.hairlineWidth },
+  pickerSwatch:    { width: 10, height: 10, borderRadius: 5 },
+  pickerRowName:   { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  pickerRowSub:    { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },
+  pickerConfHeader:{ paddingHorizontal: 20, paddingVertical: 8 },
+  pickerConfText:  { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 1.2 },
+  pickerDivHeader: { paddingHorizontal: 20, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
+  pickerDivText:   { fontSize: 10, fontFamily: "Inter_600SemiBold", letterSpacing: 0.5 },
 
   // Game plan
   planCard:     { borderRadius: 12, padding: 14, borderWidth: 1, gap: 4 },
