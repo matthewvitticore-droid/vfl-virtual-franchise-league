@@ -1,42 +1,41 @@
 import React from "react";
-import Svg, { Path, Ellipse, Text as SvgText } from "react-native-svg";
+import Svg, { Path, Ellipse, Rect, Text as SvgText } from "react-native-svg";
 
 /**
- * Front-facing cartoon NFL helmet — matches reference artwork exactly.
+ * Front-facing cartoon Schutt-style helmet.
  *
- *   shellColor     – dome & chin-cup color
- *   facemaskColor  – cage rails & crossbars
+ *   shellColor     – dome & chin-cup colour
+ *   facemaskColor  – cage bars / uprights (Schutt ROPO style)
  *   visorColor     – dark face-opening tint
- *   stripeColor    – crown stripe on top of dome
- *   chinstrapColor – chin cup pad at bottom of cage (user calls this "chinstrap")
+ *   stripeColor    – crown stripe
+ *   chinstrapColor – chin cup pad at bottom
+ *   visorText      – optional text rendered on visor (e.g. "+VFL")
  */
 export default function Helmet({
-  size          = 220,
-  shellColor    = "#ECEEF2",
-  facemaskColor = "#C0C6D0",
-  visorColor    = "#080C14",
-  stripeColor   = "#CC2020",
+  size           = 220,
+  shellColor     = "#ECEEF2",
+  facemaskColor  = "#C0C6D0",
+  visorColor     = "#080C14",
+  stripeColor    = "#CC2020",
   chinstrapColor = "#ECEEF2",
-  visorText     = "",
+  visorText      = "",
 }) {
   const ink = "#1A1E2C";
 
   return (
     <Svg width={size} height={size} viewBox="0 0 512 512">
 
-      {/* ╔══════════════════════════════════════════╗
-          ║  1. SHELL — wide, squat cartoon dome     ║
-          ╚══════════════════════════════════════════╝ */}
+      {/* ── 1. SHELL ─────────────────────────────────────────────── */}
 
       {/* Main dome */}
       <Path
         d="
-          M 256 52
-          C 146 52, 60 126, 60 222
-          C 60 292, 96 338, 166 352
-          L 346 352
-          C 416 338, 452 292, 452 222
-          C 452 126, 366 52, 256 52 Z
+          M 256 46
+          C 140 46, 58 122, 58 222
+          C 58 296, 92 344, 164 360
+          L 348 360
+          C 420 344, 454 296, 454 222
+          C 454 122, 372 46, 256 46 Z
         "
         fill={shellColor}
         stroke={ink}
@@ -44,68 +43,82 @@ export default function Helmet({
         strokeLinejoin="round"
       />
 
-      {/* Left blue-gray shadow band */}
+      {/* Left shadow band */}
       <Path
         d="
-          M 60 222
-          C 60 292, 96 338, 166 352
-          L 186 352
-          C 122 338, 88 292, 88 222
-          C 88 154, 132 100, 196 70
-          C 138 92, 86 152, 60 222 Z
+          M 58 222
+          C 58 296, 92 344, 164 360
+          L 186 360
+          C 120 344, 88 296, 88 222
+          C 88 148, 132 92, 206 66
+          C 138 90, 84 148, 58 222 Z
         "
-        fill="#00000022"
+        fill="#00000030"
       />
 
-      {/* Right subtle gloss */}
+      {/* Right gloss */}
       <Path
         d="
-          M 452 222
-          C 452 190, 444 158, 428 130
-          C 438 158, 444 190, 444 222 Z
+          M 454 222 C 454 188, 444 154, 424 126
+          C 436 154, 446 188, 446 222 Z
         "
-        fill="#FFFFFF22"
+        fill="#FFFFFF25"
       />
 
-      {/* Top-center gloss highlight streak */}
+      {/* Top-center gloss streak */}
       <Path
-        d="M 210 72 C 232 62, 280 62, 302 72"
+        d="M 208 68 C 232 56, 280 56, 304 68"
         stroke="#FFFFFF"
-        strokeWidth="10"
+        strokeWidth="11"
         fill="none"
-        opacity="0.38"
+        opacity="0.40"
         strokeLinecap="round"
       />
 
-      {/* ╔══════════════════════════════════════════╗
-          ║  2. CROWN STRIPE                         ║
-          ╚══════════════════════════════════════════╝ */}
+      {/* ── 2. CROWN STRIPE ──────────────────────────────────────── */}
       <Path
         d="
-          M 242 52
-          C 247 50, 265 50, 270 52
-          L 270 226
-          L 242 226 Z
+          M 244 48
+          Q 256 44, 268 48
+          L 270 234
+          L 242 234 Z
         "
         fill={stripeColor}
         stroke={ink}
-        strokeWidth="4"
+        strokeWidth="3.5"
         strokeLinejoin="round"
       />
 
-      {/* ╔══════════════════════════════════════════╗
-          ║  3. BROW GUARD — pill with two rivets    ║
-          ╚══════════════════════════════════════════╝ */}
+      {/* ── 3. EARHOLE PANELS (dark cut-outs each side) ──────────── */}
+      {/* Left earhole shadow */}
       <Path
         d="
-          M 164 228
-          C 164 220, 170 214, 178 214
-          L 334 214
-          C 342 214, 348 220, 348 228
-          L 348 250
-          C 348 260, 340 266, 330 266
-          L 182 266
-          C 172 266, 164 260, 164 250 Z
+          M 68 238 C 58 270, 62 318, 80 354
+          L 108 354 C 90 318, 86 270, 96 238 Z
+        "
+        fill="#00000030"
+      />
+      {/* Right earhole shadow */}
+      <Path
+        d="
+          M 444 238 C 454 270, 450 318, 432 354
+          L 404 354 C 422 318, 426 270, 416 238 Z
+        "
+        fill="#00000030"
+      />
+
+      {/* ── 4. BROW GUARD ────────────────────────────────────────── */}
+      {/* Flat rectangular brow bar */}
+      <Path
+        d="
+          M 170 232
+          C 170 222, 176 216, 186 216
+          L 326 216
+          C 336 216, 342 222, 342 232
+          L 342 252
+          C 342 262, 336 268, 326 268
+          L 186 268
+          C 176 268, 170 262, 170 252 Z
         "
         fill={shellColor}
         stroke={ink}
@@ -113,72 +126,71 @@ export default function Helmet({
         strokeLinejoin="round"
       />
 
-      {/* Rivet — left */}
-      <Ellipse cx="202" cy="238" rx="12" ry="12" fill="#9AA2AE" stroke={ink} strokeWidth="3.5" />
-      <Ellipse cx="202" cy="238" rx="6"  ry="6"  fill="#525A68" />
+      {/* ── 5. HARDWARE CLIPS — clear Schutt T-clips ─────────────── */}
+      {/* Left clip body */}
+      <Rect x="195" y="228" width="28" height="30" rx="5" ry="5"
+        fill="#D0D8E8" stroke={ink} strokeWidth="3.5" opacity="0.92" />
+      {/* Left clip tab (top flange) */}
+      <Rect x="188" y="218" width="42" height="14" rx="5" ry="5"
+        fill="#E0E6F0" stroke={ink} strokeWidth="3" opacity="0.88" />
 
-      {/* Rivet — right */}
-      <Ellipse cx="310" cy="238" rx="12" ry="12" fill="#9AA2AE" stroke={ink} strokeWidth="3.5" />
-      <Ellipse cx="310" cy="238" rx="6"  ry="6"  fill="#525A68" />
+      {/* Right clip body */}
+      <Rect x="289" y="228" width="28" height="30" rx="5" ry="5"
+        fill="#D0D8E8" stroke={ink} strokeWidth="3.5" opacity="0.92" />
+      {/* Right clip tab (top flange) */}
+      <Rect x="282" y="218" width="42" height="14" rx="5" ry="5"
+        fill="#E0E6F0" stroke={ink} strokeWidth="3" opacity="0.88" />
 
-      {/* ╔══════════════════════════════════════════╗
-          ║  4. CHEEK GUARDS — teal behind cage      ║
-          ╚══════════════════════════════════════════╝ */}
+      {/* ── 6. CHEEK GUARDS ──────────────────────────────────────── */}
       {/* Left cheek */}
       <Path
         d="
-          M 152 268
-          L 104 290
-          C 80 322, 78 372, 94 418
-          L 152 418 Z
+          M 162 270 L 110 294
+          C 84 326, 82 378, 100 422
+          L 160 422 Z
         "
         fill="#2A7A6C"
-        opacity="0.72"
+        opacity="0.70"
       />
       {/* Right cheek */}
       <Path
         d="
-          M 360 268
-          L 408 290
-          C 432 322, 434 372, 418 418
-          L 360 418 Z
+          M 350 270 L 402 294
+          C 428 326, 430 378, 412 422
+          L 352 422 Z
         "
         fill="#2A7A6C"
-        opacity="0.72"
+        opacity="0.70"
       />
 
-      {/* ╔══════════════════════════════════════════╗
-          ║  5. FACE OPENING — large dark visor      ║
-          ╚══════════════════════════════════════════╝ */}
+      {/* ── 7. FACE OPENING ──────────────────────────────────────── */}
       <Path
         d="
-          M 256 264
-          C 194 264, 154 288, 154 326
-          L 154 412
-          C 154 434, 176 448, 206 448
-          L 306 448
-          C 336 448, 358 434, 358 412
-          L 358 326
-          C 358 288, 318 264, 256 264 Z
+          M 170 270
+          L 170 454
+          Q 185 470, 256 476
+          Q 327 470, 342 454
+          L 342 270
+          C 308 258, 204 258, 170 270 Z
         "
         fill={visorColor}
       />
 
-      {/* Visor top gloss line */}
+      {/* Visor gloss */}
       <Path
-        d="M 196 282 C 220 272, 292 272, 316 282"
+        d="M 200 278 C 224 268, 288 268, 312 278"
         stroke="#FFFFFF"
         strokeWidth="5"
         fill="none"
-        opacity="0.16"
+        opacity="0.15"
         strokeLinecap="round"
       />
 
-      {/* Optional visor text (e.g. "+VFL") */}
+      {/* Optional visor text */}
       {!!visorText && (
         <SvgText
           x="256"
-          y="370"
+          y="382"
           textAnchor="middle"
           fontSize="72"
           fontWeight="bold"
@@ -190,81 +202,123 @@ export default function Helmet({
         </SvgText>
       )}
 
-      {/* ╔══════════════════════════════════════════╗
-          ║  6. CAGE FRAME — bowing rounded-oval     ║
-          ╚══════════════════════════════════════════╝ */}
+      {/* ── 8. CAGE — Schutt ROPO open-face style ────────────────── */}
+      {/*
+          Structure (front view):
+          - Left & right uprights bow gently outward
+          - Two close J-bars just below brow (the Schutt signature)
+          - Center vertical divider from J-bar 2 → chin bar
+          - Chin bar closing the bottom
+          All bars: thick facemaskColor fill + thin ink outline
+      */}
 
-      {/* Color fill layer (thick stroke traces centerline of frame) */}
+      {/* --- LEFT UPRIGHT --- */}
       <Path
-        d="
-          M 256 258
-          C 186 258, 126 278, 100 320
-          C 78 358, 78 406, 96 446
-          C 112 480, 142 496, 180 496
-          L 332 496
-          C 370 496, 400 480, 416 446
-          C 434 406, 434 358, 412 320
-          C 386 278, 326 258, 256 258 Z
-        "
-        fill="none"
+        d="M 168 268 C 126 295, 108 366, 124 462"
         stroke={facemaskColor}
-        strokeWidth="30"
-        strokeLinejoin="round"
-      />
-
-      {/* Dark ink outline on top of cage */}
-      <Path
-        d="
-          M 256 258
-          C 186 258, 126 278, 100 320
-          C 78 358, 78 406, 96 446
-          C 112 480, 142 496, 180 496
-          L 332 496
-          C 370 496, 400 480, 416 446
-          C 434 406, 434 358, 412 320
-          C 386 278, 326 258, 256 258 Z
-        "
+        strokeWidth="26"
         fill="none"
+        strokeLinecap="round"
+      />
+      <Path
+        d="M 168 268 C 126 295, 108 366, 124 462"
         stroke={ink}
-        strokeWidth="6"
-        strokeLinejoin="round"
+        strokeWidth="5.5"
+        fill="none"
+        strokeLinecap="round"
       />
 
-      {/* ╔══════════════════════════════════════════╗
-          ║  7. CAGE CROSSBARS — 3 curved bars       ║
-          ╚══════════════════════════════════════════╝ */}
+      {/* --- RIGHT UPRIGHT --- */}
+      <Path
+        d="M 344 268 C 386 295, 404 366, 388 462"
+        stroke={facemaskColor}
+        strokeWidth="26"
+        fill="none"
+        strokeLinecap="round"
+      />
+      <Path
+        d="M 344 268 C 386 295, 404 366, 388 462"
+        stroke={ink}
+        strokeWidth="5.5"
+        fill="none"
+        strokeLinecap="round"
+      />
 
-      {/* Upper crossbar */}
-      <Path d="M 96 334 C 158 325, 354 325, 416 334"
-        stroke={facemaskColor} strokeWidth="24" fill="none" strokeLinecap="round" />
-      <Path d="M 96 334 C 158 325, 354 325, 416 334"
-        stroke={ink} strokeWidth="5" fill="none" strokeLinecap="round" />
+      {/* --- J-BAR 1 (first horizontal, close to brow) --- */}
+      <Path
+        d="M 140 296 L 372 296"
+        stroke={facemaskColor}
+        strokeWidth="22"
+        fill="none"
+        strokeLinecap="round"
+      />
+      <Path
+        d="M 140 296 L 372 296"
+        stroke={ink}
+        strokeWidth="5"
+        fill="none"
+        strokeLinecap="round"
+      />
 
-      {/* Middle crossbar */}
-      <Path d="M 82 384 C 152 375, 360 375, 430 384"
-        stroke={facemaskColor} strokeWidth="24" fill="none" strokeLinecap="round" />
-      <Path d="M 82 384 C 152 375, 360 375, 430 384"
-        stroke={ink} strokeWidth="5" fill="none" strokeLinecap="round" />
+      {/* --- J-BAR 2 (second horizontal, ~24 px below J-bar 1) --- */}
+      <Path
+        d="M 136 324 L 376 324"
+        stroke={facemaskColor}
+        strokeWidth="22"
+        fill="none"
+        strokeLinecap="round"
+      />
+      <Path
+        d="M 136 324 L 376 324"
+        stroke={ink}
+        strokeWidth="5"
+        fill="none"
+        strokeLinecap="round"
+      />
 
-      {/* Lower crossbar */}
-      <Path d="M 88 432 C 154 424, 358 424, 424 432"
-        stroke={facemaskColor} strokeWidth="24" fill="none" strokeLinecap="round" />
-      <Path d="M 88 432 C 154 424, 358 424, 424 432"
-        stroke={ink} strokeWidth="5" fill="none" strokeLinecap="round" />
+      {/* --- CENTER VERTICAL DIVIDER --- */}
+      <Path
+        d="M 256 324 L 256 462"
+        stroke={facemaskColor}
+        strokeWidth="22"
+        fill="none"
+        strokeLinecap="round"
+      />
+      <Path
+        d="M 256 324 L 256 462"
+        stroke={ink}
+        strokeWidth="5"
+        fill="none"
+        strokeLinecap="round"
+      />
 
-      {/* ╔══════════════════════════════════════════╗
-          ║  8. CHIN CUP (chinstrap)                 ║
-          ╚══════════════════════════════════════════╝ */}
+      {/* --- CHIN BAR (bottom connector) --- */}
+      <Path
+        d="M 124 462 Q 256 488, 388 462"
+        stroke={facemaskColor}
+        strokeWidth="26"
+        fill="none"
+        strokeLinecap="round"
+      />
+      <Path
+        d="M 124 462 Q 256 488, 388 462"
+        stroke={ink}
+        strokeWidth="5.5"
+        fill="none"
+        strokeLinecap="round"
+      />
+
+      {/* ── 9. CHIN CUP ──────────────────────────────────────────── */}
       <Path
         d="
-          M 192 450
-          C 176 450, 164 460, 164 474
-          L 164 484
-          C 164 496, 176 502, 196 502
-          L 316 502
-          C 336 502, 348 496, 348 484
-          L 348 474
-          C 348 460, 336 450, 320 450 Z
+          M 196 462
+          C 178 462, 166 472, 166 486
+          L 166 496
+          C 166 508, 178 514, 200 514
+          L 312 514
+          C 334 514, 346 508, 346 496
+          L 346 486
+          C 346 472, 334 462, 316 462 Z
         "
         fill={chinstrapColor}
         stroke={ink}
@@ -273,10 +327,22 @@ export default function Helmet({
       />
 
       {/* Chin cup crease lines */}
-      <Path d="M 200 468 C 222 460, 290 460, 312 468"
-        stroke={ink} strokeWidth="3.5" fill="none" strokeLinecap="round" opacity="0.22" />
-      <Path d="M 204 482 C 224 476, 288 476, 308 482"
-        stroke={ink} strokeWidth="3"   fill="none" strokeLinecap="round" opacity="0.15" />
+      <Path
+        d="M 202 479 C 224 471, 288 471, 310 479"
+        stroke={ink}
+        strokeWidth="3.5"
+        fill="none"
+        strokeLinecap="round"
+        opacity="0.22"
+      />
+      <Path
+        d="M 206 493 C 226 487, 286 487, 306 493"
+        stroke={ink}
+        strokeWidth="3"
+        fill="none"
+        strokeLinecap="round"
+        opacity="0.15"
+      />
 
     </Svg>
   );
