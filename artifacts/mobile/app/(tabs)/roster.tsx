@@ -574,7 +574,18 @@ function RSortHeader({ label, sortKey: key, current, asc, onSort, colors, accent
 function RosterPlayerRow({ p, rank, colors, accent, onPress, isOwnTeam, onManage }:
   { p: Player; rank: number; colors: any; accent: string;
     onPress: () => void; isOwnTeam: boolean; onManage?: () => void }) {
-  const ratingColor = (v: number) => v >= 90 ? "#FFD700" : v >= 80 ? colors.success : v >= 70 ? colors.foreground : colors.mutedForeground;
+  // Team-colorway rating tiers: full → bright → mid → muted
+  const ratingColor = (v: number) =>
+    v >= 90 ? accent :
+    v >= 80 ? accent + "CC" :
+    v >= 70 ? accent + "88" :
+    colors.mutedForeground;
+  // Salary: max earners = full accent (flagship player), mid = dimmer, low = muted
+  const salaryColor = (sal: number) =>
+    sal >= 20 ? accent :
+    sal >= 10 ? accent + "AA" :
+    colors.mutedForeground;
+
   const acc = (p.positionRatings as any)?.acceleration ?? 50;
   const agi = (p.positionRatings as any)?.agility ?? 50;
 
@@ -585,14 +596,14 @@ function RosterPlayerRow({ p, rank, colors, accent, onPress, isOwnTeam, onManage
       <View style={{ width: 185, paddingRight: 6 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
           <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_500Medium", width: 20, textAlign: "right" }}>{rank}</Text>
-          <View style={[st.posBadge, { backgroundColor: POS_COLOR[p.position] + "25" }]}>
-            <Text style={[st.posBadgeText, { color: POS_COLOR[p.position] }]}>{p.position}</Text>
+          <View style={[st.posBadge, { backgroundColor: accent + "25" }]}>
+            <Text style={[st.posBadgeText, { color: accent }]}>{p.position}</Text>
           </View>
           <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground, flexShrink: 1 }} numberOfLines={1}>
             {p.name.split(" ").slice(-1)[0]}
           </Text>
           {p.developmentTrait !== "Normal" && (
-            <Text style={{ fontSize: 9, color: DEV_COLORS[p.developmentTrait], fontFamily: "Inter_700Bold" }}>
+            <Text style={{ fontSize: 9, color: accent + "DD", fontFamily: "Inter_700Bold" }}>
               {p.developmentTrait === "X-Factor" ? "⚡" : p.developmentTrait === "Superstar" ? "★" : p.developmentTrait === "Star" ? "◆" : "↑"}
             </Text>
           )}
@@ -607,8 +618,8 @@ function RosterPlayerRow({ p, rank, colors, accent, onPress, isOwnTeam, onManage
       <ColCell value={`${p.speed}`}             color={ratingColor(p.speed)} />
       <ColCell value={`${acc}`}                 color={ratingColor(acc)} />
       <ColCell value={`${agi}`}                 color={ratingColor(agi)} />
-      <ColCell value={`${p.yearsExperience}yr`} color={colors.foreground} />
-      <ColCell value={`$${p.salary.toFixed(1)}M`} color={p.salary >= 20 ? colors.danger : p.salary >= 10 ? colors.nflGold : colors.success} />
+      <ColCell value={`${p.yearsExperience}yr`} color={accent + "99"} />
+      <ColCell value={`$${p.salary.toFixed(1)}M`} color={salaryColor(p.salary)} />
 
       {/* Manage button (own team only) */}
       {onManage && (
