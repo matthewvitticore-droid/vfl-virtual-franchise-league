@@ -108,107 +108,86 @@ export default function Helmet({
         />
       </G>
 
-      {/* ── GROUP 3: FACEMASK ──────────────────────────────────────────────── */}
+      {/* ── GROUP 3: FACEMASK — Schutt/F7 style, all curved stroke tubes ──── */}
       {/*
-        The facemask projects FORWARD (further right) than the shell.
-        Outer rail lives at x≈480–492. Inner rail follows the face opening edge.
-        Horizontal bars use quadratic beziers so they bow outward (forward-projection).
-        A nose-bridge bar runs between the two horizontal bars.
+        Every bar is drawn TWICE: a wider outlineColor stroke behind, then a
+        narrower facemaskColor stroke on top — giving the "thick outlined tube"
+        look of the reference illustration.
+        No filled rectangles. All strokeLinecap="round".
       */}
-      <G id="facemask" fill={facemaskColor} stroke={OL} strokeWidth={sw2}
-        strokeLinejoin="round">
+      <G id="facemask">
 
-        {/* ── Top brim: connects the shell brow to the outer rail at the top ── */}
-        <Path
-          d={
-            "M 326 38 " +                           // inner attach (shell brow)
-            "C 358 22 406 30 440 60 " +             // sweeps outward and forward
-            "C 458 78 472 104 474 132 " +            // bends down to outer rail
-            "L 460 136 " +                          // outer rail top
-            "C 460 114 448 90 432 74 " +            // inner side of brim
-            "C 400 46 358 38 330 50 Z"              // back to inner attach
-          }
-        />
+        {/* ─ OUTLINE LAYER (drawn first, sits behind) ─ */}
+        <G fill="none" stroke={OL} strokeLinecap="round" strokeLinejoin="round">
 
-        {/* Snap bolts at brim-to-shell attachment */}
-        <Circle cx="356" cy="44" r="11" fill={facemaskColor} stroke={OL} strokeWidth="5" />
-        <Circle cx="410" cy="68" r="11" fill={facemaskColor} stroke={OL} strokeWidth="5" />
+          {/* Top brim — sweeps from shell crown outward and forward */}
+          <Path strokeWidth="22"
+            d="M 296 60 C 346 36 412 34 458 68 C 476 82 484 110 482 138" />
 
-        {/* ── Inner (left) vertical rail — follows face opening edge ── */}
-        <Path
-          d={
-            "M 258 84 C 252 84 246 88 244 96 " +
-            "L 242 422 " +
-            "C 246 430 256 430 262 422 " +
-            "L 264 96 Z"
-          }
-        />
+          {/* Snap bolt outlines */}
+          <Circle cx="346" cy="44" r="13" fill={OL} />
+          <Circle cx="408" cy="38" r="13" fill={OL} />
 
-        {/* ── Outer (right) vertical rail — projects well past the shell ── */}
-        {/*
-          Top is near the bill at (472,132); bottom curves in to (456,404).
-          The rail bows outward in the middle (x≈492 at mid-height).
-        */}
-        <Path
-          d={
-            "M 472 132 " +                          // top (bill attachment)
-            "C 492 168 494 226 490 278 " +           // bows outward — mid peak at x≈494
-            "C 486 330 474 374 456 404 " +           // curves back in toward bottom
-            "L 442 396 " +                          // inner edge bottom
-            "C 460 368 472 326 476 278 " +           // inner edge going up
-            "C 480 226 478 170 462 136 Z"            // back to top
-          }
-        />
+          {/* Inner (left) rail — angles slightly inward top to bottom */}
+          <Path strokeWidth="20"
+            d="M 270 90 C 264 170 260 270 268 390" />
 
-        {/* ── Upper horizontal bar — curves forward (quadratic bezier bows right) ── */}
-        <Path
-          d={
-            "M 244 210 " +
-            "Q 368 192 480 214 " +                  // curves outward — peak at x≈480
-            "L 480 234 " +
-            "Q 368 212 244 230 Z"
-          }
-        />
+          {/* Outer (right) rail — bows outward (peak ~x=496) then angles in */}
+          <Path strokeWidth="20"
+            d="M 480 138 C 498 190 500 262 492 330 C 486 374 472 400 456 414" />
 
-        {/* ── Lower horizontal bar — same curve treatment ── */}
-        <Path
-          d={
-            "M 244 326 " +
-            "Q 368 308 480 330 " +
-            "L 480 350 " +
-            "Q 368 328 244 346 Z"
-          }
-        />
+          {/* Upper eye bar — curves forward (bows toward viewer at mid-x) */}
+          <Path strokeWidth="20"
+            d="M 268 218 C 336 196 420 196 484 224" />
 
-        {/* ── Nose-bridge bar — vertical centre bar, slight forward bow ── */}
-        {/*
-          Runs from the upper bar to the lower bar, bowing forward at x≈375.
-          Represents the centre-vertical bar of a modern cage facemask.
-        */}
-        <Path
-          d={
-            "M 356 208 " +
-            "Q 372 268 358 328 " +                  // bows right at mid-height
-            "L 344 328 " +
-            "Q 358 268 342 208 Z"
-          }
-        />
+          {/* Lower bar */}
+          <Path strokeWidth="18"
+            d="M 266 316 C 334 296 416 296 482 320" />
 
-        {/* ── Bottom chin guard ── */}
-        <Path
-          d={
-            "M 244 408 " +
-            "C 244 426 270 436 344 436 " +
-            "C 420 436 448 426 448 408 " +
-            "L 448 422 " +
-            "C 448 442 420 452 344 452 " +
-            "C 270 452 244 442 244 422 Z"
-          }
-        />
+          {/* Center nose guard — drops from eye bar to chin, slight forward bow */}
+          <Path strokeWidth="20"
+            d="M 372 208 C 378 256 376 308 366 378" />
 
-        {/* Rivets at lower rail-to-chin-guard junctions */}
-        <Circle cx="254" cy="400" r="9" fill={facemaskColor} stroke={OL} strokeWidth="5" />
-        <Circle cx="448" cy="400" r="9" fill={facemaskColor} stroke={OL} strokeWidth="5" />
+          {/* Bottom chin connecting bar */}
+          <Path strokeWidth="20"
+            d="M 266 390 C 328 408 408 410 456 414" />
+        </G>
+
+        {/* ─ COLOR LAYER (drawn on top) ─ */}
+        <G fill="none" stroke={facemaskColor} strokeLinecap="round" strokeLinejoin="round">
+
+          {/* Top brim */}
+          <Path strokeWidth="12"
+            d="M 296 60 C 346 36 412 34 458 68 C 476 82 484 110 482 138" />
+
+          {/* Snap bolts */}
+          <Circle cx="346" cy="44" r="9" fill={facemaskColor} />
+          <Circle cx="408" cy="38" r="9" fill={facemaskColor} />
+
+          {/* Inner (left) rail */}
+          <Path strokeWidth="11"
+            d="M 270 90 C 264 170 260 270 268 390" />
+
+          {/* Outer (right) rail */}
+          <Path strokeWidth="11"
+            d="M 480 138 C 498 190 500 262 492 330 C 486 374 472 400 456 414" />
+
+          {/* Upper eye bar */}
+          <Path strokeWidth="11"
+            d="M 268 218 C 336 196 420 196 484 224" />
+
+          {/* Lower bar */}
+          <Path strokeWidth="10"
+            d="M 266 316 C 334 296 416 296 482 320" />
+
+          {/* Center nose guard */}
+          <Path strokeWidth="11"
+            d="M 372 208 C 378 256 376 308 366 378" />
+
+          {/* Bottom chin bar */}
+          <Path strokeWidth="11"
+            d="M 266 390 C 328 408 408 410 456 414" />
+        </G>
 
       </G>
 
