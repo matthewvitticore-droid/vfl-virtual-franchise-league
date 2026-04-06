@@ -452,16 +452,25 @@ export function PlayerStatsModal({ player, visible, onClose, teamPrimaryColor, t
             </View>
 
             {/* ── Tab bar ── */}
-            <View style={[modal.tabBar, { backgroundColor:colors.secondary, borderColor:colors.border }]}>
-              {TABS.map(t => (
-                <TouchableOpacity key={t.key} onPress={() => setTab(t.key)}
-                  style={[modal.tabBtn, tab===t.key && { backgroundColor:accent }]}>
-                  <Feather name={t.icon} size={10} color={tab===t.key ? "#fff" : colors.mutedForeground} />
-                  <Text style={[modal.tabLabel, { color:tab===t.key ? "#fff" : colors.mutedForeground }]}>
-                    {t.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            <View style={[modal.tabBar, { backgroundColor:colors.secondary, borderColor: accent + "40" }]}>
+              {TABS.map(t => {
+                const isActive = tab === t.key;
+                return (
+                  <TouchableOpacity key={t.key} onPress={() => setTab(t.key)}
+                    style={[modal.tabBtn, isActive
+                      ? { backgroundColor: accent }
+                      : { backgroundColor: accent + "15" }
+                    ]}>
+                    <Feather name={t.icon} size={10} color={isActive ? "#fff" : accent + "CC"} />
+                    <Text style={[modal.tabLabel, {
+                      color: isActive ? "#fff" : accent + "CC",
+                      fontFamily: isActive ? "Inter_700Bold" : "Inter_500Medium",
+                    }]}>
+                      {t.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
             {/* ── Tab content ── */}
