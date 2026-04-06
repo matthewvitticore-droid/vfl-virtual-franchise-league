@@ -50,6 +50,14 @@ export default function FrontOfficeScreen() {
   const [isSimRemainder, setIsSimRemainder] = useState(false);
   const [spotlightPick, setSpotlightPick] = useState<{ name: string; position: string; college: string; grade: number; devTrait: string; round: number; pick: number } | null>(null);
   const [tab, setTab] = useState<Tab>(() => (params.tab === "draft" || params.tab === "trades") ? params.tab : "freeAgency");
+
+  // Keep tab in sync when navigating here with ?tab=... after screen is already mounted
+  useEffect(() => {
+    if (params.tab === "draft" || params.tab === "trades" || params.tab === "freeAgency") {
+      setTab(params.tab as Tab);
+    }
+  }, [params.tab]);
+
   const [draftView, setDraftView] = useState<DraftView>("combine");
   const [posFilter, setPosFilter] = useState<NFLPosition | "ALL">("ALL");
   const [sortKey, setSortKey] = useState<SortKey>("grade");
