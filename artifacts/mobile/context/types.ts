@@ -520,6 +520,7 @@ export interface NFLContextValue {
   userDraftPick: (prospectId: string) => Promise<void>;
   simulateDraftPick: () => Promise<void>;
   simPicksUntilUserTurn: () => Promise<void>;
+  simRemainderOfDraft: () => Promise<void>;
   unlockScouting: (prospectId: string) => Promise<void>;
   // Trades
   proposeTrade: (offer: Omit<TradeOffer, "id" | "status" | "aiValue" | "expiresWeek">) => Promise<{ aiDecision: "accepted" | "rejected" | "considering"; aiValue: number }>;

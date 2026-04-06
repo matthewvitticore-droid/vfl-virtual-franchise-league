@@ -1366,6 +1366,52 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
     await save({ ...season, draftProspects: prospects, draftState: state });
   }, [season, save]);
 
+  const simRemainderOfDraft = useCallback(async () => {
+    if (!season) return;
+    const { teams } = season;
+    let state = season.draftState;
+    let prospects = season.draftProspects;
+    if (state.isComplete) return;
+
+    let iterations = 0;
+    while (!state.isComplete && iterations < 500) {
+      iterations++;
+      if (state.isUserTurn) {
+        // Auto-pick best available for user team during sim-all
+        const available = prospects.filter(p => !p.isPickedUp);
+        if (!available.length) break;
+        const prospect = available[0];
+        const completedPick: CompletedDraftPick = {
+          round: state.currentRound, pickInRound: state.currentPickInRound,
+          overallPick: state.overallPick, teamId: state.currentTeamId,
+          prospectId: prospect.id, prospectName: prospect.name,
+          prospectPosition: prospect.position, prospectCollege: prospect.college,
+          prospectGrade: prospect.overallGrade,
+        };
+        prospects = prospects.map(p =>
+          p.id === prospect.id ? { ...p, isPickedUp: true, pickedByTeamId: state.currentTeamId, pickedAtRound: state.currentRound, pickedAtPick: state.overallPick } : p
+        );
+        state = advanceDraftState(state, completedPick, teams);
+      } else {
+        const available = prospects.filter(p => !p.isPickedUp);
+        const prospect = simulateAIPick(state.currentTeamId, available, state.currentRound);
+        if (!prospect) break;
+        const completedPick: CompletedDraftPick = {
+          round: state.currentRound, pickInRound: state.currentPickInRound,
+          overallPick: state.overallPick, teamId: state.currentTeamId,
+          prospectId: prospect.id, prospectName: prospect.name,
+          prospectPosition: prospect.position, prospectCollege: prospect.college,
+          prospectGrade: prospect.overallGrade,
+        };
+        prospects = prospects.map(p =>
+          p.id === prospect.id ? { ...p, isPickedUp: true, pickedByTeamId: state.currentTeamId, pickedAtRound: state.currentRound, pickedAtPick: state.overallPick } : p
+        );
+        state = advanceDraftState(state, completedPick, teams);
+      }
+    }
+    await save({ ...season, draftProspects: prospects, draftState: state });
+  }, [season, save]);
+
   function advanceDraftState(state: DraftState, completedPick: CompletedDraftPick, teams: NFLTeam[]): DraftState {
     const nextOverall = state.overallPick + 1;
     const nextPickInRound = state.currentPickInRound + 1;
@@ -1623,7 +1669,7 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       signFreeAgent, releasePlayer, restructureContract, updateDepthOrder,
       updateGamePlan, updateFormation, updateOffenseScheme,
       simulateGame, simulateWeek, simulateSeason,
-      userDraftPick, simulateDraftPick, simPicksUntilUserTurn, unlockScouting,
+      userDraftPick, simulateDraftPick, simPicksUntilUserTurn, simRemainderOfDraft, unlockScouting,
       proposeTrade, respondToTrade,
       advancePhase, addNews, resetSeason,
       teamCustomization, saveCustomization, setGameDayUniform,

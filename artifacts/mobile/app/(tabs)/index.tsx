@@ -425,6 +425,53 @@ export default function HomeScreen() {
               </TouchableOpacity>
             )}
 
+            {/* ── ROOKIE CLASS PANEL (draft complete) ── */}
+            {currentPhase === "draft" && isDraftComplete && (() => {
+              const rookies = (team?.roster ?? [])
+                .filter(p => p.draftRound !== undefined)
+                .sort((a, b) => (a.draftPick ?? 999) - (b.draftPick ?? 999));
+              if (rookies.length === 0) return null;
+              const POS_COL: Record<string, string> = {
+                QB:"#E31837", RB:"#FB4F14", WR:"#FFC20E", TE:"#00B5E2", OL:"#8B949E",
+                DE:"#3FB950", DT:"#26A69A", LB:"#1F6FEB", CB:"#6E40C9", S:"#9C27B0",
+                K:"#FF7043", P:"#795548",
+              };
+              return (
+                <View style={[st.rookiePanel, { backgroundColor: colors.card, borderColor: theme.secondary + "40" }]}>
+                  <View style={st.rookiePanelHeader}>
+                    <Feather name="users" size={14} color={theme.secondary} />
+                    <Text style={[st.rookiePanelTitle, { color: theme.secondary }]}>YOUR ROOKIE CLASS</Text>
+                    <Text style={[st.rookiePanelCount, { color: colors.mutedForeground }]}>{rookies.length} PICKS</Text>
+                  </View>
+                  {rookies.map(p => {
+                    const ovrColor = p.overall >= 80 ? "#FFD700" : p.overall >= 70 ? "#3FB950" : p.overall >= 60 ? "#fff" : "#8B949E";
+                    const pc = POS_COL[p.position] ?? theme.primary;
+                    return (
+                      <View key={p.id} style={[st.rookieRow, { borderBottomColor: colors.border }]}>
+                        {/* Round badge */}
+                        <View style={[st.rookieRdBadge, { backgroundColor: theme.secondary + "20", borderColor: theme.secondary + "50" }]}>
+                          <Text style={[st.rookieRdNum, { color: theme.secondary }]}>R{p.draftRound}</Text>
+                          <Text style={[st.rookieRdPick, { color: colors.mutedForeground }]}>#{p.draftPick}</Text>
+                        </View>
+                        {/* Pos pill */}
+                        <View style={[st.rookiePosPill, { backgroundColor: pc + "20", borderColor: pc + "50" }]}>
+                          <Text style={[st.rookiePosText, { color: pc }]}>{p.position}</Text>
+                        </View>
+                        {/* Name */}
+                        <Text style={[st.rookieName, { color: colors.foreground, flex: 1 }]} numberOfLines={1}>{p.name}</Text>
+                        {/* College */}
+                        <Text style={[st.rookieCollege, { color: colors.mutedForeground }]} numberOfLines={1}>{p.college}</Text>
+                        {/* OVR */}
+                        <View style={[st.rookieOvrBadge, { borderColor: ovrColor + "50", backgroundColor: ovrColor + "18" }]}>
+                          <Text style={[st.rookieOvr, { color: ovrColor }]}>{p.overall}</Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              );
+            })()}
+
             {/* Draft advance to preseason */}
             {currentPhase === "draft" && isDraftComplete && (
               <TouchableOpacity
@@ -677,6 +724,24 @@ const st = StyleSheet.create({
   advanceBtn:    { flexDirection:"row", alignItems:"center", justifyContent:"center",
                    gap:7, paddingVertical:11, borderRadius:12, borderWidth:1, marginTop:4 },
   advanceBtnTxt: { fontSize:13, fontFamily:"Inter_600SemiBold" },
+
+  // Rookie class panel
+  rookiePanel:       { borderRadius:14, borderWidth:1.5, overflow:"hidden", marginBottom:8 },
+  rookiePanelHeader: { flexDirection:"row", alignItems:"center", gap:8,
+                       paddingHorizontal:14, paddingVertical:10, borderBottomWidth:1, borderBottomColor:"#ffffff10" },
+  rookiePanelTitle:  { fontSize:11, fontFamily:"Inter_700Bold", letterSpacing:1.5, flex:1 },
+  rookiePanelCount:  { fontSize:10, fontFamily:"Inter_600SemiBold", letterSpacing:1 },
+  rookieRow:         { flexDirection:"row", alignItems:"center", gap:8,
+                       paddingHorizontal:12, paddingVertical:8, borderBottomWidth:StyleSheet.hairlineWidth },
+  rookieRdBadge:     { borderRadius:6, borderWidth:1, paddingHorizontal:6, paddingVertical:3, alignItems:"center", minWidth:36 },
+  rookieRdNum:       { fontSize:10, fontFamily:"Inter_700Bold", lineHeight:12 },
+  rookieRdPick:      { fontSize:8,  fontFamily:"Inter_600SemiBold", lineHeight:10 },
+  rookiePosPill:     { borderRadius:5, borderWidth:1, paddingHorizontal:6, paddingVertical:3 },
+  rookiePosText:     { fontSize:10, fontFamily:"Inter_700Bold" },
+  rookieName:        { fontSize:13, fontFamily:"Inter_600SemiBold" },
+  rookieCollege:     { fontSize:10, fontFamily:"Inter_400Regular", maxWidth:80 },
+  rookieOvrBadge:    { borderRadius:6, borderWidth:1, paddingHorizontal:7, paddingVertical:3 },
+  rookieOvr:         { fontSize:12, fontFamily:"Inter_700Bold" },
 
   // Nav tiles
   tilesSection: { gap: 8, marginTop: 4 },

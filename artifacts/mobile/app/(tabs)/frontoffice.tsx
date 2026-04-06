@@ -1,9 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Alert, Platform, ScrollView, StyleSheet, Text, TextInput,
+  Alert, Modal, Platform, ScrollView, StyleSheet, Text, TextInput,
   TouchableOpacity, View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -43,9 +44,11 @@ export default function FrontOfficeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { membership } = useAuth();
-  const { season, getPlayerTeam, signFreeAgent, userDraftPick, simulateDraftPick, simPicksUntilUserTurn, unlockScouting, proposeTrade, respondToTrade } = useNFL();
+  const { season, getPlayerTeam, signFreeAgent, userDraftPick, simulateDraftPick, simPicksUntilUserTurn, simRemainderOfDraft, unlockScouting, proposeTrade, respondToTrade } = useNFL();
   const params = useLocalSearchParams<{ tab?: string }>();
   const [isSimming, setIsSimming] = useState(false);
+  const [isSimRemainder, setIsSimRemainder] = useState(false);
+  const [spotlightPick, setSpotlightPick] = useState<{ name: string; position: string; college: string; grade: number; devTrait: string; round: number; pick: number } | null>(null);
   const [tab, setTab] = useState<Tab>(() => (params.tab === "draft" || params.tab === "trades") ? params.tab : "freeAgency");
   const [draftView, setDraftView] = useState<DraftView>("combine");
   const [posFilter, setPosFilter] = useState<NFLPosition | "ALL">("ALL");
@@ -250,6 +253,24 @@ export default function FrontOfficeScreen() {
     else { setSortKey(key); setSortAsc(false); }
   }
 
+  async function handleDraftPlayer(prospectId: string) {
+    const prospect = season?.draftProspects.find(p => p.id === prospectId);
+    const round = ds?.currentRound ?? 1;
+    const pick  = ds?.overallPick  ?? 1;
+    await userDraftPick(prospectId);
+    if (prospect) {
+      setSpotlightPick({
+        name:     prospect.name,
+        position: prospect.position,
+        college:  prospect.college,
+        grade:    prospect.overallGrade,
+        devTrait: prospect.developmentTrait,
+        round,
+        pick,
+      });
+    }
+  }
+
   async function handleSimulateAllAI() {
     if (!ds || ds.isComplete || ds.isUserTurn) return;
     await simulateDraftPick();
@@ -260,6 +281,26 @@ export default function FrontOfficeScreen() {
     setIsSimming(true);
     await simPicksUntilUserTurn();
     setIsSimming(false);
+  }
+
+  async function handleSimRemainder() {
+    if (!ds || ds.isComplete || isSimRemainder) return;
+    Alert.alert(
+      "Sim Remainder of Draft?",
+      "The AI will auto-pick for all teams including yours. Your war room targets won't be guaranteed.",
+      [
+        { text: "Cancel" },
+        {
+          text: "Sim All",
+          style: "destructive",
+          onPress: async () => {
+            setIsSimRemainder(true);
+            await simRemainderOfDraft();
+            setIsSimRemainder(false);
+          },
+        },
+      ]
+    );
   }
 
   function evaluateTradeValue() {
@@ -365,17 +406,28 @@ export default function FrontOfficeScreen() {
                   {ds.isComplete ? `${ds.completedPicks.length} picks made` : ds.isUserTurn ? `Overall pick #${ds.overallPick}` : `${season?.teams.find(t=>t.id===ds.currentTeamId)?.city ?? "Team"} on the clock`}
                 </Text>
               </View>
-              {!ds.isComplete && !ds.isUserTurn && (
-                <View style={{ flexDirection:"row", gap:6 }}>
-                  <TouchableOpacity onPress={handleSimulateAllAI}
-                    style={[st.simPickBtn, { backgroundColor: colors.secondary, borderWidth:1, borderColor: colors.border }]}>
-                    <Feather name="chevron-right" size={13} color={colors.foreground} />
-                    <Text style={[st.simPickBtnText, { color: colors.foreground }]}>1 Pick</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={handleSimToMyPick} disabled={isSimming}
-                    style={[st.simPickBtn, { backgroundColor: isSimming ? colors.secondary : teamColor, opacity: isSimming ? 0.6 : 1 }]}>
-                    <Feather name="chevrons-right" size={13} color="#fff" />
-                    <Text style={[st.simPickBtnText, { color:"#fff" }]}>{isSimming ? "Simming…" : "My Pick"}</Text>
+              {!ds.isComplete && (
+                <View style={{ flexDirection:"row", gap:6, flexWrap:"wrap", justifyContent:"flex-end" }}>
+                  {!ds.isUserTurn && (
+                    <TouchableOpacity onPress={handleSimulateAllAI}
+                      style={[st.simPickBtn, { backgroundColor: colors.secondary, borderWidth:1, borderColor: colors.border }]}>
+                      <Feather name="chevron-right" size={13} color={colors.foreground} />
+                      <Text style={[st.simPickBtnText, { color: colors.foreground }]}>1 Pick</Text>
+                    </TouchableOpacity>
+                  )}
+                  {!ds.isUserTurn && (
+                    <TouchableOpacity onPress={handleSimToMyPick} disabled={isSimming}
+                      style={[st.simPickBtn, { backgroundColor: isSimming ? colors.secondary : teamColor, opacity: isSimming ? 0.6 : 1 }]}>
+                      <Feather name="chevrons-right" size={13} color="#fff" />
+                      <Text style={[st.simPickBtnText, { color:"#fff" }]}>{isSimming ? "Simming…" : "My Pick"}</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity onPress={handleSimRemainder} disabled={isSimRemainder}
+                    style={[st.simPickBtn, { backgroundColor: "#8B0000", opacity: isSimRemainder ? 0.6 : 1, borderWidth:1, borderColor:"#FF000060" }]}>
+                    {isSimRemainder
+                      ? <Feather name="loader" size={13} color="#fff" />
+                      : <Feather name="zap" size={13} color="#fff" />}
+                    <Text style={[st.simPickBtnText, { color:"#fff" }]}>{isSimRemainder ? "Simming…" : "Sim All"}</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -429,7 +481,7 @@ export default function FrontOfficeScreen() {
                       isUserTurn={ds?.isUserTurn ?? false} isGM={isGM}
                       isOnBoard={warRoomIds.includes(p.id)}
                       onTap={() => setSelectedProspect(p)}
-                      onDraft={() => userDraftPick(p.id)}
+                      onDraft={() => handleDraftPlayer(p.id)}
                       onToggleWarRoom={() => toggleWarRoom(p.id)}
                     />
                   ))}
@@ -492,7 +544,7 @@ export default function FrontOfficeScreen() {
                       onMoveUp={() => moveWarRoomUp(id)}
                       onMoveDown={() => moveWarRoomDown(id)}
                       onRemove={() => toggleWarRoom(id)}
-                      onDraft={() => userDraftPick(id)}
+                      onDraft={() => handleDraftPlayer(id)}
                       onTap={() => setSelectedProspect(prospect)}
                     />
                   );
@@ -847,7 +899,7 @@ export default function FrontOfficeScreen() {
         teamColor={teamColor}
         isGM={isGM}
         isUserTurn={ds?.isUserTurn ?? false}
-        onDraft={selectedProspect ? () => { userDraftPick(selectedProspect.id); setSelectedProspect(null); } : undefined}
+        onDraft={selectedProspect ? () => { handleDraftPlayer(selectedProspect.id); setSelectedProspect(null); } : undefined}
       />
 
       {/* ── Trade Player Stats Modal ─── */}
@@ -856,7 +908,108 @@ export default function FrontOfficeScreen() {
         visible={!!selectedTradePlayer}
         onClose={() => setSelectedTradePlayer(null)}
       />
+
+      {/* ── DRAFT PICK SPOTLIGHT MODAL ───────────────────────────────────── */}
+      <DraftPickSpotlight
+        pick={spotlightPick}
+        teamColor={teamColor}
+        onDismiss={() => setSpotlightPick(null)}
+      />
     </View>
+  );
+}
+
+// ─── Draft Pick Spotlight Modal ───────────────────────────────────────────────
+
+const DEV_SPOTLIGHT: Record<string, { color: string; icon: string }> = {
+  "X-Factor":    { color: "#FFD700", icon: "zap" },
+  Superstar:     { color: "#FF6B35", icon: "star" },
+  Star:          { color: "#3FB950", icon: "award" },
+  Normal:        { color: "#8B949E", icon: "user" },
+  "Late Bloomer":{ color: "#00B5E2", icon: "trending-up" },
+};
+
+function DraftPickSpotlight({
+  pick, teamColor, onDismiss
+}: {
+  pick: { name: string; position: string; college: string; grade: number; devTrait: string; round: number; pick: number } | null;
+  teamColor: string;
+  onDismiss: () => void;
+}) {
+  if (!pick) return null;
+  const dev = DEV_SPOTLIGHT[pick.devTrait] ?? DEV_SPOTLIGHT["Normal"];
+  const posCol = POS_COLOR[pick.position as NFLPosition] ?? teamColor;
+  const gradeColor = pick.grade >= 90 ? "#FFD700" : pick.grade >= 80 ? "#3FB950" : pick.grade >= 70 ? "#00B5E2" : "#8B949E";
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onDismiss}>
+      <View style={{ flex: 1, backgroundColor: "#000000CC", justifyContent: "center", alignItems: "center", padding: 24 }}>
+        <LinearGradient
+          colors={[teamColor + "FF", teamColor + "AA", "#0A0A0A"]}
+          style={{ width: "100%", borderRadius: 24, overflow: "hidden", borderWidth: 1.5, borderColor: teamColor + "80" }}
+        >
+          {/* HEADER */}
+          <View style={{ paddingTop: 32, paddingHorizontal: 24, alignItems: "center", gap: 4 }}>
+            <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: "#ffffffaa", letterSpacing: 2.5, textTransform: "uppercase" }}>
+              With the #{pick.pick} Pick
+            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 }}>
+              <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#ffffffaa" }}>ROUND {pick.round}</Text>
+            </View>
+          </View>
+
+          {/* BIG OVR BADGE */}
+          <View style={{ alignItems: "center", marginTop: 20, marginBottom: 4 }}>
+            <View style={{
+              width: 96, height: 96, borderRadius: 48,
+              backgroundColor: gradeColor + "22", borderWidth: 3, borderColor: gradeColor,
+              alignItems: "center", justifyContent: "center",
+            }}>
+              <Text style={{ fontSize: 34, fontFamily: "Inter_700Bold", color: gradeColor }}>{pick.grade}</Text>
+              <Text style={{ fontSize: 9, fontFamily: "Inter_600SemiBold", color: gradeColor + "bb", letterSpacing: 1.5, marginTop: -2 }}>OVR</Text>
+            </View>
+          </View>
+
+          {/* PLAYER NAME */}
+          <View style={{ alignItems: "center", paddingHorizontal: 20, marginTop: 16 }}>
+            <Text style={{ fontSize: 32, fontFamily: "Inter_700Bold", color: "#fff", textAlign: "center", lineHeight: 36 }}>
+              {pick.name}
+            </Text>
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 10, alignItems: "center" }}>
+              <View style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8, backgroundColor: posCol + "30", borderWidth: 1.5, borderColor: posCol }}>
+                <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: posCol }}>{pick.position}</Text>
+              </View>
+              <Text style={{ fontSize: 14, fontFamily: "Inter_400Regular", color: "#ffffffcc" }}>{pick.college}</Text>
+            </View>
+          </View>
+
+          {/* DEV TRAIT */}
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 16,
+            paddingHorizontal: 20, paddingVertical: 10,
+            marginHorizontal: 24, borderRadius: 12,
+            backgroundColor: dev.color + "18", borderWidth: 1, borderColor: dev.color + "50" }}>
+            <Feather name={dev.icon as any} size={14} color={dev.color} />
+            <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: dev.color }}>{pick.devTrait}</Text>
+          </View>
+
+          {/* WELCOME LINE */}
+          <Text style={{ textAlign: "center", color: "#ffffffaa", fontSize: 13, fontFamily: "Inter_400Regular",
+            marginTop: 16, paddingHorizontal: 24 }}>
+            Welcome to the franchise! 🏈
+          </Text>
+
+          {/* CTA */}
+          <TouchableOpacity
+            onPress={onDismiss}
+            style={{ margin: 24, marginTop: 20, paddingVertical: 16, borderRadius: 14,
+              backgroundColor: "#ffffff15", borderWidth: 1.5, borderColor: "#ffffff30",
+              alignItems: "center" }}
+          >
+            <Text style={{ fontSize: 16, fontFamily: "Inter_700Bold", color: "#fff" }}>Back to Draft Room</Text>
+          </TouchableOpacity>
+        </LinearGradient>
+      </View>
+    </Modal>
   );
 }
 
