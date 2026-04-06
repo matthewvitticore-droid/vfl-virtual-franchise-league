@@ -150,7 +150,10 @@ export default function FrontOfficeScreen() {
     return list.sort((a, b) => {
       if (sortKey === "grade") return sortAsc ? a.overallGrade - b.overallGrade : b.overallGrade - a.overallGrade;
       const getVal = (p: DraftProspect) => {
-        if (!p.combine || p.combine.didNotParticipate) return sortAsc ? 9999 : -9999;
+        if (!p.combine || p.combine.didNotParticipate) {
+          // TIME_KEYS: lower = better → DNP always gets the highest possible value so they sink to the bottom regardless of direction
+          return TIME_KEYS.includes(sortKey) ? 9999 : (sortAsc ? 9999 : -9999);
+        }
         if (DERIVED_KEYS.includes(sortKey)) return derivedVal(p, sortKey);
         return (p.combine as any)[sortKey] ?? 0;
       };
@@ -930,9 +933,6 @@ function WarRoomCard({ p, boardRank, total, teamColor, colors, isGM, isUserTurn,
           <View style={st.wrQuickStats}>
             <Text style={[st.wrQuickStat, { color: colors.mutedForeground }]}>
               40: <Text style={{ color: p.combine.fortyYardDash < 4.4 ? "#3FB950" : colors.foreground }}>{p.combine.fortyYardDash}s</Text>
-            </Text>
-            <Text style={[st.wrQuickStat, { color: colors.mutedForeground }]}>
-              Vert: <Text style={{ color: colors.foreground }}>{p.combine.verticalJump}"</Text>
             </Text>
             <Text style={[st.wrQuickStat, { color: colors.mutedForeground }]}>
               POT: <Text style={{ color: p.potential >= 90 ? "#FFD700" : p.potential >= 80 ? "#3FB950" : colors.foreground }}>{p.potential}</Text>
