@@ -21,6 +21,7 @@ export function UniformPreview({
 }: Props) {
   const {
     helmetColor, helmetLogoPlacement,
+    helmetFacemaskColor, helmetChinstrapColor,
     jerseyStyle, jerseyColor, jerseyAccentColor,
     numberFont, numberColor, numberOutlineColor,
     pantColor, pantStripeStyle, pantStripeColor,
@@ -30,8 +31,8 @@ export function UniformPreview({
   const nf = numFontAttrs(numberFont);
   const abbr3 = abbreviation.slice(0, 3).toUpperCase();
 
-  // Facemask color — slightly lighter than charcoal so it reads clearly
-  const fmColor = "#B0BEC5";
+  const fmColor = helmetFacemaskColor ?? "#B0BEC5";
+  const csColor = helmetChinstrapColor ?? helmetColor;
 
   return (
     <Svg width={width} height={height} viewBox="0 0 200 320">
@@ -127,6 +128,16 @@ export function UniformPreview({
       {/* Facemask mounting screws / clips */}
       <Circle cx={58}  cy={45} r={3.5} fill="#546E7A" />
       <Circle cx={142} cy={45} r={3.5} fill="#546E7A" />
+
+      {/* ── CHINSTRAP ── */}
+      {/* Side clips */}
+      <Rect x={30} y={84} width={10} height={6} rx={2} fill={csColor} opacity={0.9} />
+      <Rect x={160} y={84} width={10} height={6} rx={2} fill={csColor} opacity={0.9} />
+      {/* Chin cup oval */}
+      <Path
+        d="M 72 100 Q 72 110 100 110 Q 128 110 128 100 L 122 97 Q 100 99 78 97 Z"
+        fill={csColor} opacity={0.88}
+      />
 
       {/* ──────────── JERSEY ──────────── */}
 

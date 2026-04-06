@@ -6,7 +6,6 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ColorPickerModal } from "@/components/ColorPickerModal";
-import { HelmetSVGWithLogo } from "@/components/HelmetSVG";
 import { UniformPreview } from "@/components/UniformPreview";
 import { useColors } from "@/hooks/useColors";
 import { useNFL } from "@/context/NFLContext";
@@ -46,8 +45,7 @@ const LOGO_PLACEMENTS: { value: HelmetLogoPlacement; label: string }[] = [
 ];
 
 type PickerTarget =
-  | "helmetColor" | "helmetFacemaskColor" | "helmetChinstrapColor" | "helmetStripeColor"
-  | "helmetLogoColor" | "helmetVisorColor"
+  | "helmetColor" | "helmetFacemaskColor" | "helmetChinstrapColor"
   | "jerseyColor" | "jerseyAccentColor"
   | "numberColor" | "numberOutlineColor" | "pantColor"
   | "pantStripeColor" | "sockColor" | "sockAccentColor";
@@ -177,35 +175,12 @@ export default function UniformScreen() {
         {/* ── HELMET ── */}
         <SectionHeader title="HELMET" icon="shield" colors={colors} />
 
-        {/* Helmet visual preview */}
-        <View style={[st.helmetPreviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <HelmetSVGWithLogo
-            width={220}
-            shellColor={u.helmetColor}
-            facemaskColor={u.helmetFacemaskColor   ?? "#C0C6D0"}
-            visorColor={u.helmetVisorColor         ?? "#080C14"}
-            chinstrapColor={u.helmetChinstrapColor ?? u.helmetColor}
-          />
-        </View>
-
         <OptionCard colors={colors}>
-          <ColorRow label="Helmet Color"    color={u.helmetColor}                    onPress={() => setPickerTarget("helmetColor")}          colors={colors} />
+          <ColorRow label="Helmet Color"    color={u.helmetColor}                        onPress={() => setPickerTarget("helmetColor")}          colors={colors} />
           <Divider colors={colors} />
-          <ColorRow label="Helmet Stripe"   color={u.helmetStripeColor    ?? "#CC2020"} onPress={() => setPickerTarget("helmetStripeColor")}   colors={colors} />
-          <Divider colors={colors} />
-          <ColorRow label="Facemask Color"  color={u.helmetFacemaskColor  ?? "#C0C6D0"} onPress={() => setPickerTarget("helmetFacemaskColor")}  colors={colors} />
+          <ColorRow label="Facemask Color"  color={u.helmetFacemaskColor  ?? "#B0BEC5"} onPress={() => setPickerTarget("helmetFacemaskColor")}  colors={colors} />
           <Divider colors={colors} />
           <ColorRow label="Chinstrap Color" color={u.helmetChinstrapColor ?? u.helmetColor} onPress={() => setPickerTarget("helmetChinstrapColor")} colors={colors} />
-          <Divider colors={colors} />
-          <ColorRow label="Visor Color"     color={u.helmetVisorColor     ?? "#080C14"} onPress={() => setPickerTarget("helmetVisorColor")}     colors={colors} />
-          <Divider colors={colors} />
-          <Text style={[st.optLabel, { color: colors.mutedForeground }]}>LOGO PLACEMENT</Text>
-          <View style={st.chipRow}>
-            {LOGO_PLACEMENTS.map(p => (
-              <Chip key={p.value} label={p.label} active={u.helmetLogoPlacement === p.value}
-                onPress={() => updateUniform("helmetLogoPlacement", p.value)} colors={colors} />
-            ))}
-          </View>
         </OptionCard>
 
         {/* ── JERSEY ── */}
@@ -348,7 +323,6 @@ const st = StyleSheet.create({
   tabText:       { fontSize: 12, fontFamily: "Inter_700Bold", letterSpacing: 0.8 },
   content:       { padding: 14, gap: 6 },
   previewCard:      { alignItems: "center", borderRadius: 18, borderWidth: 1, paddingVertical: 20, marginBottom: 6, gap: 14 },
-  helmetPreviewCard: { alignItems: "center", justifyContent: "center", borderRadius: 18, borderWidth: 1, paddingVertical: 12, marginBottom: 6 },
   bgToggleBtn:   { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 16, paddingVertical: 9, borderRadius: 10, borderWidth: 1.5, marginHorizontal: 16 },
   bgToggleText:  { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   sectionRow:    { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 12, marginBottom: 4, marginLeft: 4 },
