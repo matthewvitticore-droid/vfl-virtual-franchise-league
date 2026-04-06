@@ -65,6 +65,7 @@ export function TradeBuilder({ visible, onClose, teamColor, onPropose }: TradeBu
   const [teamPickerOpen,    setTeamPickerOpen]    = useState(false);
   const [sending,           setSending]           = useState(false);
   const [tradeResult,       setTradeResult]       = useState<TradeResult | null>(null);
+  const [summaryExpanded,   setSummaryExpanded]   = useState(false);
 
   const targetTeam   = season?.teams.find(t => t.id === targetTeamId) ?? null;
   const targetAccent = targetTeam
@@ -208,70 +209,113 @@ export function TradeBuilder({ visible, onClose, teamColor, onPropose }: TradeBu
           </View>
         </View>
 
-        {/* ── TRADE SUMMARY CARD ── */}
+        {/* ── TRADE SUMMARY (compact strip — tap to expand chips) ── */}
         {hasSelection && (
-          <View style={[tb.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={tb.summaryRow}>
-              {/* YOU OFFER */}
-              <View style={{ flex: 1, paddingRight: 8 }}>
-                <Text style={[tb.sideLabel, { color: colors.mutedForeground }]}>YOU OFFER</Text>
+          <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}>
+            {/* Always-visible compact bar */}
+            <TouchableOpacity
+              onPress={() => setSummaryExpanded(v => !v)}
+              activeOpacity={0.8}
+              style={{
+                flexDirection: "row", alignItems: "center", gap: 8,
+                paddingHorizontal: 14, paddingVertical: 9,
+                backgroundColor: verdictColor + "12",
+              }}>
+              {/* Offer side */}
+              <View style={{ flex: 1, flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
                 {offerPlayers.map(p => (
-                  <TouchableOpacity key={p.id} onPress={() => toggleOffer(p.id)}
-                    style={[tb.chip, { backgroundColor: teamColor + "20", borderColor: teamColor + "50" }]}>
-                    <Text style={[tb.chipText, { color: teamColor }]} numberOfLines={1}>
-                      {p.position} {p.overall} · {p.name.split(" ").slice(-1)[0]}
+                  <View key={p.id} style={[tb.miniChip, { borderColor: teamColor + "60", backgroundColor: teamColor + "18" }]}>
+                    <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: teamColor }} numberOfLines={1}>
+                      {p.position} {p.overall}
                     </Text>
-                    <Feather name="x" size={9} color={teamColor} />
-                  </TouchableOpacity>
+                  </View>
                 ))}
                 {offerPicks.map(pk => (
-                  <TouchableOpacity key={pk.id} onPress={() => toggleOfferPick(pk.id)}
-                    style={[tb.chip, { backgroundColor: PICK_ROUND_COLORS[pk.round] + "20", borderColor: PICK_ROUND_COLORS[pk.round] + "50" }]}>
-                    <Text style={[tb.chipText, { color: PICK_ROUND_COLORS[pk.round] }]} numberOfLines={1}>R{pk.round} Pick</Text>
-                    <Feather name="x" size={9} color={PICK_ROUND_COLORS[pk.round]} />
-                  </TouchableOpacity>
+                  <View key={pk.id} style={[tb.miniChip, { borderColor: PICK_ROUND_COLORS[pk.round] + "70", backgroundColor: PICK_ROUND_COLORS[pk.round] + "20" }]}>
+                    <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: PICK_ROUND_COLORS[pk.round] }}>R{pk.round}</Text>
+                  </View>
                 ))}
-                {offerPlayers.length === 0 && offerPicks.length === 0 &&
-                  <Text style={[tb.chipEmpty, { color: colors.mutedForeground }]}>—</Text>}
               </View>
 
-              <View style={{ alignItems: "center", justifyContent: "center", paddingTop: 16 }}>
-                <Feather name="arrow-right" size={18} color={colors.mutedForeground} />
-              </View>
+              <Feather name="arrow-right" size={14} color={verdictColor} />
 
-              {/* YOU RECEIVE */}
-              <View style={{ flex: 1, paddingLeft: 8 }}>
-                <Text style={[tb.sideLabel, { color: colors.mutedForeground }]}>YOU RECEIVE</Text>
+              {/* Receive side */}
+              <View style={{ flex: 1, flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
                 {recvPlayers.map(p => (
-                  <TouchableOpacity key={p.id} onPress={() => toggleReceive(p.id)}
-                    style={[tb.chip, { backgroundColor: targetAccent + "20", borderColor: targetAccent + "50" }]}>
-                    <Text style={[tb.chipText, { color: targetAccent }]} numberOfLines={1}>
-                      {p.position} {p.overall} · {p.name.split(" ").slice(-1)[0]}
+                  <View key={p.id} style={[tb.miniChip, { borderColor: targetAccent + "60", backgroundColor: targetAccent + "18" }]}>
+                    <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: targetAccent }} numberOfLines={1}>
+                      {p.position} {p.overall}
                     </Text>
-                    <Feather name="x" size={9} color={targetAccent} />
-                  </TouchableOpacity>
+                  </View>
                 ))}
                 {recvPicks.map(pk => (
-                  <TouchableOpacity key={pk.id} onPress={() => toggleReceivePick(pk.id)}
-                    style={[tb.chip, { backgroundColor: PICK_ROUND_COLORS[pk.round] + "20", borderColor: PICK_ROUND_COLORS[pk.round] + "50" }]}>
-                    <Text style={[tb.chipText, { color: PICK_ROUND_COLORS[pk.round] }]} numberOfLines={1}>
-                      R{pk.round} Pick {targetTeam?.abbreviation ? `(${targetTeam.abbreviation})` : ""}
-                    </Text>
-                    <Feather name="x" size={9} color={PICK_ROUND_COLORS[pk.round]} />
-                  </TouchableOpacity>
+                  <View key={pk.id} style={[tb.miniChip, { borderColor: PICK_ROUND_COLORS[pk.round] + "70", backgroundColor: PICK_ROUND_COLORS[pk.round] + "20" }]}>
+                    <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: PICK_ROUND_COLORS[pk.round] }}>R{pk.round}</Text>
+                  </View>
                 ))}
-                {recvPlayers.length === 0 && recvPicks.length === 0 &&
-                  <Text style={[tb.chipEmpty, { color: colors.mutedForeground }]}>—</Text>}
               </View>
-            </View>
 
-            {/* Value meter */}
-            <View style={[tb.valueBar, { backgroundColor: verdictColor + "18", borderColor: verdictColor + "40" }]}>
-              <Text style={[tb.valueVerdict, { color: verdictColor }]}>{verdict}</Text>
-              <Text style={[tb.valueNum, { color: verdictColor }]}>
-                {tradeValue > 0 ? "+" : ""}{tradeValue} pts
-              </Text>
-            </View>
+              {/* Verdict pill */}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4,
+                borderRadius: 8, backgroundColor: verdictColor + "20", borderWidth: 1, borderColor: verdictColor + "50" }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: verdictColor }}>
+                  {tradeValue > 0 ? "+" : ""}{tradeValue}
+                </Text>
+              </View>
+
+              <Feather name={summaryExpanded ? "chevron-up" : "chevron-down"} size={14} color={colors.mutedForeground} />
+            </TouchableOpacity>
+
+            {/* Expanded chip detail */}
+            {summaryExpanded && (
+              <View style={{ paddingHorizontal: 14, paddingBottom: 10, backgroundColor: colors.card }}>
+                <View style={{ flexDirection: "row", gap: 8, paddingTop: 10 }}>
+                  {/* Offer column */}
+                  <View style={{ flex: 1 }}>
+                    <Text style={[tb.sideLabel, { color: colors.mutedForeground, marginBottom: 6 }]}>YOU OFFER</Text>
+                    {offerPlayers.map(p => (
+                      <TouchableOpacity key={p.id} onPress={() => toggleOffer(p.id)}
+                        style={[tb.chip, { backgroundColor: teamColor + "20", borderColor: teamColor + "50", marginBottom: 4 }]}>
+                        <Text style={[tb.chipText, { color: teamColor }]} numberOfLines={1}>
+                          {p.position} {p.overall} · {p.name.split(" ").slice(-1)[0]}
+                        </Text>
+                        <Feather name="x" size={9} color={teamColor} />
+                      </TouchableOpacity>
+                    ))}
+                    {offerPicks.map(pk => (
+                      <TouchableOpacity key={pk.id} onPress={() => toggleOfferPick(pk.id)}
+                        style={[tb.chip, { backgroundColor: PICK_ROUND_COLORS[pk.round] + "20", borderColor: PICK_ROUND_COLORS[pk.round] + "50", marginBottom: 4 }]}>
+                        <Text style={[tb.chipText, { color: PICK_ROUND_COLORS[pk.round] }]}>R{pk.round} Pick</Text>
+                        <Feather name="x" size={9} color={PICK_ROUND_COLORS[pk.round]} />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {/* Receive column */}
+                  <View style={{ flex: 1 }}>
+                    <Text style={[tb.sideLabel, { color: colors.mutedForeground, marginBottom: 6 }]}>YOU RECEIVE</Text>
+                    {recvPlayers.map(p => (
+                      <TouchableOpacity key={p.id} onPress={() => toggleReceive(p.id)}
+                        style={[tb.chip, { backgroundColor: targetAccent + "20", borderColor: targetAccent + "50", marginBottom: 4 }]}>
+                        <Text style={[tb.chipText, { color: targetAccent }]} numberOfLines={1}>
+                          {p.position} {p.overall} · {p.name.split(" ").slice(-1)[0]}
+                        </Text>
+                        <Feather name="x" size={9} color={targetAccent} />
+                      </TouchableOpacity>
+                    ))}
+                    {recvPicks.map(pk => (
+                      <TouchableOpacity key={pk.id} onPress={() => toggleReceivePick(pk.id)}
+                        style={[tb.chip, { backgroundColor: PICK_ROUND_COLORS[pk.round] + "20", borderColor: PICK_ROUND_COLORS[pk.round] + "50", marginBottom: 4 }]}>
+                        <Text style={[tb.chipText, { color: PICK_ROUND_COLORS[pk.round] }]}>
+                          R{pk.round} {targetTeam?.abbreviation ? `(${targetTeam.abbreviation})` : ""}
+                        </Text>
+                        <Feather name="x" size={9} color={PICK_ROUND_COLORS[pk.round]} />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              </View>
+            )}
           </View>
         )}
 
@@ -640,10 +684,11 @@ const tb = StyleSheet.create({
 
   summaryCard:  { margin: 12, borderRadius: 14, borderWidth: 1, padding: 12 },
   summaryRow:   { flexDirection: "row", alignItems: "flex-start" },
-  sideLabel:    { fontSize: 9, fontFamily: "Inter_700Bold", letterSpacing: 1, marginBottom: 6, textTransform: "uppercase" },
-  chip:         { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 7, paddingVertical: 4, borderRadius: 6, borderWidth: 1, marginBottom: 4 },
+  sideLabel:    { fontSize: 9, fontFamily: "Inter_700Bold", letterSpacing: 1, textTransform: "uppercase" },
+  chip:         { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 7, paddingVertical: 4, borderRadius: 6, borderWidth: 1 },
   chipText:     { fontSize: 11, fontFamily: "Inter_600SemiBold", flex: 1 },
   chipEmpty:    { fontSize: 11, fontFamily: "Inter_400Regular", fontStyle: "italic" },
+  miniChip:     { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, borderWidth: 1 },
   valueBar:     { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 10, padding: 10, borderRadius: 8, borderWidth: 1 },
   valueVerdict: { fontSize: 13, fontFamily: "Inter_700Bold" },
   valueNum:     { fontSize: 13, fontFamily: "Inter_600SemiBold" },
