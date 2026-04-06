@@ -119,15 +119,29 @@ export default function HomeScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Uniform background gradient */}
-      {featuredUniform && (
+      {/* Team color full-page ambient wash */}
+      <LinearGradient
+        colors={[teamColor + "38", teamColor + "18", teamColor + "06", "transparent"]}
+        locations={[0, 0.3, 0.6, 1]}
+        style={{ position: "absolute", top: 0, left: 0, right: 0, height: 520, zIndex: 0 }}
+        pointerEvents="none"
+      />
+      {/* Uniform accent overlay (if customized) */}
+      {featuredUniform && uniformBgColor !== teamColor && (
         <LinearGradient
-          colors={[uniformHelmetColor + "26", uniformBgColor + "14", "transparent"]}
-          locations={[0, 0.4, 1]}
-          style={{ position: "absolute", top: 0, left: 0, right: 0, height: 380, zIndex: 0 }}
+          colors={[uniformBgColor + "18", "transparent"]}
+          locations={[0, 1]}
+          style={{ position: "absolute", top: 0, left: 0, right: 0, height: 260, zIndex: 0 }}
           pointerEvents="none"
         />
       )}
+      {/* Right-edge color glow */}
+      <LinearGradient
+        colors={["transparent", teamColor + "14", "transparent"]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+        style={{ position: "absolute", top: 80, right: 0, width: 120, height: 400, zIndex: 0 }}
+        pointerEvents="none"
+      />
       {/* News Ticker */}
       {season?.news && season.news.length > 0 && (
         <View style={[st.ticker, { backgroundColor: teamColor, top: topPad }]}>
@@ -153,8 +167,8 @@ export default function HomeScreen() {
           <View style={st.headerLeft}>
             <VFLLogo size="sm" />
             <View>
-              <Text style={[st.seasonLabel, { color: colors.mutedForeground }]}>VFL {season?.year} SEASON</Text>
-              <Text style={[st.weekLabel, { color: colors.foreground }]}>WEEK {season?.currentWeek}</Text>
+              <Text style={[st.seasonLabel, { color: teamColor + "cc" }]}>VFL {season?.year} SEASON</Text>
+              <Text style={[st.weekLabel, { color: colors.foreground }]}>WEEK <Text style={{ color: teamColor }}>{season?.currentWeek}</Text></Text>
             </View>
           </View>
           <View style={st.headerRight}>
@@ -172,7 +186,14 @@ export default function HomeScreen() {
 
         {/* Team Hero Card */}
         {team && (
-          <View style={[st.heroCard, { backgroundColor: teamColor + "22", borderColor: teamColor + "70" }]}>
+          <View style={[st.heroCard, { backgroundColor: teamColor + "30", borderColor: teamColor + "99" }]}>
+            <LinearGradient
+              colors={[teamColor + "55", teamColor + "18", "transparent"]}
+              locations={[0, 0.5, 1]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, borderRadius: 18 }}
+              pointerEvents="none"
+            />
             <View style={[st.heroAccent, { backgroundColor: teamColor, height: 4 }]} />
             <View style={st.heroContent}>
               <NFLTeamBadge abbreviation={team.abbreviation} primaryColor={team.primaryColor} size="lg" />
@@ -197,7 +218,7 @@ export default function HomeScreen() {
 
         {/* Compact stats strip */}
         {team && (
-          <View style={[st.statsStrip, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[st.statsStrip, { backgroundColor: teamColor + "12", borderColor: teamColor + "45" }]}>
             <View style={st.statStripItem}>
               <Text style={[st.statStripVal, { color: parseFloat(capLeft) > 0 ? colors.success : colors.danger }]}>${capLeft}M</Text>
               <Text style={[st.statStripLbl, { color: colors.mutedForeground }]}>CAP AVAIL</Text>
@@ -240,11 +261,11 @@ export default function HomeScreen() {
 
         {/* Quick action tiles */}
         <View style={st.quickGrid}>
-          <QuickTile icon="users"   label="Depth Chart"  sub="Manage lineups"      color={teamColor}         onPress={() => router.push("/(tabs)/roster")} />
-          <QuickTile icon="user-plus" label="Free Agency" sub={`${season?.freeAgents.length ?? 0} available`} color={colors.success} onPress={() => router.push("/(tabs)/frontoffice")} />
-          <QuickTile icon="git-merge" label="Trades"      sub="Build an offer"      color={colors.nflRed}     onPress={() => router.push("/(tabs)/frontoffice")} />
-          <QuickTile icon="award"   label="Draft Room"   sub={`${season?.draftProspects.filter(p=>!p.isPickedUp).length ?? 0} prospects`} color={colors.nflGold} onPress={() => router.push({ pathname: "/(tabs)/frontoffice", params: { tab: "draft" } })} />
-          <QuickTile icon="edit-2"  label="Customize"   sub="Team identity & kits"  color={colors.nflBlue}    onPress={() => router.push("/customize")} />
+          <QuickTile icon="users"     label="Depth Chart"  sub="Manage lineups"        color={teamColor} onPress={() => router.push("/(tabs)/roster")} />
+          <QuickTile icon="user-plus" label="Free Agency"  sub={`${season?.freeAgents.length ?? 0} available`} color={teamColor} onPress={() => router.push("/(tabs)/frontoffice")} />
+          <QuickTile icon="git-merge" label="Trades"       sub="Build an offer"        color={teamColor} onPress={() => router.push("/(tabs)/frontoffice")} />
+          <QuickTile icon="award"     label="Draft Room"   sub={`${season?.draftProspects.filter(p=>!p.isPickedUp).length ?? 0} prospects`} color={teamColor} onPress={() => router.push({ pathname: "/(tabs)/frontoffice", params: { tab: "draft" } })} />
+          <QuickTile icon="edit-2"    label="Customize"    sub="Team identity & kits"  color={teamColor} onPress={() => router.push("/customize")} />
         </View>
 
         {/* Co-GM Mode Card */}
@@ -283,7 +304,7 @@ export default function HomeScreen() {
         {/* Next game */}
         {myGame && (
           <View style={st.section}>
-            <SectionTitle>{myGame.status === "final" ? "Last Result" : "Next Game"}</SectionTitle>
+            <SectionTitle teamColor={teamColor}>{myGame.status === "final" ? "Last Result" : "Next Game"}</SectionTitle>
             {(() => {
               const home = season!.teams.find(t => t.id === myGame.homeTeamId)!;
               const away = season!.teams.find(t => t.id === myGame.awayTeamId)!;
@@ -382,7 +403,7 @@ export default function HomeScreen() {
           const accentColor = canAdvance ? colors.nflBlue : teamColor;
 
           return (
-            <View style={[st.cmdCard, { borderColor: accentColor + "55" }]}>
+            <View style={[st.cmdCard, { borderColor: accentColor + "70", backgroundColor: teamColor + "14" }]}>
               <View style={[st.cmdAccent, { backgroundColor: accentColor }]} />
               <View style={st.cmdBody}>
                 {/* tags row */}
@@ -439,7 +460,7 @@ export default function HomeScreen() {
         {/* Recent News */}
         {season?.news && season.news.length > 0 && (
           <View style={st.section}>
-            <SectionTitle>Front Office News</SectionTitle>
+            <SectionTitle teamColor={teamColor}>Front Office News</SectionTitle>
             {season.news.slice(0, 5).map(n => (
               <View key={n.id} style={[st.newsItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <View style={[st.newsCat, { backgroundColor: getCatColor(n.category, colors, teamColor) + "25" }]}>
@@ -456,7 +477,7 @@ export default function HomeScreen() {
 
         {/* Standings snapshot */}
         <View style={st.section}>
-          <SectionTitle>{team?.conference ?? "Ironclad"} Standings</SectionTitle>
+          <SectionTitle teamColor={teamColor}>{team?.conference ?? "Ironclad"} Standings</SectionTitle>
           <View style={[st.standingsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {standings.slice(0, 8).map((t, idx) => (
               <View key={t.id} style={[st.standingRow, { borderBottomColor: colors.border, backgroundColor: t.id === season?.playerTeamId ? teamColor + "15" : "transparent" }]}>
@@ -515,8 +536,9 @@ function TeamSide({ team, label, isPlayer, colors }: { team: any; label: string;
 function QuickTile({ icon, label, sub, color, onPress }: { icon: any; label: string; sub: string; color: string; onPress: () => void }) {
   const colors = useColors();
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.8} style={[st.quickTile, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={[st.quickIcon, { backgroundColor: color + "20" }]}>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.8}
+      style={[st.quickTile, { backgroundColor: color + "14", borderColor: color + "50" }]}>
+      <View style={[st.quickIcon, { backgroundColor: color + "25" }]}>
         <Feather name={icon} size={18} color={color} />
       </View>
       <Text style={[st.quickLabel, { color: colors.foreground }]}>{label}</Text>
@@ -525,9 +547,14 @@ function QuickTile({ icon, label, sub, color, onPress }: { icon: any; label: str
   );
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
+function SectionTitle({ children, teamColor }: { children: React.ReactNode; teamColor?: string }) {
   const colors = useColors();
-  return <Text style={[st.sectionTitle, { color: colors.foreground }]}>{children}</Text>;
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
+      {teamColor && <View style={{ width: 3, height: 16, borderRadius: 2, backgroundColor: teamColor }} />}
+      <Text style={[st.sectionTitle, { color: colors.foreground, marginBottom: 0 }]}>{children}</Text>
+    </View>
+  );
 }
 
 // ─── Utility fns ──────────────────────────────────────────────────────────────
@@ -622,7 +649,7 @@ const st = StyleSheet.create({
   statStripLbl:   { fontSize:8.5, fontFamily:"Inter_600SemiBold", letterSpacing:0.8 },
   statDivider:    { width:1, height:28, opacity:0.4 },
   // Season Command Center
-  cmdCard:        { borderRadius:16, borderWidth:1.5, marginBottom:16, overflow:"hidden", backgroundColor:"#0E0E1C" },
+  cmdCard:        { borderRadius:16, borderWidth:1.5, marginBottom:16, overflow:"hidden" },
   cmdAccent:      { height:3 },
   cmdBody:        { padding:16, gap:8 },
   cmdTagRow:      { flexDirection:"row", flexWrap:"wrap", gap:6 },

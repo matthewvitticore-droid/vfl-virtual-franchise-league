@@ -21,8 +21,8 @@ export default function TabLayout() {
         tabBarStyle: {
           position: "absolute",
           backgroundColor: isIOS ? "transparent" : colors.card,
-          borderTopWidth: 1,
-          borderTopColor: colors.border,
+          borderTopWidth: 2,
+          borderTopColor: teamColor + "90",
           elevation: 0,
           height: Platform.OS === "web" ? 70 : undefined,
         },

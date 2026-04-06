@@ -121,17 +121,24 @@ export default function RosterScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Uniform background gradient */}
-      {featuredUniform && (
+      {/* Team-color ambient wash */}
+      <LinearGradient
+        colors={[teamColor + "40", teamColor + "18", teamColor + "06", "transparent"]}
+        locations={[0, 0.25, 0.55, 1]}
+        style={{ position: "absolute", top: 0, left: 0, right: 0, height: 420, zIndex: 0 }}
+        pointerEvents="none"
+      />
+      {/* Uniform accent (if customized) */}
+      {featuredUniform && uniformBgColor !== teamColor && (
         <LinearGradient
-          colors={[uniformHelmetColor + "26", uniformBgColor + "14", "transparent"]}
-          locations={[0, 0.4, 1]}
-          style={{ position: "absolute", top: 0, left: 0, right: 0, height: 380, zIndex: 0 }}
+          colors={[uniformBgColor + "18", "transparent"]}
+          locations={[0, 1]}
+          style={{ position: "absolute", top: 0, left: 0, right: 0, height: 220, zIndex: 0 }}
           pointerEvents="none"
         />
       )}
       {/* Header */}
-      <View style={[st.header, { paddingTop: topPad + 8, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+      <View style={[st.header, { paddingTop: topPad + 8, backgroundColor: "transparent", borderBottomColor: teamColor + "40" }]}>
         <View style={st.headerTop}>
           <View style={{ flex: 1 }}>
             <Text style={[st.headerTitle, { color: colors.foreground }]}>{team.city} {team.name}</Text>
