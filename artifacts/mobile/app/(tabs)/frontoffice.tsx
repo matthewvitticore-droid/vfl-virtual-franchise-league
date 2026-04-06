@@ -305,6 +305,11 @@ export default function FrontOfficeScreen() {
             setIsSimRemainder(true);
             await simRemainderOfDraft();
             setIsSimRemainder(false);
+            Alert.alert(
+              "Draft Complete",
+              "All picks have been made. Check your Home Screen to see your rookie class.",
+              [{ text: "Done" }]
+            );
           },
         },
       ]
