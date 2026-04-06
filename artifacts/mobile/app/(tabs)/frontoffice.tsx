@@ -11,6 +11,7 @@ import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
 import { DraftProspect, NFLPosition, Player, TradeOffer, useNFL } from "@/context/NFLContext";
 import { PlayerCard } from "@/components/PlayerCard";
+import { PlayerStatsModal } from "@/components/PlayerStatsModal";
 import { ProspectModal } from "@/components/ProspectModal";
 import { CombineMeasurables } from "@/context/types";
 
@@ -18,6 +19,7 @@ type Tab = "freeAgency" | "draft" | "trades";
 type DraftView = "combine" | "warRoom";
 type SortKey = "grade" | "fortyYardDash" | "benchPress" | "verticalJump" | "broadJump" | "shuttleRun" | "threeCone" | "speed" | "acceleration" | "agility" | "explosion" | "strength";
 type FASortKey = "overall" | "age" | "speed" | "acceleration" | "agility" | "faInterestLevel" | "yearsExperience" | "salary";
+type TradeSortKey = "overall" | "age" | "speed" | "acceleration" | "agility" | "yearsExperience" | "salary";
 
 const ALL_POS: NFLPosition[] = ["QB","RB","WR","TE","OL","DE","DT","LB","CB","S","K","P"];
 const POS_COLOR: Record<NFLPosition, string> = {
@@ -95,6 +97,10 @@ export default function FrontOfficeScreen() {
   const [offeringPlayerIds, setOfferingPlayerIds] = useState<string[]>([]);
   const [receivingPlayerIds, setReceivingPlayerIds] = useState<string[]>([]);
   const [tradeTargetTeamId, setTradeTargetTeamId] = useState<string | null>(null);
+  const [tradeSortKey, setTradeSortKey] = useState<TradeSortKey>("overall");
+  const [tradeSortAsc, setTradeSortAsc] = useState(false);
+  const [tradePosFilter, setTradePosFilter] = useState<NFLPosition | "ALL">("ALL");
+  const [selectedTradePlayer, setSelectedTradePlayer] = useState<Player | null>(null);
 
   const role = membership?.role ?? "GM";
   const isGM = role === "GM";
@@ -197,6 +203,38 @@ export default function FrontOfficeScreen() {
   // ── Trades data ────────────────────────────────────────────────────────────
 
   const pendingOffers = season?.tradeOffers.filter(o => o.status === "pending") ?? [];
+
+  const tradePool = useMemo(() => {
+    if (!season) return [];
+    const TRADE_LOW_BETTER: TradeSortKey[] = ["age", "salary", "yearsExperience"];
+    const all: Array<Player & { teamId: string; teamAbbr: string; teamColor: string }> =
+      season.teams.flatMap(t =>
+        t.roster.map(p => ({ ...p, teamId: t.id, teamAbbr: t.abbreviation, teamColor: t.primaryColor }))
+      );
+    const filtered = tradePosFilter === "ALL" ? all : all.filter(p => p.position === tradePosFilter);
+    return filtered.sort((a, b) => {
+      const getVal = (p: Player): number => {
+        switch (tradeSortKey) {
+          case "overall":        return p.overall;
+          case "age":            return p.age;
+          case "speed":          return p.speed;
+          case "acceleration":   return (p.positionRatings as any)?.acceleration ?? 50;
+          case "agility":        return (p.positionRatings as any)?.agility ?? 50;
+          case "yearsExperience":return p.yearsExperience;
+          case "salary":         return p.salary;
+          default:               return p.overall;
+        }
+      };
+      const invert = TRADE_LOW_BETTER.includes(tradeSortKey);
+      const diff = getVal(a) - getVal(b);
+      return (tradeSortAsc !== invert) ? diff : -diff;
+    });
+  }, [season, tradePosFilter, tradeSortKey, tradeSortAsc]);
+
+  const handleTradeSort = (key: TradeSortKey) => {
+    if (tradeSortKey === key) setTradeSortAsc(a => !a);
+    else { setTradeSortKey(key); setTradeSortAsc(false); }
+  };
 
   function handleSort(key: SortKey) {
     if (sortKey === key) setSortAsc(a => !a);
@@ -491,89 +529,150 @@ export default function FrontOfficeScreen() {
 
       {/* ── TRADES ─────────────────────────────────────────────────────────── */}
       {tab === "trades" && (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-          {/* Trade builder */}
-          {isGM && (
-            <View style={[st.tradeBuilder, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-              <View style={st.tradeHeader}>
-                <Feather name="git-merge" size={16} color={teamColor} />
-                <Text style={[st.tradeTitle, { color: colors.foreground }]}>Build Trade Offer</Text>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+
+          {/* ── Position filter pills ─────────────────────────────── */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}
+            contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 10, gap: 6 }}>
+            {(["ALL", ...ALL_POS] as (NFLPosition | "ALL")[]).map(pos => (
+              <TouchableOpacity key={pos} onPress={() => setTradePosFilter(pos)}
+                style={[st.posPill, {
+                  backgroundColor: tradePosFilter === pos
+                    ? (pos === "ALL" ? teamColor : POS_COLOR[pos as NFLPosition])
+                    : colors.secondary,
+                  borderColor: tradePosFilter === pos
+                    ? (pos === "ALL" ? teamColor : POS_COLOR[pos as NFLPosition])
+                    : colors.border,
+                }]}>
+                <Text style={[st.posPillText, { color: tradePosFilter === pos ? "#fff" : colors.mutedForeground }]}>{pos}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {/* ── Sortable trade pool ───────────────────────────────── */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={{ minWidth: 700 }}>
+              {/* Header row */}
+              <View style={[st.combineHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+                <Text style={[st.colFixHdr, { width: 185, color: colors.mutedForeground }]}># POS PLAYER TEAM</Text>
+                <TradeSortHeader label="OVR"  sortKey="overall"          current={tradeSortKey} asc={tradeSortAsc} onSort={handleTradeSort} colors={colors} teamColor={teamColor} />
+                <TradeSortHeader label="SPD"  sortKey="speed"            current={tradeSortKey} asc={tradeSortAsc} onSort={handleTradeSort} colors={colors} teamColor={teamColor} />
+                <TradeSortHeader label="ACC"  sortKey="acceleration"     current={tradeSortKey} asc={tradeSortAsc} onSort={handleTradeSort} colors={colors} teamColor={teamColor} />
+                <TradeSortHeader label="AGI"  sortKey="agility"          current={tradeSortKey} asc={tradeSortAsc} onSort={handleTradeSort} colors={colors} teamColor={teamColor} />
+                <TradeSortHeader label="EXP"  sortKey="yearsExperience"  current={tradeSortKey} asc={tradeSortAsc} onSort={handleTradeSort} colors={colors} teamColor={teamColor} />
+                <TradeSortHeader label="SAL"  sortKey="salary"           current={tradeSortKey} asc={tradeSortAsc} onSort={handleTradeSort} colors={colors} teamColor={teamColor} />
+                <View style={{ width: 58 }} />
               </View>
 
-              {/* Target team selector */}
-              <Text style={[st.tradeSubLabel, { color: colors.mutedForeground }]}>Target Team</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap:8, paddingBottom:8 }}>
-                {(season?.teams.filter(t => t.id !== season.playerTeamId) ?? []).map(t => (
-                  <TouchableOpacity key={t.id} onPress={() => setTradeTargetTeamId(t.id)}
-                    style={[st.teamChip, { backgroundColor: tradeTargetTeamId===t.id ? t.primaryColor+"25" : colors.secondary, borderColor: tradeTargetTeamId===t.id ? t.primaryColor : colors.border }]}>
-                    <Text style={[st.teamChipText, { color: tradeTargetTeamId===t.id ? t.primaryColor : colors.mutedForeground }]}>{t.abbreviation}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-
-              {/* You offer */}
-              <Text style={[st.tradeSubLabel, { color: colors.mutedForeground }]}>You Offer</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap:8, paddingBottom:8 }}>
-                {(team?.roster ?? []).sort((a,b) => b.overall-a.overall).slice(0, 15).map(p => {
-                  const sel = offeringPlayerIds.includes(p.id);
-                  return (
-                    <TouchableOpacity key={p.id} onPress={() => setOfferingPlayerIds(sel ? offeringPlayerIds.filter(id=>id!==p.id) : [...offeringPlayerIds, p.id])}
-                      style={[st.playerChip, { backgroundColor: sel ? teamColor+"25" : colors.secondary, borderColor: sel ? teamColor : colors.border }]}>
-                      <Text style={[st.playerChipName, { color: sel ? teamColor : colors.foreground }]}>{p.name.split(" ")[1]}</Text>
-                      <Text style={[st.playerChipPos, { color: sel ? teamColor+"aa" : colors.mutedForeground }]}>{p.position} {p.overall}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-
-              {/* You receive */}
-              {tradeTargetTeamId && (
-                <>
-                  <Text style={[st.tradeSubLabel, { color: colors.mutedForeground }]}>You Receive</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap:8, paddingBottom:8 }}>
-                    {(season?.teams.find(t=>t.id===tradeTargetTeamId)?.roster ?? []).sort((a,b) => b.overall-a.overall).slice(0, 15).map(p => {
-                      const sel = receivingPlayerIds.includes(p.id);
-                      return (
-                        <TouchableOpacity key={p.id} onPress={() => setReceivingPlayerIds(sel ? receivingPlayerIds.filter(id=>id!==p.id) : [...receivingPlayerIds, p.id])}
-                          style={[st.playerChip, { backgroundColor: sel ? colors.success+"20" : colors.secondary, borderColor: sel ? colors.success : colors.border }]}>
-                          <Text style={[st.playerChipName, { color: sel ? colors.success : colors.foreground }]}>{p.name.split(" ")[1]}</Text>
-                          <Text style={[st.playerChipPos, { color: sel ? colors.success+"aa" : colors.mutedForeground }]}>{p.position} {p.overall}</Text>
-                        </TouchableOpacity>
+              {/* Player rows */}
+              {(tradePool as Array<Player & { teamId: string; teamAbbr: string; teamColor: string }>).map((p, idx) => (
+                <TradePlayerRow
+                  key={p.id}
+                  p={p}
+                  rank={idx + 1}
+                  colors={colors}
+                  teamColor={teamColor}
+                  isMyTeam={p.teamId === season?.playerTeamId}
+                  isOffering={offeringPlayerIds.includes(p.id)}
+                  isReceiving={receivingPlayerIds.includes(p.id)}
+                  onPress={() => setSelectedTradePlayer(p)}
+                  onToggle={() => {
+                    if (p.teamId === season?.playerTeamId) {
+                      setOfferingPlayerIds(prev =>
+                        prev.includes(p.id) ? prev.filter(x => x !== p.id) : [...prev, p.id]
                       );
-                    })}
-                  </ScrollView>
-                </>
-              )}
+                    } else {
+                      if (tradeTargetTeamId && tradeTargetTeamId !== p.teamId) {
+                        Alert.alert("One team at a time", "Remove your current target selection first, or clear the build.");
+                        return;
+                      }
+                      setTradeTargetTeamId(p.teamId);
+                      setReceivingPlayerIds(prev =>
+                        prev.includes(p.id) ? prev.filter(x => x !== p.id) : [...prev, p.id]
+                      );
+                    }
+                  }}
+                />
+              ))}
+            </View>
+          </ScrollView>
 
-              {/* Trade value meter */}
-              {(offeringPlayerIds.length > 0 || receivingPlayerIds.length > 0) && (
+          {/* ── Build Trade summary strip ─────────────────────────── */}
+          {isGM && (offeringPlayerIds.length > 0 || receivingPlayerIds.length > 0) && (() => {
+            const allRoster = season?.teams.flatMap(t => t.roster) ?? [];
+            const offerPlayers = offeringPlayerIds.map(id => allRoster.find(p => p.id === id)).filter(Boolean) as Player[];
+            const recvPlayers  = receivingPlayerIds.map(id => allRoster.find(p => p.id === id)).filter(Boolean) as Player[];
+            const targetTeam   = season?.teams.find(t => t.id === tradeTargetTeamId);
+            const verdictColor = tradeValue > 10 ? colors.success : tradeValue < -10 ? colors.danger : colors.nflGold;
+            const verdict      = tradeValue > 20 ? "Win" : tradeValue > 5 ? "Slight +" : tradeValue > -5 ? "Even" : tradeValue > -20 ? "Slight −" : "Bad deal";
+            return (
+              <View style={[st.tradeSummaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={st.tradeHeader}>
+                  <Feather name="git-merge" size={15} color={teamColor} />
+                  <Text style={[st.tradeTitle, { color: colors.foreground }]}>Build Trade Offer</Text>
+                  {targetTeam && (
+                    <View style={[st.teamChip, { borderColor: targetTeam.primaryColor, backgroundColor: targetTeam.primaryColor+"20", marginLeft: "auto" }]}>
+                      <Text style={[st.teamChipText, { color: targetTeam.primaryColor }]}>{targetTeam.abbreviation}</Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* You offer / you receive */}
+                <View style={st.offerContent}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[st.offerSide, { color: colors.mutedForeground }]}>YOU OFFER</Text>
+                    {offerPlayers.length === 0
+                      ? <Text style={[st.offerPlayer, { color: colors.mutedForeground }]}>—</Text>
+                      : offerPlayers.map(p => (
+                          <Text key={p.id} style={[st.offerPlayer, { color: teamColor }]}>
+                            {p.name} ({p.position} {p.overall})
+                          </Text>
+                        ))}
+                  </View>
+                  <Feather name="arrow-right" size={16} color={colors.mutedForeground} style={{ marginTop: 18 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[st.offerSide, { color: colors.mutedForeground }]}>YOU RECEIVE</Text>
+                    {recvPlayers.length === 0
+                      ? <Text style={[st.offerPlayer, { color: colors.mutedForeground }]}>—</Text>
+                      : recvPlayers.map(p => (
+                          <Text key={p.id} style={[st.offerPlayer, { color: colors.success }]}>
+                            {p.name} ({p.position} {p.overall})
+                          </Text>
+                        ))}
+                  </View>
+                </View>
+
+                {/* Value meter + send */}
                 <View style={[st.valueMeter, { backgroundColor: colors.secondary }]}>
                   <View style={{ flex: 1 }}>
                     <Text style={[st.valueLabel, { color: colors.mutedForeground }]}>TRADE VALUE</Text>
-                    <Text style={[st.valueNum, { color: tradeValue > 10 ? colors.success : tradeValue < -10 ? colors.danger : colors.nflGold }]}>
-                      {tradeValue > 0 ? "+" : ""}{tradeValue} pts
-                    </Text>
-                    <Text style={[st.valueVerdict, { color: tradeValue > 10 ? colors.success : tradeValue < -10 ? colors.danger : colors.nflGold }]}>
-                      {tradeValue > 20 ? "Win for your team" : tradeValue > 5 ? "Slight advantage" : tradeValue > -5 ? "Even trade" : tradeValue > -20 ? "Slight disadvantage" : "Lopsided against you"}
-                    </Text>
+                    <Text style={[st.valueNum, { color: verdictColor }]}>{tradeValue > 0 ? "+" : ""}{tradeValue} pts</Text>
+                    <Text style={[st.valueVerdict, { color: verdictColor }]}>{verdict}</Text>
                   </View>
-                  <TouchableOpacity onPress={() => {
-                    if (!tradeTargetTeamId) { Alert.alert("Select a team first"); return; }
-                    proposeTrade({ fromTeamId: season!.playerTeamId, toTeamId: tradeTargetTeamId, offeringPlayerIds, offeringPickIds: [], receivingPlayerIds, receivingPickIds: [] });
-                    setOfferingPlayerIds([]); setReceivingPlayerIds([]); setTradeTargetTeamId(null);
-                    Alert.alert("Trade Offered!", "The offer has been sent to the other GM.");
-                  }}
-                  disabled={offeringPlayerIds.length === 0 && receivingPlayerIds.length === 0}
-                  style={[st.sendTradeBtn, { backgroundColor: teamColor, opacity: offeringPlayerIds.length === 0 && receivingPlayerIds.length === 0 ? 0.4 : 1 }]}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (!tradeTargetTeamId) { Alert.alert("Select a target player first"); return; }
+                      proposeTrade({ fromTeamId: season!.playerTeamId, toTeamId: tradeTargetTeamId, offeringPlayerIds, offeringPickIds: [], receivingPlayerIds, receivingPickIds: [] });
+                      setOfferingPlayerIds([]); setReceivingPlayerIds([]); setTradeTargetTeamId(null);
+                      Alert.alert("Trade Offered!", "The offer has been sent.");
+                    }}
+                    style={[st.sendTradeBtn, { backgroundColor: teamColor }]}>
                     <Feather name="send" size={14} color="#fff" />
                     <Text style={st.sendTradeBtnText}>Send Offer</Text>
                   </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => { setOfferingPlayerIds([]); setReceivingPlayerIds([]); setTradeTargetTeamId(null); }}
+                    style={[st.sendTradeBtn, { backgroundColor: colors.secondary, borderWidth: 1, borderColor: colors.border }]}>
+                    <Feather name="x" size={14} color={colors.mutedForeground} />
+                    <Text style={[st.sendTradeBtnText, { color: colors.mutedForeground }]}>Clear</Text>
+                  </TouchableOpacity>
                 </View>
-              )}
-            </View>
-          )}
+              </View>
+            );
+          })()}
 
-          {/* Pending offers */}
+          {/* ── Incoming Offers ───────────────────────────────────── */}
           <View style={{ padding: 16 }}>
             <Text style={[st.sectionTitle, { color: colors.foreground }]}>Incoming Offers</Text>
             {pendingOffers.length === 0 && (
@@ -636,6 +735,13 @@ export default function FrontOfficeScreen() {
         isGM={isGM}
         isUserTurn={ds?.isUserTurn ?? false}
         onDraft={selectedProspect ? () => { userDraftPick(selectedProspect.id); setSelectedProspect(null); } : undefined}
+      />
+
+      {/* ── Trade Player Stats Modal ─── */}
+      <PlayerStatsModal
+        player={selectedTradePlayer}
+        visible={!!selectedTradePlayer}
+        onClose={() => setSelectedTradePlayer(null)}
       />
     </View>
   );
@@ -946,6 +1052,78 @@ function FARow({ p, rank, colors, teamColor, isGM, onSign }: {
           <Text style={st.draftBtnSmText}>Sign</Text>
         </TouchableOpacity>
       )}
+    </TouchableOpacity>
+  );
+}
+
+// ─── Trade Sort Header ────────────────────────────────────────────────────────
+function TradeSortHeader({ label, sortKey: key, current, asc, onSort, colors, teamColor }:
+  { label: string; sortKey: TradeSortKey; current: TradeSortKey; asc: boolean; onSort: (k: TradeSortKey) => void; colors: any; teamColor: string }) {
+  const active = key === current;
+  return (
+    <TouchableOpacity onPress={() => onSort(key)} style={[st.colHeader, { borderBottomColor: active ? teamColor : "transparent", borderBottomWidth: active ? 2 : 0 }]}>
+      <Text style={[st.colHeaderText, { color: active ? teamColor : colors.mutedForeground }]}>{label}</Text>
+      {active && <Feather name={asc ? "chevron-up" : "chevron-down"} size={9} color={teamColor} />}
+    </TouchableOpacity>
+  );
+}
+
+// ─── Trade Player Row ─────────────────────────────────────────────────────────
+function TradePlayerRow({ p, rank, colors, teamColor, isMyTeam, isOffering, isReceiving, onPress, onToggle }: {
+  p: Player & { teamAbbr: string; teamColor: string };
+  rank: number; colors: any; teamColor: string;
+  isMyTeam: boolean; isOffering: boolean; isReceiving: boolean;
+  onPress: () => void; onToggle: () => void;
+}) {
+  const ratingColor = (v: number) => v >= 90 ? "#FFD700" : v >= 80 ? colors.success : v >= 70 ? colors.foreground : colors.mutedForeground;
+  const acc = (p.positionRatings as any)?.acceleration ?? 50;
+  const agi = (p.positionRatings as any)?.agility ?? 50;
+  const selected = isOffering || isReceiving;
+  const btnColor  = isMyTeam ? teamColor : colors.success;
+  const btnLabel  = isMyTeam ? (isOffering ? "OFFER ✓" : "OFFER") : (isReceiving ? "GET ✓" : "GET");
+  const rowBg     = isOffering ? teamColor + "15" : isReceiving ? colors.success + "15" : "transparent";
+
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.75}
+      style={[st.combineRowContainer, { backgroundColor: rowBg, borderBottomColor: colors.border }]}>
+      {/* Fixed left name cell */}
+      <View style={{ width: 185, paddingRight: 6 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_500Medium", width: 20, textAlign: "right" }}>{rank}</Text>
+          <View style={[st.posBadge, { backgroundColor: POS_COLOR[p.position] + "25" }]}>
+            <Text style={[st.posBadgeText, { color: POS_COLOR[p.position] }]}>{p.position}</Text>
+          </View>
+          <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground, flexShrink: 1 }} numberOfLines={1}>
+            {p.name.split(" ").slice(-1)[0]}
+          </Text>
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 1, paddingLeft: 24 }}>
+          <View style={{ paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4, backgroundColor: p.teamColor + "25" }}>
+            <Text style={{ fontSize: 9, fontFamily: "Inter_700Bold", color: p.teamColor }}>{p.teamAbbr}</Text>
+          </View>
+          <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_400Regular" }}>Age {p.age}</Text>
+        </View>
+      </View>
+
+      {/* Stat cells */}
+      <ColCell value={`${p.overall}`} color={ratingColor(p.overall)} />
+      <ColCell value={`${p.speed}`}   color={ratingColor(p.speed)} />
+      <ColCell value={`${acc}`}       color={ratingColor(acc)} />
+      <ColCell value={`${agi}`}       color={ratingColor(agi)} />
+      <ColCell value={`${p.yearsExperience}yr`} color={colors.foreground} />
+      <ColCell value={`$${p.salary}M`} color={p.salary >= 15 ? colors.danger : p.salary >= 8 ? colors.nflGold : colors.success} />
+
+      {/* Action button */}
+      <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); onToggle(); }}
+        style={{ width: 52, alignItems: "center", justifyContent: "center" }}>
+        <View style={{
+          paddingHorizontal: 5, paddingVertical: 3, borderRadius: 5,
+          backgroundColor: selected ? btnColor + "25" : colors.secondary,
+          borderWidth: 1, borderColor: selected ? btnColor : colors.border,
+        }}>
+          <Text style={{ fontSize: 8, fontFamily: "Inter_700Bold", color: selected ? btnColor : colors.mutedForeground }}>{btnLabel}</Text>
+        </View>
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 }
@@ -1267,7 +1445,7 @@ const st = StyleSheet.create({
   pickName:         { fontSize:14, fontFamily:"Inter_600SemiBold" },
   pickMeta:         { fontSize:11, fontFamily:"Inter_400Regular", marginTop:1 },
   pickOverall:      { fontSize:13, fontFamily:"Inter_600SemiBold" },
-  posPill:          { paddingHorizontal:5, paddingVertical:2, borderRadius:5 },
+  posPill:          { paddingHorizontal:5, paddingVertical:2, borderRadius:5, borderWidth:1, borderColor:"transparent" },
   posPillText:      { fontSize:10, fontFamily:"Inter_700Bold" },
   // Board tip banner
   boardTip:         { flexDirection:"row", alignItems:"center", gap:8, marginHorizontal:12, marginVertical:8,
@@ -1289,7 +1467,8 @@ const st = StyleSheet.create({
   wrActions:        { alignItems:"center", gap:4 },
   wrRemoveBtn:      { width:26, height:26, alignItems:"center", justifyContent:"center" },
   // Trade builder
-  tradeBuilder:     { borderBottomWidth:1, padding:14, gap:10 },
+  tradeBuilder:       { borderBottomWidth:1, padding:14, gap:10 },
+  tradeSummaryCard:   { margin:12, borderRadius:12, borderWidth:1, padding:14, gap:10 },
   tradeHeader:      { flexDirection:"row", alignItems:"center", gap:8 },
   tradeTitle:       { fontSize:16, fontFamily:"Inter_700Bold" },
   tradeSubLabel:    { fontSize:11, fontFamily:"Inter_600SemiBold", letterSpacing:0.5, marginTop:4 },
