@@ -162,7 +162,7 @@ export default function HomeScreen() {
               visorColor={uniformVisorColor}
               abbreviation={team?.abbreviation ?? "VFL"}
               width={320}
-              height={Math.round(320 * 380 / 420)}
+              height={Math.round(320 * 480 / 520)}
             />
           </View>
           {/* Bottom fade so team info blends into content */}
@@ -599,7 +599,7 @@ const st = StyleSheet.create({
   liveTag:        { paddingHorizontal:6, paddingVertical:2, borderRadius:4, marginRight:8 },
   // Helmet hero
   helmetHero:     { height:360, overflow:"hidden", position:"relative" },
-  helmetImg:      { position:"absolute", right:-30, top:0, width:320, height:290 },
+  helmetImg:      { position:"absolute", right:-30, top:0, width:320, height:296 },
   helmetTopBar:   { flexDirection:"row", alignItems:"center", justifyContent:"space-between", paddingHorizontal:16, paddingBottom:8 },
   helmetTeamInfo: { position:"absolute", bottom:16, left:16, right:16 },
   // Header pieces still used

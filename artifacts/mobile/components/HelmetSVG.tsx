@@ -1,15 +1,14 @@
 /**
- * HelmetSVG – pure SVG football helmet component (React Native)
+ * Helmet – SVG football helmet component for React Native (react-native-svg)
  *
- * Modelled after the cartoon/illustration style: ¾ front-left view.
+ * ¾ front-left view matching the reference illustration.
  * Four independently-colorable groups:
- *   1. Shell     (shellColor  / helmetColor)
- *   2. Visor     (dark tinted glass – visorColor, default near-black)
- *   3. Facemask  (facemaskColor)
- *   4. Chinstrap (chinstrapColor)
+ *   1. shell      (shellColor / helmetColor)
+ *   2. visor      (visorColor)
+ *   3. facemask   (facemaskColor)
+ *   4. chinstrap  (chinstrapColor)
  *
- * ViewBox: 0 0 420 380
- * All paths were hand-traced to match the reference illustration.
+ * ViewBox: 0 0 520 480
  */
 
 import React from "react";
@@ -18,242 +17,287 @@ import Svg, {
   Circle, Defs, Ellipse, G, Path, RadialGradient, Rect, Stop,
 } from "react-native-svg";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Props ────────────────────────────────────────────────────────────────────
 
 interface HelmetProps {
-  /** Main dome color */
-  helmetColor?:    string;
-  shellColor?:     string;    // alias
-  /** Cage / facemask color */
-  facemaskColor?:  string;
-  /** Chinstrap clips + strap color */
-  chinstrapColor?: string;
-  /** Team initials color on dome */
-  logoColor?:      string;
-  /** Tinted visor color (defaults to near-black) */
+  /** Shell / dome color */
+  shellColor?:     string;
+  helmetColor?:    string;   // alias kept for callers
+  /** Tinted visor / eye-shield color */
   visorColor?:     string;
-  /** Team abbreviation shown on dome */
+  /** Facemask cage color */
+  facemaskColor?:  string;
+  /** Chinstrap hardware color */
+  chinstrapColor?: string;
+  /** Team initials rendered on dome */
+  logoColor?:      string;
   abbreviation?:   string;
   width?:          number;
   height?:         number;
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
+// ─── Geometry constants (all in 0 0 520 480 coordinate space) ─────────────────
+
+// ── DOME ──
+// Large rounded dome occupying the left/centre. The dome's face-opening edge
+// is on the right side (x ≈ 300-420).
+const DOME =
+  "M 44 380 " +
+  "C 12 356 8 268 12 190 " +
+  "C 16 88 106 14 220 10 " +
+  "C 328 6 415 62 424 178 " +
+  "C 432 268 410 344 376 374 " +
+  "C 355 384 318 390 278 390 " +
+  "C 200 390 106 370 44 380 Z";
+
+// ── FACE OPENING ──
+// Dark region cut out of the dome face. Drawn ON TOP of the dome in dark colour.
+// Runs from the top of the face (y≈55) down to the bottom chin area (y≈382).
+const FACE_OPEN =
+  "M 318 52 " +
+  "C 370 80 410 155 418 228 " +
+  "C 426 300 406 365 372 385 " +
+  "C 345 384 318 374 298 358 " +
+  "C 274 326 258 278 256 226 " +
+  "C 254 166 272 100 318 52 Z";
+
+// ── VISOR ──
+// The tinted glass shield. Fills the upper portion of the face opening.
+const VISOR =
+  "M 322 62 " +
+  "C 368 90 404 160 412 228 " +
+  "C 418 290 400 350 368 372 " +
+  "C 347 372 324 362 306 346 " +
+  "C 288 316 276 276 274 230 " +
+  "C 272 170 288 106 322 62 Z";
+
+// ── FACEMASK PATHS ──
+// Left vertical rail (runs along the inner-left edge of the face opening)
+const FM_RAIL_L =
+  "M 252 60 " +
+  "C 248 56 244 55 242 56 " +
+  "L 240 390 " +
+  "C 244 392 250 392 255 390 " +
+  "L 258 60 Z";
+
+// Right outer frame rail
+const FM_RAIL_R =
+  "M 414 95 " +
+  "C 418 100 420 108 420 118 " +
+  "L 418 390 " +
+  "C 414 395 406 395 402 390 " +
+  "L 400 118 " +
+  "C 400 110 404 100 408 95 Z";
+
+// Top brim — connects the two rails at the top with a curved bar
+const FM_TOP =
+  "M 242 56 " +
+  "C 260 44 310 38 360 46 " +
+  "C 390 52 412 72 414 95 " +
+  "L 402 100 " +
+  "C 400 82 378 64 350 58 " +
+  "C 305 50 262 54 255 66 Z";
+
+// Horizontal bar 1 (across the mid-face area, below the visor)
+const FM_BAR1 =
+  "M 244 256 L 410 256 L 410 268 L 244 268 Z";
+
+// Centre vertical bar (from top to bottom chin guard)
+const FM_CENTER =
+  "M 322 56 L 330 56 L 332 390 L 324 390 Z";
+
+// Bottom chin guard — the flat horizontal tab at the bottom of the cage
+const FM_CHIN =
+  "M 244 382 " +
+  "C 244 395 262 402 326 402 " +
+  "C 388 402 412 395 412 382 " +
+  "L 412 394 " +
+  "C 412 410 386 416 326 416 " +
+  "C 264 416 242 410 242 394 Z";
+
+// ─── Component ───────────────────────────────────────────────────────────────
 
 export function HelmetSVGWithLogo({
-  helmetColor,
   shellColor,
+  helmetColor,
+  visorColor     = "#0d1117",
   facemaskColor  = "#aaaaaa",
   chinstrapColor = "#888888",
   logoColor      = "#ffffff",
-  visorColor     = "#111827",
   abbreviation   = "VFL",
   width          = 300,
   height,
 }: HelmetProps) {
   const shell  = helmetColor ?? shellColor ?? "#4F46E5";
-  const shell2 = lighten(shell, 0.22);   // highlight for dome gloss
-  const shell3 = darken(shell, 0.18);    // shadow for depth
-  const abbr   = abbreviation.slice(0, 3).toUpperCase();
+  const hi     = lighten(shell, 0.26);   // gloss highlight
+  const sh     = darken(shell, 0.20);    // shadow / depth
+  const abbr   = (abbreviation ?? "VFL").slice(0, 3).toUpperCase();
 
-  // Scale to requested display size (viewBox is 420×380)
-  const vw = 420, vh = 380;
+  const VW = 520, VH = 480;
   const displayW = width;
-  const displayH = height ?? Math.round(width * vh / vw);
+  const displayH = height ?? Math.round(width * VH / VW);
+  const scaleW   = displayW / VW;
+  const scaleH   = displayH / VH;
 
-  const logoFS = abbr.length > 2 ? 30 : 38;
-  // Logo position on dome (left side, centre of visible shell)
-  const LOGO_X = 148, LOGO_Y = 178;
+  // Logo placement: centre-left of dome
+  const LOGO_X  = 158;
+  const LOGO_Y  = 215;
+  const LOGO_FS = abbr.length > 2 ? 42 : 54;
 
   return (
     <View style={{ width: displayW, height: displayH }}>
-      <Svg
-        width={displayW}
-        height={displayH}
-        viewBox={`0 0 ${vw} ${vh}`}
-      >
+      <Svg width={displayW} height={displayH} viewBox={`0 0 ${VW} ${VH}`}>
         <Defs>
-          {/* Radial gradient for dome gloss */}
-          <RadialGradient id="domeGloss" cx="38%" cy="30%" r="60%">
-            <Stop offset="0%"   stopColor={shell2} stopOpacity="1" />
-            <Stop offset="55%"  stopColor={shell}  stopOpacity="1" />
-            <Stop offset="100%" stopColor={shell3} stopOpacity="1" />
+          <RadialGradient id="domeGrad" cx="35%" cy="28%" r="62%">
+            <Stop offset="0%"   stopColor={hi}   stopOpacity="1" />
+            <Stop offset="52%"  stopColor={shell} stopOpacity="1" />
+            <Stop offset="100%" stopColor={sh}    stopOpacity="1" />
           </RadialGradient>
         </Defs>
 
-        {/* ─── GROUP 1: HELMET SHELL ─────────────────────────────────────── */}
-        {/*
-          The dome is a large rounded shape, left-facing.
-          The face opening on the right is cut out by drawing a dark overlay.
-        */}
+        {/* ── GROUP 1: SHELL ──────────────────────────────────────────────── */}
         <G id="shell">
-          {/* Main dome body */}
+          {/* Main dome */}
           <Path
-            d="M 50 268
-               C 18 248 12 166 16 106
-               C 20 38 102 4 195 4
-               C 280 4 352 46 364 132
-               C 376 200 356 258 322 283
-               C 290 302 245 308 195 308
-               C 148 308 100 296 68 278
-               Z"
-            fill="url(#domeGloss)"
+            d={DOME}
+            fill="url(#domeGrad)"
             stroke="#111"
             strokeWidth="6"
             strokeLinejoin="round"
           />
 
-          {/* Neck/chin roll — bottom rim */}
+          {/* Neck / bottom rim edge */}
           <Path
-            d="M 50 268 C 68 282 128 312 195 312 C 260 312 300 300 322 283"
+            d="M 44 380 C 120 415 200 424 278 420 C 340 416 390 400 420 380"
             fill="none"
-            stroke={shell3}
-            strokeWidth="10"
+            stroke={sh}
+            strokeWidth="12"
             strokeLinecap="round"
           />
 
-          {/* Ear hole */}
-          <Ellipse cx="72" cy="226" rx="16" ry="20" fill={shell3} stroke="#111" strokeWidth="4" />
-          <Ellipse cx="72" cy="226" rx="9"  ry="12" fill="#111" />
+          {/* Ear hole (left side of dome) */}
+          <Ellipse cx="76" cy="302" rx="18" ry="22"
+            fill={sh} stroke="#111" strokeWidth="4" />
+          <Ellipse cx="76" cy="302" rx="10" ry="13" fill="#0d0d18" />
 
-          {/* Snap / vent on back dome */}
-          <Circle cx="55" cy="155" r="6" fill={shell3} stroke="#111" strokeWidth="3" />
+          {/* Back vent dot */}
+          <Circle cx="52" cy="210" r="7"
+            fill={sh} stroke="#111" strokeWidth="3" />
 
-          {/* Dome gloss highlight */}
-          <Ellipse cx="148" cy="68" rx="45" ry="28" fill="rgba(255,255,255,0.16)" transform="rotate(-15 148 68)" />
+          {/* Gloss highlight on dome */}
+          <Ellipse cx="158" cy="88" rx="52" ry="32"
+            fill="rgba(255,255,255,0.17)"
+            transform="rotate(-12 158 88)"
+          />
         </G>
 
-        {/* ─── FACE OPENING (dark void) ──────────────────────────────────── */}
-        {/* Overlaid on dome to create the face area */}
+        {/* ── FACE OPENING (dark void) ────────────────────────────────────── */}
         <Path
-          d="M 275 52
-             C 336 82 364 158 360 218
-             C 356 272 328 298 298 302
-             C 285 302 274 296 266 286
-             C 248 268 240 222 240 168
-             C 240 110 254 68 275 52
-             Z"
+          d={FACE_OPEN}
           fill="#0d0d18"
           stroke="#111"
           strokeWidth="5"
+          strokeLinejoin="round"
         />
 
-        {/* ─── GROUP 2: VISOR ───────────────────────────────────────────── */}
-        {/* Tinted glass sits inside the face opening */}
+        {/* ── GROUP 2: VISOR ──────────────────────────────────────────────── */}
         <G id="visor">
           <Path
-            d="M 280 62
-               C 334 92 358 164 354 220
-               C 350 268 324 292 298 294
-               C 274 276 256 230 254 174
-               C 252 116 264 74 280 62
-               Z"
+            d={VISOR}
             fill={visorColor}
-            opacity="0.88"
+            opacity="0.92"
           />
           {/* Visor gloss streak */}
           <Path
-            d="M 290 75 C 330 104 348 162 345 210"
+            d="M 332 76 C 374 108 400 170 404 234"
             fill="none"
-            stroke="rgba(255,255,255,0.12)"
-            strokeWidth="18"
+            stroke="rgba(255,255,255,0.13)"
+            strokeWidth="22"
             strokeLinecap="round"
           />
         </G>
 
-        {/* ─── GROUP 3: FACEMASK ────────────────────────────────────────── */}
-        {/*
-          Cage structure: left rail, right rail, top brim,
-          2 horizontal bars, 1 centre vertical, bottom chin guard.
-          All paths use facemaskColor.
-        */}
-        <G id="facemask" fill={facemaskColor} stroke="#111" strokeWidth="3.5" strokeLinejoin="round">
+        {/* ── GROUP 3: FACEMASK ───────────────────────────────────────────── */}
+        <G id="facemask"
+          fill={facemaskColor}
+          stroke="#111"
+          strokeWidth="4"
+          strokeLinejoin="round"
+        >
+          {/* Top brim */}
+          <Path d={FM_TOP} />
 
-          {/* Top mounting brim (the bracket connecting cage to shell crown) */}
-          <Path
-            d="M 258 52
-               C 270 42 295 38 318 46
-               C 328 50 336 60 332 70
-               L 320 76
-               C 316 68 306 62 295 58
-               C 278 54 265 60 260 66
-               Z"
-          />
+          {/* Mounting bolts on top brim */}
+          <Circle cx="288" cy="48" r="9"
+            fill={darken(facemaskColor, 0.22)} stroke="#111" strokeWidth="3.5" />
+          <Circle cx="356" cy="50" r="9"
+            fill={darken(facemaskColor, 0.22)} stroke="#111" strokeWidth="3.5" />
 
-          {/* Top snap bolts */}
-          <Circle cx="280" cy="47" r="7" fill={darken(facemaskColor, 0.2)} stroke="#111" strokeWidth="3" />
-          <Circle cx="316" cy="50" r="7" fill={darken(facemaskColor, 0.2)} stroke="#111" strokeWidth="3" />
+          {/* Left vertical rail */}
+          <Path d={FM_RAIL_L} />
 
-          {/* LEFT vertical rail (runs along inner face opening edge) */}
-          <Rect x="248" y="62" width="16" height="228" rx="8" />
+          {/* Right outer frame */}
+          <Path d={FM_RAIL_R} />
 
-          {/* RIGHT vertical rail (outer edge of cage) */}
-          <Rect x="356" y="98" width="16" height="196" rx="8" />
-
-          {/* Horizontal bar 1 */}
-          <Rect x="248" y="155" width="124" height="13" rx="6" />
-
-          {/* Horizontal bar 2 */}
-          <Rect x="248" y="205" width="124" height="13" rx="6" />
+          {/* Horizontal bar */}
+          <Path d={FM_BAR1} />
 
           {/* Centre vertical bar */}
-          <Rect x="304" y="62" width="14" height="228" rx="7" />
+          <Path d={FM_CENTER} />
 
           {/* Bottom chin guard */}
-          <Path
-            d="M 248 268
-               C 248 292 268 308 312 308
-               C 356 308 374 292 374 268
-               L 374 280
-               C 374 308 355 322 312 322
-               C 266 322 248 308 248 282
-               Z"
-          />
+          <Path d={FM_CHIN} />
+
           {/* Chin guard horizontal lip */}
-          <Rect x="248" y="265" width="126" height="14" rx="7" />
+          <Rect x="240" y="380" width="174" height="14" rx="7" />
         </G>
 
-        {/* Clip mount screw at lower-left of cage */}
-        <Circle cx="258" cy="256" r="6" fill={darken(facemaskColor, 0.25)} stroke="#111" strokeWidth="3" />
-        <Circle cx="366" cy="256" r="6" fill={darken(facemaskColor, 0.25)} stroke="#111" strokeWidth="3" />
+        {/* Cage screw/rivet at lower clips */}
+        <Circle cx="252" cy="374" r="7"
+          fill={darken(facemaskColor, 0.28)} stroke="#111" strokeWidth="3" />
+        <Circle cx="408" cy="374" r="7"
+          fill={darken(facemaskColor, 0.28)} stroke="#111" strokeWidth="3" />
 
-        {/* ─── GROUP 4: CHINSTRAP ───────────────────────────────────────── */}
-        {/*
-          Left snap buckle clip (visible on the helmet left side, just above neck roll)
-          Strap/chin pad below the chin guard
-        */}
-        <G id="chinstrap" fill={chinstrapColor} stroke="#111" strokeWidth="3.5" strokeLinejoin="round">
-          {/* Left buckle clip (rectangular snap on the helmet side) */}
-          <Rect x="94"  y="246" width="30" height="18" rx="6" />
-          <Rect x="101" y="240" width="16" height="10" rx="3" fill={darken(chinstrapColor, 0.2)} />
+        {/* ── GROUP 4: CHINSTRAP ──────────────────────────────────────────── */}
+        <G id="chinstrap"
+          fill={chinstrapColor}
+          stroke="#111"
+          strokeWidth="3.5"
+          strokeLinejoin="round"
+        >
+          {/* Upper clip (left side, above ear hole) */}
+          <Rect x="100" y="262" width="32" height="18" rx="6" />
+          <Rect x="108" y="255" width="16" height="10" rx="3"
+            fill={darken(chinstrapColor, 0.22)} />
 
-          {/* Second left clip (lower, just above neck) */}
-          <Rect x="88"  y="278" width="28" height="16" rx="5" />
-          <Rect x="95"  y="272" width="14" height="10" rx="3" fill={darken(chinstrapColor, 0.2)} />
+          {/* Lower clip (below ear hole) */}
+          <Rect x="92"  y="318" width="30" height="17" rx="5" />
+          <Rect x="100" y="311" width="14" height="9"  rx="3"
+            fill={darken(chinstrapColor, 0.22)} />
 
-          {/* Chin pad strap below chin guard */}
+          {/* Chin pad strap arc */}
           <Path
-            d="M 260 316 C 260 334 280 344 312 344 C 342 344 362 334 362 316"
+            d="M 252 408 C 252 434 276 446 326 446 C 374 446 400 434 400 408"
             fill="none"
             stroke={chinstrapColor}
-            strokeWidth="14"
+            strokeWidth="16"
             strokeLinecap="round"
           />
-          {/* Chin pad oval */}
-          <Ellipse cx="312" cy="344" rx="38" ry="16" />
-        </G>
 
+          {/* Chin pad oval */}
+          <Ellipse cx="326" cy="446" rx="44" ry="18" />
+        </G>
       </Svg>
 
-      {/* Team initials on dome — rendered as RN Text for font access */}
+      {/* Team initials — React Native Text for font access */}
       <Text
         style={[
           styles.logo,
           {
             color:    logoColor,
-            fontSize: logoFS * (displayW / vw),
-            left:     LOGO_X * (displayW / vw) - logoFS * abbr.length * 0.3 * (displayW / vw),
-            top:      LOGO_Y * (displayH / vh) - logoFS * 0.55 * (displayH / vh),
+            fontSize: LOGO_FS * scaleW,
+            left:     (LOGO_X - LOGO_FS * abbr.length * 0.35) * scaleW,
+            top:      (LOGO_Y - LOGO_FS * 0.55) * scaleH,
           },
         ]}
         numberOfLines={1}
@@ -264,14 +308,13 @@ export function HelmetSVGWithLogo({
   );
 }
 
-// Keep alias for backwards compat
 export { HelmetSVGWithLogo as HelmetSVG };
 
-// ─── Color helpers ─────────────────────────────────────────────────────────────
+// ─── Color utilities ───────────────────────────────────────────────────────────
 
 function hexToRgb(hex: string): [number, number, number] {
-  const clean = hex.replace("#", "").padEnd(6, "0").slice(0, 6);
-  const n = parseInt(clean, 16);
+  const c = hex.replace("#", "").padEnd(6, "0").slice(0, 6);
+  const n = parseInt(c, 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 function rgbToHex(r: number, g: number, b: number): string {
@@ -293,8 +336,8 @@ const styles = StyleSheet.create({
     position:      "absolute",
     fontFamily:    "Inter_700Bold",
     letterSpacing: -0.5,
-    textShadowColor:  "rgba(0,0,0,0.7)",
+    textShadowColor:  "rgba(0,0,0,0.75)",
     textShadowOffset: { width: 1, height: 2 },
-    textShadowRadius: 4,
+    textShadowRadius: 5,
   },
 });

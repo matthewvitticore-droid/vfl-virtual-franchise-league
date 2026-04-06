@@ -186,7 +186,7 @@ export default function UniformScreen() {
             visorColor={u.helmetVisorColor    ?? "#111827"}
             abbreviation={abbr}
             width={240}
-            height={Math.round(240 * 380 / 420)}
+            height={Math.round(240 * 480 / 520)}
           />
         </View>
 
