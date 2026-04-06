@@ -1,124 +1,73 @@
 import React from "react";
-import Svg, { Path, Ellipse, Rect, Text as SvgText } from "react-native-svg";
+import Svg, {
+  Path, Ellipse, Rect, Defs, RadialGradient, Stop,
+  Text as SvgText,
+} from "react-native-svg";
 
 /**
- * Front-facing cartoon Schutt-style helmet.
+ * Modern front-facing Schutt-style football helmet.
  *
- *   shellColor     – dome & chin-cup colour
- *   facemaskColor  – cage bars / uprights (Schutt ROPO style)
- *   visorColor     – dark face-opening tint
- *   stripeColor    – crown stripe
- *   chinstrapColor – chin cup pad at bottom
- *   visorText      – optional text rendered on visor (e.g. "+VFL")
+ * THREE distinct parts:
+ *   1. Shell     – rounded dome, gloss, shadow, crown stripe, ear holes
+ *   2. Facemask  – Schutt ROPO-DW: brow mount bar, dimensional tube uprights,
+ *                  2 J-bars, center divider, curved chin bar, dark visor
+ *   3. Chinstrap – strap curves + oval chin cup pad
+ *
+ * Props: size | shellColor | facemaskColor | visorColor | chinstrapColor
+ *        stripeColor (crown) | visorText (optional overlay text)
  */
 export default function Helmet({
   size           = 220,
   shellColor     = "#ECEEF2",
   facemaskColor  = "#C0C6D0",
   visorColor     = "#080C14",
-  stripeColor    = "#CC2020",
   chinstrapColor = "#ECEEF2",
+  stripeColor    = "#CC2020",
   visorText      = "",
 }) {
-  const ink = "#1A1E2C";
+  const ink = "#10141E";
+
+  /**
+   * Dimensional tube bar:
+   *   outer dark ring → main colour → bright center highlight → ink outline
+   *   Creates the appearance of a round-cross-section tube from the front.
+   */
+  const Tube = ({ d, w = 22 }) => (
+    <>
+      <Path d={d} stroke="rgba(0,0,0,0.22)" strokeWidth={w + 5} fill="none" strokeLinecap="round" />
+      <Path d={d} stroke={facemaskColor}     strokeWidth={w}     fill="none" strokeLinecap="round" />
+      <Path d={d} stroke="rgba(255,255,255,0.28)" strokeWidth={w * 0.28} fill="none" strokeLinecap="round" />
+      <Path d={d} stroke={ink}               strokeWidth={3.5}   fill="none" strokeLinecap="round" />
+    </>
+  );
 
   return (
     <Svg width={size} height={size} viewBox="0 0 512 512">
+      <Defs>
+        <RadialGradient id="hGloss" cx="38%" cy="26%" r="52%">
+          <Stop offset="0%"  stopColor="#FFFFFF" stopOpacity="0.30" />
+          <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0.00" />
+        </RadialGradient>
+        <RadialGradient id="hShadow" cx="14%" cy="60%" r="44%">
+          <Stop offset="0%"  stopColor="#000000" stopOpacity="0.24" />
+          <Stop offset="100%" stopColor="#000000" stopOpacity="0.00" />
+        </RadialGradient>
+      </Defs>
 
-      {/* ── 1. SHELL ─────────────────────────────────────────────── */}
+      {/* ════════════════════════════════
+          PART 1 — SHELL
+          ════════════════════════════════ */}
 
       {/* Main dome */}
       <Path
         d="
-          M 256 46
-          C 140 46, 58 122, 58 222
-          C 58 296, 92 344, 164 360
-          L 348 360
-          C 420 344, 454 296, 454 222
-          C 454 122, 372 46, 256 46 Z
-        "
-        fill={shellColor}
-        stroke={ink}
-        strokeWidth="8"
-        strokeLinejoin="round"
-      />
-
-      {/* Left shadow band */}
-      <Path
-        d="
-          M 58 222
-          C 58 296, 92 344, 164 360
-          L 186 360
-          C 120 344, 88 296, 88 222
-          C 88 148, 132 92, 206 66
-          C 138 90, 84 148, 58 222 Z
-        "
-        fill="#00000030"
-      />
-
-      {/* Right gloss */}
-      <Path
-        d="
-          M 454 222 C 454 188, 444 154, 424 126
-          C 436 154, 446 188, 446 222 Z
-        "
-        fill="#FFFFFF25"
-      />
-
-      {/* Top-center gloss streak */}
-      <Path
-        d="M 208 68 C 232 56, 280 56, 304 68"
-        stroke="#FFFFFF"
-        strokeWidth="11"
-        fill="none"
-        opacity="0.40"
-        strokeLinecap="round"
-      />
-
-      {/* ── 2. CROWN STRIPE ──────────────────────────────────────── */}
-      <Path
-        d="
-          M 244 48
-          Q 256 44, 268 48
-          L 270 234
-          L 242 234 Z
-        "
-        fill={stripeColor}
-        stroke={ink}
-        strokeWidth="3.5"
-        strokeLinejoin="round"
-      />
-
-      {/* ── 3. EARHOLE PANELS (dark cut-outs each side) ──────────── */}
-      {/* Left earhole shadow */}
-      <Path
-        d="
-          M 68 238 C 58 270, 62 318, 80 354
-          L 108 354 C 90 318, 86 270, 96 238 Z
-        "
-        fill="#00000030"
-      />
-      {/* Right earhole shadow */}
-      <Path
-        d="
-          M 444 238 C 454 270, 450 318, 432 354
-          L 404 354 C 422 318, 426 270, 416 238 Z
-        "
-        fill="#00000030"
-      />
-
-      {/* ── 4. BROW GUARD ────────────────────────────────────────── */}
-      {/* Flat rectangular brow bar */}
-      <Path
-        d="
-          M 170 232
-          C 170 222, 176 216, 186 216
-          L 326 216
-          C 336 216, 342 222, 342 232
-          L 342 252
-          C 342 262, 336 268, 326 268
-          L 186 268
-          C 176 268, 170 262, 170 252 Z
+          M 256 40
+          C 148 40, 54 116, 48 220
+          C 42 320, 82 384, 160 408
+          Q 208 422, 256 424
+          Q 304 422, 352 408
+          C 430 384, 470 320, 464 220
+          C 458 116, 364 40, 256 40 Z
         "
         fill={shellColor}
         stroke={ink}
@@ -126,63 +75,145 @@ export default function Helmet({
         strokeLinejoin="round"
       />
 
-      {/* ── 5. HARDWARE CLIPS — clear Schutt T-clips ─────────────── */}
-      {/* Left clip body */}
-      <Rect x="195" y="228" width="28" height="30" rx="5" ry="5"
-        fill="#D0D8E8" stroke={ink} strokeWidth="3.5" opacity="0.92" />
-      {/* Left clip tab (top flange) */}
-      <Rect x="188" y="218" width="42" height="14" rx="5" ry="5"
-        fill="#E0E6F0" stroke={ink} strokeWidth="3" opacity="0.88" />
-
-      {/* Right clip body */}
-      <Rect x="289" y="228" width="28" height="30" rx="5" ry="5"
-        fill="#D0D8E8" stroke={ink} strokeWidth="3.5" opacity="0.92" />
-      {/* Right clip tab (top flange) */}
-      <Rect x="282" y="218" width="42" height="14" rx="5" ry="5"
-        fill="#E0E6F0" stroke={ink} strokeWidth="3" opacity="0.88" />
-
-      {/* ── 6. CHEEK GUARDS ──────────────────────────────────────── */}
-      {/* Left cheek */}
+      {/* Gloss overlay */}
       <Path
         d="
-          M 162 270 L 110 294
-          C 84 326, 82 378, 100 422
-          L 160 422 Z
+          M 256 40 C 148 40, 54 116, 48 220
+          C 42 320, 82 384, 160 408
+          Q 208 422, 256 424 Q 304 422, 352 408
+          C 430 384, 470 320, 464 220
+          C 458 116, 364 40, 256 40 Z
         "
-        fill="#2A7A6C"
-        opacity="0.70"
-      />
-      {/* Right cheek */}
-      <Path
-        d="
-          M 350 270 L 402 294
-          C 428 326, 430 378, 412 422
-          L 352 422 Z
-        "
-        fill="#2A7A6C"
-        opacity="0.70"
+        fill="url(#hGloss)"
       />
 
-      {/* ── 7. FACE OPENING ──────────────────────────────────────── */}
+      {/* Shadow overlay */}
       <Path
         d="
-          M 170 270
-          L 170 454
-          Q 185 470, 256 476
-          Q 327 470, 342 454
-          L 342 270
-          C 308 258, 204 258, 170 270 Z
+          M 256 40 C 148 40, 54 116, 48 220
+          C 42 320, 82 384, 160 408
+          Q 208 422, 256 424 Q 304 422, 352 408
+          C 430 384, 470 320, 464 220
+          C 458 116, 364 40, 256 40 Z
+        "
+        fill="url(#hShadow)"
+      />
+
+      {/* Top gloss streak */}
+      <Path
+        d="M 198 64 C 228 52, 284 52, 314 64"
+        stroke="#FFFFFF"
+        strokeWidth="13"
+        fill="none"
+        opacity="0.44"
+        strokeLinecap="round"
+      />
+
+      {/* Crown stripe */}
+      <Path
+        d="
+          M 247 42 Q 256 37, 265 42
+          L 266 232 L 246 232 Z
+        "
+        fill={stripeColor}
+        stroke={ink}
+        strokeWidth="2.5"
+        strokeLinejoin="round"
+      />
+
+      {/* Earhole — left shadow */}
+      <Path
+        d="
+          M 63 252 C 52 284, 54 328, 72 362
+          C 84 382, 106 394, 130 398
+          C 108 386, 92 362, 84 334
+          C 74 304, 74 268, 86 248
+          C 76 248, 68 250, 63 252 Z
+        "
+        fill={ink}
+        opacity="0.26"
+      />
+
+      {/* Earhole — right shadow */}
+      <Path
+        d="
+          M 449 252 C 460 284, 458 328, 440 362
+          C 428 382, 406 394, 382 398
+          C 404 386, 420 362, 428 334
+          C 438 304, 438 268, 426 248
+          C 436 248, 444 250, 449 252 Z
+        "
+        fill={ink}
+        opacity="0.26"
+      />
+
+      {/* ════════════════════════════════
+          PART 2 — FACEMASK
+          ════════════════════════════════
+
+          Draw order (back → front):
+            brow mount bar
+            → visor (dark)
+            → cheek guards
+            → uprights (tube)
+            → J-bar 1  (tube)
+            → J-bar 2  (tube)
+            → center divider (tube)
+            → chin bar (tube)
+      */}
+
+      {/* Brow mount bar — flat shelf that attaches cage to shell */}
+      <Path
+        d="
+          M 176 234 C 176 222, 182 216, 194 216
+          L 318 216 C 330 216, 336 222, 336 234
+          L 336 258 C 336 270, 330 276, 318 276
+          L 194 276 C 182 276, 176 270, 176 258 Z
+        "
+        fill={facemaskColor}
+        stroke={ink}
+        strokeWidth="5"
+        strokeLinejoin="round"
+      />
+      {/* Brow bar highlight */}
+      <Path d="M 182 222 L 330 222"
+        stroke="rgba(255,255,255,0.30)"
+        strokeWidth="6"
+        strokeLinecap="round"
+        fill="none"
+      />
+
+      {/* Hardware T-clips — left */}
+      <Rect x="200" y="210" width="34" height="16" rx="4" ry="4"
+        fill="#D8DDE8" stroke={ink} strokeWidth="3" opacity="0.92" />
+      <Rect x="206" y="220" width="22" height="20" rx="3" ry="3"
+        fill="#C8CDD8" stroke={ink} strokeWidth="3" opacity="0.92" />
+
+      {/* Hardware T-clips — right */}
+      <Rect x="278" y="210" width="34" height="16" rx="4" ry="4"
+        fill="#D8DDE8" stroke={ink} strokeWidth="3" opacity="0.92" />
+      <Rect x="284" y="220" width="22" height="20" rx="3" ry="3"
+        fill="#C8CDD8" stroke={ink} strokeWidth="3" opacity="0.92" />
+
+      {/* Visor — dark tinted area behind bars */}
+      <Path
+        d="
+          M 178 277
+          L 178 422
+          Q 195 440, 256 446
+          Q 317 440, 334 422
+          L 334 277
+          C 306 262, 206 262, 178 277 Z
         "
         fill={visorColor}
       />
-
-      {/* Visor gloss */}
+      {/* Visor gloss line */}
       <Path
-        d="M 200 278 C 224 268, 288 268, 312 278"
+        d="M 204 285 C 228 273, 284 273, 308 285"
         stroke="#FFFFFF"
         strokeWidth="5"
         fill="none"
-        opacity="0.15"
+        opacity="0.13"
         strokeLinecap="round"
       />
 
@@ -190,9 +221,9 @@ export default function Helmet({
       {!!visorText && (
         <SvgText
           x="256"
-          y="382"
+          y="380"
           textAnchor="middle"
-          fontSize="72"
+          fontSize="68"
           fontWeight="bold"
           fill="#FFFFFF"
           letterSpacing="3"
@@ -202,146 +233,119 @@ export default function Helmet({
         </SvgText>
       )}
 
-      {/* ── 8. CAGE — Schutt ROPO open-face style ────────────────── */}
-      {/*
-          Structure (front view):
-          - Left & right uprights bow gently outward
-          - Two close J-bars just below brow (the Schutt signature)
-          - Center vertical divider from J-bar 2 → chin bar
-          - Chin bar closing the bottom
-          All bars: thick facemaskColor fill + thin ink outline
-      */}
-
-      {/* --- LEFT UPRIGHT --- */}
+      {/* Cheek guards */}
       <Path
-        d="M 168 268 C 126 295, 108 366, 124 462"
-        stroke={facemaskColor}
-        strokeWidth="26"
-        fill="none"
-        strokeLinecap="round"
+        d="M 176 280 L 120 306 C 90 340, 88 394, 108 438 L 168 438 Z"
+        fill="#2A7A6C"
+        opacity="0.62"
       />
       <Path
-        d="M 168 268 C 126 295, 108 366, 124 462"
+        d="M 336 280 L 392 306 C 422 340, 424 394, 404 438 L 344 438 Z"
+        fill="#2A7A6C"
+        opacity="0.62"
+      />
+
+      {/* Left upright — bows outward */}
+      <Tube d="M 174 276 C 128 302, 106 372, 122 458" w={24} />
+
+      {/* Right upright */}
+      <Tube d="M 338 276 C 384 302, 406 372, 390 458" w={24} />
+
+      {/* J-bar 1 */}
+      <Tube d="M 134 304 L 378 304" w={22} />
+
+      {/* J-bar 2  (Schutt double-bar signature, ~28 px below J-bar 1) */}
+      <Tube d="M 130 332 L 382 332" w={22} />
+
+      {/* Center vertical divider */}
+      <Tube d="M 256 332 L 256 458" w={22} />
+
+      {/* Chin bar — curved bottom connector */}
+      <Tube d="M 122 458 Q 256 488, 390 458" w={24} />
+
+      {/* ════════════════════════════════
+          PART 3 — CHINSTRAP & CHIN CUP
+          ════════════════════════════════ */}
+
+      {/* Strap curve — left */}
+      <Path
+        d="M 130 404 C 126 428, 168 460, 206 470"
+        stroke={chinstrapColor}
+        strokeWidth="9"
+        fill="none"
+        strokeLinecap="round"
+        opacity="0.80"
+      />
+      <Path
+        d="M 130 404 C 126 428, 168 460, 206 470"
         stroke={ink}
-        strokeWidth="5.5"
+        strokeWidth="3"
         fill="none"
         strokeLinecap="round"
+        opacity="0.40"
       />
 
-      {/* --- RIGHT UPRIGHT --- */}
+      {/* Strap curve — right */}
       <Path
-        d="M 344 268 C 386 295, 404 366, 388 462"
-        stroke={facemaskColor}
-        strokeWidth="26"
+        d="M 382 404 C 386 428, 344 460, 306 470"
+        stroke={chinstrapColor}
+        strokeWidth="9"
         fill="none"
         strokeLinecap="round"
+        opacity="0.80"
       />
       <Path
-        d="M 344 268 C 386 295, 404 366, 388 462"
+        d="M 382 404 C 386 428, 344 460, 306 470"
         stroke={ink}
-        strokeWidth="5.5"
+        strokeWidth="3"
         fill="none"
         strokeLinecap="round"
+        opacity="0.40"
       />
 
-      {/* --- J-BAR 1 (first horizontal, close to brow) --- */}
-      <Path
-        d="M 140 296 L 372 296"
-        stroke={facemaskColor}
-        strokeWidth="22"
-        fill="none"
-        strokeLinecap="round"
-      />
-      <Path
-        d="M 140 296 L 372 296"
-        stroke={ink}
-        strokeWidth="5"
-        fill="none"
-        strokeLinecap="round"
-      />
-
-      {/* --- J-BAR 2 (second horizontal, ~24 px below J-bar 1) --- */}
-      <Path
-        d="M 136 324 L 376 324"
-        stroke={facemaskColor}
-        strokeWidth="22"
-        fill="none"
-        strokeLinecap="round"
-      />
-      <Path
-        d="M 136 324 L 376 324"
-        stroke={ink}
-        strokeWidth="5"
-        fill="none"
-        strokeLinecap="round"
-      />
-
-      {/* --- CENTER VERTICAL DIVIDER --- */}
-      <Path
-        d="M 256 324 L 256 462"
-        stroke={facemaskColor}
-        strokeWidth="22"
-        fill="none"
-        strokeLinecap="round"
-      />
-      <Path
-        d="M 256 324 L 256 462"
-        stroke={ink}
-        strokeWidth="5"
-        fill="none"
-        strokeLinecap="round"
-      />
-
-      {/* --- CHIN BAR (bottom connector) --- */}
-      <Path
-        d="M 124 462 Q 256 488, 388 462"
-        stroke={facemaskColor}
-        strokeWidth="26"
-        fill="none"
-        strokeLinecap="round"
-      />
-      <Path
-        d="M 124 462 Q 256 488, 388 462"
-        stroke={ink}
-        strokeWidth="5.5"
-        fill="none"
-        strokeLinecap="round"
-      />
-
-      {/* ── 9. CHIN CUP ──────────────────────────────────────────── */}
+      {/* Chin cup outer body */}
       <Path
         d="
-          M 196 462
-          C 178 462, 166 472, 166 486
-          L 166 496
-          C 166 508, 178 514, 200 514
-          L 312 514
-          C 334 514, 346 508, 346 496
-          L 346 486
-          C 346 472, 334 462, 316 462 Z
+          M 200 464
+          C 182 464, 170 476, 170 490
+          L 170 500
+          C 170 512, 184 520, 208 520
+          L 304 520
+          C 328 520, 342 512, 342 500
+          L 342 490
+          C 342 476, 330 464, 312 464 Z
         "
         fill={chinstrapColor}
         stroke={ink}
         strokeWidth="6"
         strokeLinejoin="round"
       />
-
-      {/* Chin cup crease lines */}
+      {/* Chin cup gloss */}
       <Path
-        d="M 202 479 C 224 471, 288 471, 310 479"
-        stroke={ink}
-        strokeWidth="3.5"
+        d="M 207 474 C 230 466, 282 466, 305 474"
+        stroke="#FFFFFF"
+        strokeWidth="4"
         fill="none"
         strokeLinecap="round"
-        opacity="0.22"
+        opacity="0.26"
       />
+      {/* Chin cup crease 1 */}
       <Path
-        d="M 206 493 C 226 487, 286 487, 306 493"
+        d="M 205 484 C 228 476, 284 476, 307 484"
         stroke={ink}
-        strokeWidth="3"
+        strokeWidth="2.5"
         fill="none"
         strokeLinecap="round"
-        opacity="0.15"
+        opacity="0.16"
+      />
+      {/* Chin cup crease 2 */}
+      <Path
+        d="M 208 498 C 229 492, 283 492, 304 498"
+        stroke={ink}
+        strokeWidth="2"
+        fill="none"
+        strokeLinecap="round"
+        opacity="0.12"
       />
 
     </Svg>
