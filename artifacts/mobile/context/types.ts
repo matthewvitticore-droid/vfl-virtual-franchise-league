@@ -445,6 +445,7 @@ export interface UniformSet {
   helmetColor: string;
   helmetFacemaskColor?:  string;
   helmetChinstrapColor?: string;
+  helmetStripeColor?:    string;
   helmetLogoColor?:      string;
   helmetVisorColor?:     string;
   helmetLogoPlacement: HelmetLogoPlacement;
