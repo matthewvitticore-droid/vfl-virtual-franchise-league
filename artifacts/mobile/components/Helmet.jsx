@@ -251,14 +251,11 @@ export default function Helmet({
       {/* Right upright */}
       <Tube d="M 338 276 C 384 302, 406 372, 390 458" w={24} />
 
-      {/* J-bar 1 */}
-      <Tube d="M 134 304 L 378 304" w={22} />
+      {/* J-bar 1 (upper of the two chin-area bars) */}
+      <Tube d="M 128 414 L 384 414" w={22} />
 
-      {/* J-bar 2  (Schutt double-bar signature, ~28 px below J-bar 1) */}
-      <Tube d="M 130 332 L 382 332" w={22} />
-
-      {/* Center vertical divider */}
-      <Tube d="M 256 332 L 256 458" w={22} />
+      {/* J-bar 2 (lower, Schutt double-bar signature near chin) */}
+      <Tube d="M 124 442 L 388 442" w={22} />
 
       {/* Chin bar — curved bottom connector */}
       <Tube d="M 122 458 Q 256 488, 390 458" w={24} />
