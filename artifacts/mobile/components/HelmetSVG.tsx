@@ -1,181 +1,173 @@
+/**
+ * HelmetPhotoCustomizer
+ *
+ * Renders the real helmet photo (transparent-background PNG) tinted to helmetColor,
+ * then overlays SVG shapes — precisely matched to the photo geometry — for:
+ *   • Facemask cage bars   → facemaskColor
+ *   • Chinstrap hardware   → chinstrapColor
+ *   • Team initials        → logoColor (on dome side)
+ *
+ * Internally always renders at INTERNAL_SIZE × INTERNAL_SIZE (square = matches photo).
+ * Scale the outer View to display at any size.
+ */
+
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
-import Svg, {
-  Path, Ellipse, Rect, Line, G, Defs, RadialGradient, Stop,
-} from "react-native-svg";
+import { Image, StyleSheet, Text, View } from "react-native";
+import Svg, { Ellipse, G, Line, Path, Rect } from "react-native-svg";
+
+// The internal working size (matches the square photo source)
+const S = 300;
 
 interface HelmetSVGProps {
-  helmetColor: string;
-  facemaskColor?: string;
+  helmetColor:     string;
+  facemaskColor?:  string;
   chinstrapColor?: string;
-  logoColor?: string;
-  abbreviation?: string;
-  width?: number;
-  height?: number;
+  logoColor?:      string;
+  abbreviation?:   string;
+  /** Display width in points. Height auto-equals width (square). */
+  width?:          number;
+  /** If provided, aspect is width × height; image is letterboxed. Pass equal values to keep square. */
+  height?:         number;
 }
 
-/**
- * Vector football helmet drawn as SVG — side profile (facing right).
- * Each major part is independently colored.
- *
- * Coordinate space: 240 × 210
- */
-export function HelmetSVG({
+export function HelmetSVGWithLogo({
   helmetColor,
   facemaskColor  = "#aaaaaa",
   chinstrapColor = "#888888",
   logoColor      = "#ffffff",
   abbreviation   = "VFL",
-  width          = 240,
-  height         = 210,
+  width          = S,
+  height,
 }: HelmetSVGProps) {
-  const abbr = abbreviation.slice(0, 3).toUpperCase();
-  const highlight = lighten(helmetColor, 0.28);
-  const shadow    = darken(helmetColor, 0.22);
-  const rim       = darken(helmetColor, 0.14);
+  // Always keep square so photo geometry stays correct
+  const size   = height ? Math.min(width, height) : width;
+  const abbr   = abbreviation.slice(0, 3).toUpperCase();
+  const scale  = size / S;
+
+  // ── Photo geometry (all in S×S = 300 coordinates) ──────────────────────────
+  //
+  // Source photo: 1024×1024 white helmet, right-facing ¾ view.
+  // Helmet fills ~85% of the image with about 7% margin on each side.
+  // After bg-removal, still 1024×1024. Displayed with resizeMode="stretch"
+  // so every coordinate below maps directly to the same fraction of the container.
+  //
+  // Reference points (as % of 1024, then × 300 / 1 = direct in S coords):
+
+  // ── Facemask cage ──────────────────────────────────────────────────────────
+  const FM_L  = 0.490 * S;   // left vertical bar X
+  const FM_R  = 0.835 * S;   // right vertical bar X
+  const FM_T  = 0.215 * S;   // top bar Y
+  const FM_B  = 0.790 * S;   // bottom bar Y
+  const FM_M1 = 0.420 * S;   // middle bar 1 Y
+  const FM_M2 = 0.590 * S;   // middle bar 2 Y
+  const FM_CV = 0.655 * S;   // center vertical bar X
+  const FM_SW = 10;           // stroke width (thick enough to cover photo bars)
+  const BOLT  = 6;            // bolt circle radius
+
+  // ── Chinstrap / snap clips ────────────────────────────────────────────────
+  // Left clip (rear of helmet chin area)
+  const CS_L_X = 0.190 * S;
+  const CS_L_Y = 0.750 * S;
+  const CS_W   = 0.065 * S;
+  const CS_H   = 0.055 * S;
+  // Right clip (front chin)
+  const CS_R_X = 0.430 * S;
+  const CS_R_Y = 0.760 * S;
+  // Chin pad oval
+  const CHIN_X = 0.310 * S;
+  const CHIN_Y = 0.840 * S;
+  const CHIN_W = 0.070 * S;
+  const CHIN_H = 0.030 * S;
+  const STRAP_W = 6;
+
+  // ── Logo on dome side ─────────────────────────────────────────────────────
+  const LOGO_X  = 0.270 * S;
+  const LOGO_Y  = 0.450 * S;
+  const LOGO_FS = abbr.length > 2 ? 22 : 28;
+
+  // When rendering inside a non-square container, center the square content
+  const containerW = width;
+  const containerH = height ?? width;
+  const offsetX = (containerW - size) / 2;
+  const offsetY = (containerH - size) / 2;
 
   return (
-    <Svg width={width} height={height} viewBox="0 0 240 210">
-      <Defs>
-        <RadialGradient id="shine" cx="38%" cy="35%" r="55%">
-          <Stop offset="0%"   stopColor={highlight} stopOpacity="0.85" />
-          <Stop offset="60%"  stopColor={helmetColor} stopOpacity="1" />
-          <Stop offset="100%" stopColor={shadow}    stopOpacity="1" />
-        </RadialGradient>
-      </Defs>
+    <View style={{ width: containerW, height: containerH }}>
 
-      {/* ── Helmet Shell ──────────────────────────────────────────────────────── */}
-      {/* Main dome */}
-      <Path
-        d="M 68 162
-           Q 24 158 16 112
-           Q 10 58 72 22
-           Q 120 4  158 28
-           Q 196 52 198 102
-           Q 200 148 170 160
-           L 68 162 Z"
-        fill="url(#shine)"
+      {/* ── Base helmet photo, tinted to helmetColor ──────────────────────── */}
+      <Image
+        source={require("@/assets/helmet_photo.png")}
+        style={{
+          position: "absolute",
+          left:   offsetX,
+          top:    offsetY,
+          width:  size,
+          height: size,
+        }}
+        tintColor={helmetColor}
+        resizeMode="stretch"
       />
 
-      {/* Bottom rim / neck roll */}
-      <Path
-        d="M 68 162 Q 120 172 170 160"
-        fill="none"
-        stroke={rim}
-        strokeWidth="8"
-        strokeLinecap="round"
-      />
+      {/* ── SVG overlay (facemask + chinstrap) ────────────────────────────── */}
+      <Svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${S} ${S}`}
+        style={{ position: "absolute", left: offsetX, top: offsetY }}
+      >
+        {/* Facemask cage */}
+        <G>
+          <Line x1={FM_L} y1={FM_T} x2={FM_L} y2={FM_B}
+            stroke={facemaskColor} strokeWidth={FM_SW} strokeLinecap="round" />
+          <Line x1={FM_R} y1={FM_T} x2={FM_R} y2={FM_B}
+            stroke={facemaskColor} strokeWidth={FM_SW} strokeLinecap="round" />
+          <Line x1={FM_L} y1={FM_T} x2={FM_R} y2={FM_T}
+            stroke={facemaskColor} strokeWidth={FM_SW} strokeLinecap="round" />
+          <Line x1={FM_L} y1={FM_B} x2={FM_R} y2={FM_B}
+            stroke={facemaskColor} strokeWidth={FM_SW} strokeLinecap="round" />
+          <Line x1={FM_L} y1={FM_M1} x2={FM_R} y2={FM_M1}
+            stroke={facemaskColor} strokeWidth={FM_SW} strokeLinecap="round" />
+          <Line x1={FM_L} y1={FM_M2} x2={FM_R} y2={FM_M2}
+            stroke={facemaskColor} strokeWidth={FM_SW} strokeLinecap="round" />
+          <Line x1={FM_CV} y1={FM_T} x2={FM_CV} y2={FM_B}
+            stroke={facemaskColor} strokeWidth={FM_SW} strokeLinecap="round" />
+          {/* Mount bolts */}
+          <Ellipse cx={FM_L} cy={FM_T + BOLT * 2.5} rx={BOLT} ry={BOLT}
+            fill={darken(facemaskColor, 0.3)} />
+          <Ellipse cx={FM_L} cy={FM_B - BOLT * 2.5} rx={BOLT} ry={BOLT}
+            fill={darken(facemaskColor, 0.3)} />
+          <Ellipse cx={FM_R - BOLT * 1.5} cy={FM_T + BOLT * 2} rx={BOLT * 0.8} ry={BOLT * 0.8}
+            fill={darken(facemaskColor, 0.3)} />
+        </G>
 
-      {/* ── Face Opening (dark void inside the face cutout) ─────────────────── */}
-      <Path
-        d="M 170 160
-           Q 200 148 198 102
-           Q 196 60 162 32
-           Q 152 25 148 38
-           Q 158 60 158 98
-           Q 158 134 152 154
-           Z"
-        fill="#0d0d18"
-      />
+        {/* Chinstrap clips */}
+        <G>
+          <Rect x={CS_L_X - CS_W / 2} y={CS_L_Y} width={CS_W} height={CS_H}
+            rx={CS_H * 0.3} fill={chinstrapColor} />
+          <Rect x={CS_R_X - CS_W / 2} y={CS_R_Y} width={CS_W} height={CS_H}
+            rx={CS_H * 0.3} fill={chinstrapColor} />
+          <Ellipse cx={CHIN_X} cy={CHIN_Y} rx={CHIN_W} ry={CHIN_H}
+            fill={chinstrapColor} />
+          <Path
+            d={`M ${CS_L_X} ${CS_L_Y + CS_H} Q ${CS_L_X + 15} ${CHIN_Y} ${CHIN_X - CHIN_W} ${CHIN_Y}`}
+            fill="none" stroke={chinstrapColor}
+            strokeWidth={STRAP_W} strokeLinecap="round" />
+          <Path
+            d={`M ${CS_R_X} ${CS_R_Y + CS_H} Q ${CS_R_X - 10} ${CHIN_Y} ${CHIN_X + CHIN_W} ${CHIN_Y}`}
+            fill="none" stroke={chinstrapColor}
+            strokeWidth={STRAP_W} strokeLinecap="round" />
+        </G>
+      </Svg>
 
-      {/* ── Inner padding line (shadow edge) ────────────────────────────────── */}
-      <Path
-        d="M 148 38 Q 144 70 144 98 Q 144 134 148 155"
-        fill="none"
-        stroke={shadow}
-        strokeWidth="3"
-        opacity="0.6"
-      />
-
-      {/* ── Logo on side of helmet ───────────────────────────────────────────── */}
+      {/* ── Team initials (React Native Text for font support) ────────────── */}
       <Text
         style={[
-          styles.logoText,
-          { color: logoColor, fontSize: abbr.length > 2 ? 22 : 28 },
-        ]}
-        // SVG Text doesn't render well via Text; handled below with react-native Text overlay
-      />
-
-      {/* ── Facemask cage ───────────────────────────────────────────────────── */}
-      {/* Outer frame */}
-      <Path
-        d="M 152 56
-           L 220 56
-           Q 232 56 232 68
-           L 232 152
-           Q 232 162 220 162
-           L 152 162"
-        fill="none"
-        stroke={facemaskColor}
-        strokeWidth="8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      {/* Top horizontal bar */}
-      <Line x1="152" y1="56" x2="232" y2="56"  stroke={facemaskColor} strokeWidth="8" strokeLinecap="round" />
-      {/* Middle bar 1 */}
-      <Line x1="152" y1="96" x2="232" y2="96"  stroke={facemaskColor} strokeWidth="7" strokeLinecap="round" />
-      {/* Middle bar 2 */}
-      <Line x1="152" y1="128" x2="232" y2="128" stroke={facemaskColor} strokeWidth="7" strokeLinecap="round" />
-      {/* Center vertical bar */}
-      <Line x1="192" y1="56" x2="192" y2="162" stroke={facemaskColor} strokeWidth="7" strokeLinecap="round" />
-
-      {/* Facemask mount bolts */}
-      <Ellipse cx="160" cy="56"  rx="5" ry="5" fill={darken(facemaskColor, 0.15)} />
-      <Ellipse cx="160" cy="162" rx="5" ry="5" fill={darken(facemaskColor, 0.15)} />
-
-      {/* ── Ear hole / snap clips ───────────────────────────────────────────── */}
-      <Ellipse cx="46" cy="120" rx="12" ry="14" fill={darken(helmetColor, 0.3)} />
-      <Ellipse cx="46" cy="120" rx="7"  ry="9"  fill="#0d0d18" />
-
-      {/* ── Chinstrap clips ─────────────────────────────────────────────────── */}
-      <Rect x="44" y="155" width="22" height="12" rx="4" fill={chinstrapColor} />
-      <Rect x="136" y="156" width="22" height="12" rx="4" fill={chinstrapColor} />
-
-      {/* Strap band */}
-      <Path
-        d="M 55 167 Q 55 182 90 190 Q 122 198 149 168"
-        fill="none"
-        stroke={chinstrapColor}
-        strokeWidth="7"
-        strokeLinecap="round"
-      />
-      {/* Strap center buckle */}
-      <Rect x="84" y="186" width="22" height="10" rx="3" fill={darken(chinstrapColor, 0.2)} />
-      <Line x1="95" y1="186" x2="95" y2="196" stroke={chinstrapColor} strokeWidth="2" />
-
-      {/* ── Highlight gloss ─────────────────────────────────────────────────── */}
-      <Ellipse
-        cx="88"
-        cy="62"
-        rx="28"
-        ry="18"
-        fill="rgba(255,255,255,0.12)"
-        transform="rotate(-25 88 62)"
-      />
-    </Svg>
-  );
-}
-
-/** Lightweight logo text overlay positioned on the helmet side */
-export function HelmetSVGWithLogo(props: HelmetSVGProps) {
-  const { width = 240, height = 210, logoColor = "#ffffff", abbreviation = "VFL" } = props;
-  const abbr = abbreviation.slice(0, 3).toUpperCase();
-  const scale = width / 240;
-
-  return (
-    <View style={{ width, height }}>
-      <HelmetSVG {...props} />
-      {/* Logo text: positioned on the left dome area of the helmet */}
-      <Text
-        style={[
-          styles.logoOverlay,
+          styles.logo,
           {
-            color: logoColor,
-            fontSize: (abbr.length > 2 ? 22 : 28) * scale,
-            left:  width * 0.29,
-            top:   height * 0.41,
-            textShadowColor: "rgba(0,0,0,0.45)",
+            color:    logoColor,
+            fontSize: LOGO_FS * scale,
+            left:     offsetX + (LOGO_X - LOGO_FS * abbr.length * 0.38) * scale,
+            top:      offsetY + (LOGO_Y - LOGO_FS * 0.55) * scale,
           },
         ]}
         numberOfLines={1}
@@ -186,7 +178,10 @@ export function HelmetSVGWithLogo(props: HelmetSVGProps) {
   );
 }
 
-// ─── Color helpers ─────────────────────────────────────────────────────────
+// Keep old alias
+export { HelmetSVGWithLogo as HelmetSVG };
+
+// ─── Color helpers ─────────────────────────────────────────────────────────────
 
 function hexToRgb(hex: string): [number, number, number] {
   const clean = hex.replace("#", "").padEnd(6, "0").slice(0, 6);
@@ -195,12 +190,9 @@ function hexToRgb(hex: string): [number, number, number] {
 }
 
 function rgbToHex(r: number, g: number, b: number): string {
-  return "#" + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("");
-}
-
-function lighten(hex: string, amount: number): string {
-  const [r, g, b] = hexToRgb(hex);
-  return rgbToHex(r + (255 - r) * amount, g + (255 - g) * amount, b + (255 - b) * amount);
+  return "#" + [r, g, b]
+    .map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0"))
+    .join("");
 }
 
 function darken(hex: string, amount: number): string {
@@ -209,12 +201,12 @@ function darken(hex: string, amount: number): string {
 }
 
 const styles = StyleSheet.create({
-  logoText:    { display: "none" },
-  logoOverlay: {
+  logo: {
     position:   "absolute",
     fontFamily: "Inter_700Bold",
-    letterSpacing: -1,
+    letterSpacing: -0.5,
+    textShadowColor:  "rgba(0,0,0,0.6)",
     textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
+    textShadowRadius: 4,
   },
 });

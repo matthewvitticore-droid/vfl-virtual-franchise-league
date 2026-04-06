@@ -151,7 +151,7 @@ export default function HomeScreen() {
             locations={[0, 0.35, 0.7, 1]}
             style={StyleSheet.absoluteFill}
           />
-          {/* Helmet SVG — fully colorized from uniform settings */}
+          {/* Helmet photo — fully colorized from uniform settings */}
           <View style={st.helmetImg}>
             <HelmetSVGWithLogo
               helmetColor={uniformHelmetColor ?? teamColor}
@@ -159,8 +159,8 @@ export default function HomeScreen() {
               chinstrapColor={uniformChinstrapColor}
               logoColor={uniformLogoColor}
               abbreviation={team?.abbreviation ?? "VFL"}
-              width={310}
-              height={270}
+              width={300}
+              height={300}
             />
           </View>
           {/* Bottom fade so team info blends into content */}
@@ -597,7 +597,7 @@ const st = StyleSheet.create({
   liveTag:        { paddingHorizontal:6, paddingVertical:2, borderRadius:4, marginRight:8 },
   // Helmet hero
   helmetHero:     { height:360, overflow:"hidden", position:"relative" },
-  helmetImg:      { position:"absolute", right:-20, top:5, width:310, height:270 },
+  helmetImg:      { position:"absolute", right:-35, top:-10, width:300, height:300 },
   helmetTopBar:   { flexDirection:"row", alignItems:"center", justifyContent:"space-between", paddingHorizontal:16, paddingBottom:8 },
   helmetTeamInfo: { position:"absolute", bottom:16, left:16, right:16 },
   // Header pieces still used

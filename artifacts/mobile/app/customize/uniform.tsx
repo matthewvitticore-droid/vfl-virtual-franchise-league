@@ -180,12 +180,12 @@ export default function UniformScreen() {
         <View style={[st.helmetPreviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <HelmetSVGWithLogo
             helmetColor={u.helmetColor}
-            facemaskColor={u.helmetFacemaskColor ?? colors.mutedForeground}
-            chinstrapColor={u.helmetChinstrapColor ?? colors.mutedForeground}
+            facemaskColor={u.helmetFacemaskColor ?? "#888888"}
+            chinstrapColor={u.helmetChinstrapColor ?? "#888888"}
             logoColor={u.helmetLogoColor ?? "#FFFFFF"}
             abbreviation={abbr}
-            width={200}
-            height={175}
+            width={220}
+            height={220}
           />
         </View>
 
