@@ -17,6 +17,7 @@ import { CombineMeasurables } from "@/context/types";
 type Tab = "freeAgency" | "draft" | "trades";
 type DraftView = "combine" | "warRoom";
 type SortKey = "grade" | "fortyYardDash" | "benchPress" | "verticalJump" | "broadJump" | "shuttleRun" | "threeCone" | "speed" | "acceleration" | "agility" | "explosion" | "strength";
+type FASortKey = "overall" | "age" | "speed" | "acceleration" | "agility" | "faInterestLevel" | "yearsExperience" | "salary";
 
 const ALL_POS: NFLPosition[] = ["QB","RB","WR","TE","OL","DE","DT","LB","CB","S","K","P"];
 const POS_COLOR: Record<NFLPosition, string> = {
@@ -46,6 +47,8 @@ export default function FrontOfficeScreen() {
   const [posFilter, setPosFilter] = useState<NFLPosition | "ALL">("ALL");
   const [sortKey, setSortKey] = useState<SortKey>("grade");
   const [sortAsc, setSortAsc] = useState(false);
+  const [faSortKey, setFASortKey] = useState<FASortKey>("overall");
+  const [faSortAsc, setFASortAsc] = useState(false);
   const [expandedProspect, setExpandedProspect] = useState<string | null>(null);
   const [selectedProspect, setSelectedProspect] = useState<DraftProspect | null>(null);
   const [warRoomIds, setWarRoomIds] = useState<string[]>([]);
@@ -104,9 +107,32 @@ export default function FrontOfficeScreen() {
 
   const freeAgents = useMemo(() => {
     if (!season) return [];
-    const sorted = [...season.freeAgents].sort((a, b) => b.overall - a.overall);
-    return posFilter === "ALL" ? sorted : sorted.filter(p => p.position === posFilter);
-  }, [season, posFilter]);
+    const FA_LOW_BETTER: FASortKey[] = ["age", "salary", "yearsExperience"];
+    const list = posFilter === "ALL" ? [...season.freeAgents] : season.freeAgents.filter(p => p.position === posFilter);
+    return list.sort((a, b) => {
+      const getVal = (p: Player): number => {
+        switch (faSortKey) {
+          case "overall":          return p.overall;
+          case "age":              return p.age;
+          case "speed":            return p.speed;
+          case "acceleration":     return (p.positionRatings as any)?.acceleration ?? 50;
+          case "agility":          return (p.positionRatings as any)?.agility ?? 50;
+          case "faInterestLevel":  return p.faInterestLevel;
+          case "yearsExperience":  return p.yearsExperience;
+          case "salary":           return p.salary;
+          default:                 return p.overall;
+        }
+      };
+      const invert = FA_LOW_BETTER.includes(faSortKey);
+      const diff = getVal(a) - getVal(b);
+      return (faSortAsc !== invert) ? diff : -diff;
+    });
+  }, [season, posFilter, faSortKey, faSortAsc]);
+
+  const handleFASort = (key: FASortKey) => {
+    if (faSortKey === key) setFASortAsc(a => !a);
+    else { setFASortKey(key); setFASortAsc(false); }
+  };
 
   // ── Draft data ────────────────────────────────────────────────────────────
 
@@ -227,7 +253,8 @@ export default function FrontOfficeScreen() {
 
       {/* ── FREE AGENCY ─────────────────────────────────────────────────────── */}
       {tab === "freeAgency" && (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+        <View style={{ flex: 1 }}>
+          {/* Status bar */}
           <View style={[st.phaseBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
             <Feather name="user-plus" size={14} color={teamColor} />
             <Text style={[st.phaseText, { color: colors.foreground }]}>{freeAgents.length} free agents available</Text>
@@ -238,7 +265,7 @@ export default function FrontOfficeScreen() {
             </View>
           </View>
           {/* Position filter */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap:6, padding:12 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap:6, padding:10 }} style={{ flexGrow:0 }}>
             {(["ALL", ...ALL_POS] as (NFLPosition|"ALL")[]).map(p => (
               <TouchableOpacity key={p} onPress={() => setPosFilter(p)}
                 style={[st.posChip, { backgroundColor: posFilter===p ? (p==="ALL"?teamColor:POS_COLOR[p as NFLPosition]) : colors.secondary, borderColor: posFilter===p ? (p==="ALL"?teamColor:POS_COLOR[p as NFLPosition]) : colors.border }]}>
@@ -246,18 +273,35 @@ export default function FrontOfficeScreen() {
               </TouchableOpacity>
             ))}
           </ScrollView>
-          {freeAgents.slice(0, 40).map(p => (
-            <FAPlayerCard key={p.id} p={p} expanded={expandedFA === p.id} teamColor={teamColor} isGM={isGM} colors={colors}
-              onToggle={() => setExpandedFA(expandedFA === p.id ? null : p.id)}
-              onSign={(yrs, sal) => {
-                Alert.alert(`Sign ${p.name}?`, `${yrs}-year, $${sal}M/yr deal.`, [
-                  { text:"Cancel" },
-                  { text:"Sign Player", onPress: () => signFreeAgent(p.id, yrs, sal) },
-                ]);
-              }}
-            />
-          ))}
-        </ScrollView>
+          {/* Sortable table */}
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View>
+                {/* Column headers */}
+                <View style={[st.combineHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+                  <Text style={[st.colFixHdr, { width: 170, color: colors.mutedForeground }]}># POS PLAYER AGE</Text>
+                  <FASortHeader label="OVR"  sortKey="overall"         current={faSortKey} asc={faSortAsc} onSort={handleFASort} colors={colors} teamColor={teamColor} />
+                  <FASortHeader label="SPD"  sortKey="speed"           current={faSortKey} asc={faSortAsc} onSort={handleFASort} colors={colors} teamColor={teamColor} />
+                  <FASortHeader label="ACC"  sortKey="acceleration"    current={faSortKey} asc={faSortAsc} onSort={handleFASort} colors={colors} teamColor={teamColor} />
+                  <FASortHeader label="AGI"  sortKey="agility"         current={faSortKey} asc={faSortAsc} onSort={handleFASort} colors={colors} teamColor={teamColor} />
+                  <FASortHeader label="INT"  sortKey="faInterestLevel" current={faSortKey} asc={faSortAsc} onSort={handleFASort} colors={colors} teamColor={teamColor} />
+                  <FASortHeader label="EXP"  sortKey="yearsExperience" current={faSortKey} asc={faSortAsc} onSort={handleFASort} colors={colors} teamColor={teamColor} />
+                  <FASortHeader label="SAL"  sortKey="salary"          current={faSortKey} asc={faSortAsc} onSort={handleFASort} colors={colors} teamColor={teamColor} />
+                </View>
+                {freeAgents.map((p, idx) => (
+                  <FARow key={p.id} p={p} rank={idx + 1} colors={colors} teamColor={teamColor} isGM={isGM}
+                    onSign={(yrs, sal) => {
+                      Alert.alert(`Sign ${p.name}?`, `${yrs}-year deal, $${sal}M/yr.\nInterest: ${p.faInterestLevel >= 4 ? "High" : p.faInterestLevel >= 3 ? "Medium" : "Low"}`, [
+                        { text: "Cancel" },
+                        { text: "Sign Player", onPress: () => signFreeAgent(p.id, yrs, sal) },
+                      ]);
+                    }}
+                  />
+                ))}
+              </View>
+            </ScrollView>
+          </ScrollView>
+        </View>
       )}
 
       {/* ── DRAFT ──────────────────────────────────────────────────────────── */}
@@ -821,6 +865,91 @@ function deriveCombineRating(key: "speed"|"acceleration"|"agility"|"strength", c
   }
 }
 
+// ─── FA Sort Header ───────────────────────────────────────────────────────────
+function FASortHeader({ label, sortKey: key, current, asc, onSort, colors, teamColor }:
+  { label: string; sortKey: FASortKey; current: FASortKey; asc: boolean; onSort: (k: FASortKey) => void; colors: any; teamColor: string }) {
+  const active = key === current;
+  return (
+    <TouchableOpacity onPress={() => onSort(key)} style={[st.sortHeader, active && { borderBottomWidth: 2, borderBottomColor: teamColor }]}>
+      <Text style={[st.sortHeaderText, { color: active ? teamColor : colors.mutedForeground }]}>{label}</Text>
+      {active && <Feather name={asc ? "chevron-up" : "chevron-down"} size={9} color={teamColor} />}
+    </TouchableOpacity>
+  );
+}
+
+// ─── FA Row ───────────────────────────────────────────────────────────────────
+function FARow({ p, rank, colors, teamColor, isGM, onSign }: {
+  p: Player; rank: number; colors: any; teamColor: string; isGM: boolean;
+  onSign: (yrs: number, sal: number) => void;
+}) {
+  const ratingColor = (v: number) => v >= 90 ? "#FFD700" : v >= 80 ? colors.success : v >= 70 ? colors.foreground : colors.mutedForeground;
+  const interestColor = (v: number) => v >= 5 ? "#FFD700" : v >= 4 ? colors.success : v >= 3 ? colors.foreground : colors.mutedForeground;
+  const acc = (p.positionRatings as any)?.acceleration ?? 50;
+  const agi = (p.positionRatings as any)?.agility ?? 50;
+
+  const interestDots = Array.from({ length: 5 }, (_, i) => i < p.faInterestLevel);
+
+  return (
+    <TouchableOpacity
+      activeOpacity={isGM ? 0.75 : 1}
+      onPress={isGM ? () => {
+        const options = [1, 2, 3].map(yrs => {
+          const sal = parseFloat((p.salary * (1 + (yrs - 1) * 0.03)).toFixed(1));
+          return { text: `${yrs}yr · $${sal}M/yr`, onPress: () => onSign(yrs, sal) };
+        });
+        Alert.alert(
+          `Sign ${p.name}`,
+          `${p.position} · Age ${p.age} · ${p.faInterestLevel >= 4 ? "High" : p.faInterestLevel >= 3 ? "Medium" : "Low"} Interest`,
+          [{ text: "Cancel", style: "cancel" }, ...options],
+        );
+      } : undefined}
+      style={[st.combineRowContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}
+    >
+      {/* Fixed name cell — wider to include age */}
+      <View style={st.faNameCell}>
+        <Text style={[st.rankNum, { color: colors.mutedForeground }]}>{rank}.</Text>
+        <View style={[st.posBubble, { backgroundColor: (POS_COLOR[p.position] ?? "#888") + "30" }]}>
+          <Text style={[st.posBubbleText, { color: POS_COLOR[p.position] ?? "#888" }]}>{p.position}</Text>
+        </View>
+        <View style={{ flex: 1, gap: 1 }}>
+          <Text style={[st.playerLastName, { color: colors.foreground }]} numberOfLines={1}>
+            {p.name.split(" ").slice(1).join(" ")}
+          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <Text style={[st.faAge, { color: colors.mutedForeground }]}>Age {p.age}</Text>
+            <View style={{ flexDirection: "row", gap: 1.5 }}>
+              {interestDots.map((filled, i) => (
+                <View key={i} style={[st.faInterestDot, { backgroundColor: filled ? teamColor : colors.border }]} />
+              ))}
+            </View>
+          </View>
+        </View>
+      </View>
+      {/* Scrollable stat columns */}
+      <ColCell value={`${p.overall}`} color={ratingColor(p.overall)} />
+      <ColCell value={`${p.speed}`}   color={ratingColor(p.speed)} />
+      <ColCell value={`${acc}`}       color={ratingColor(acc)} />
+      <ColCell value={`${agi}`}       color={ratingColor(agi)} />
+      <ColCell value={`${p.faInterestLevel}/5`} color={interestColor(p.faInterestLevel)} />
+      <ColCell value={`${p.yearsExperience}yr`} color={colors.foreground} />
+      <ColCell value={`$${p.salary}M`} color={p.salary >= 15 ? colors.danger : p.salary >= 8 ? colors.nflGold : colors.success} />
+      {isGM && (
+        <TouchableOpacity onPress={(e) => {
+          e.stopPropagation?.();
+          const options = [1, 2, 3].map(yrs => {
+            const sal = parseFloat((p.salary * (1 + (yrs - 1) * 0.03)).toFixed(1));
+            return { text: `${yrs}yr · $${sal}M/yr`, onPress: () => onSign(yrs, sal) };
+          });
+          Alert.alert(`Sign ${p.name}`, `${p.position} · Age ${p.age}`, [{ text: "Cancel", style: "cancel" }, ...options]);
+        }}
+          style={[st.draftBtnSm, { backgroundColor: teamColor }]}>
+          <Text style={st.draftBtnSmText}>Sign</Text>
+        </TouchableOpacity>
+      )}
+    </TouchableOpacity>
+  );
+}
+
 function CombineRow({ p, rank, colors, teamColor, isUserTurn, isGM, isOnBoard, onDraft, onTap, onToggleWarRoom }: {
   p: DraftProspect; rank: number; colors: any; teamColor: string; isUserTurn: boolean; isGM: boolean;
   isOnBoard?: boolean; onDraft: () => void; onTap?: () => void; onToggleWarRoom?: () => void;
@@ -1117,6 +1246,9 @@ const st = StyleSheet.create({
   colFixHdr:        { width:140, fontSize:11, fontFamily:"Inter_600SemiBold" },
   colFix2:          { width:100, fontSize:11, fontFamily:"Inter_500Medium" },
   nameCell:         { width:140, flexDirection:"row", alignItems:"center", gap:4 },
+  faNameCell:       { width:170, flexDirection:"row", alignItems:"center", gap:4 },
+  faAge:            { fontSize:9, fontFamily:"Inter_500Medium" },
+  faInterestDot:    { width:5, height:5, borderRadius:2.5 },
   rankNum:          { fontSize:10, fontFamily:"Inter_400Regular", width:18 },
   posBubble:        { borderRadius:4, paddingHorizontal:4, paddingVertical:1 },
   posBubbleText:    { fontSize:9, fontFamily:"Inter_700Bold" },
