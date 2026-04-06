@@ -1,128 +1,79 @@
 import React from "react";
-import Svg, { Path, Ellipse, G } from "react-native-svg";
+import Svg, { Path, G } from "react-native-svg";
 
 export default function Helmet({
   size = 220,
   shellColor = "#E5E7EB",
-  facemaskColor = "#DC2626",
+  facemaskColor = "#FFFFFF",
   visorColor = "#0F172A",
   chinstrapColor = "#1D4ED8",
 }) {
   return (
-    <Svg
-      width={size}
-      height={size}
-      viewBox="0 0 512 512"
-    >
+    <Svg width={size} height={size} viewBox="0 0 512 512">
 
-      {/* ================= SHELL ================= */}
+      {/* SHELL */}
       <Path
         d="
-          M90 300
-          C80 200, 160 120, 300 130
-          C400 140, 460 200, 430 300
-          C410 360, 340 390, 250 380
-          C160 370, 110 340, 90 300
+          M80 300
+          C70 200, 150 110, 280 110
+          C360 110, 440 160, 460 230
+          C470 270, 440 300, 380 310
+          L200 320
+          C140 320, 100 320, 80 300
           Z
         "
         fill={shellColor}
       />
 
-      {/* Shell highlight */}
+      {/* BACK BOTTOM */}
       <Path
-        d="
-          M150 180
-          C220 140, 330 150, 380 200
-        "
-        stroke="#FFFFFF"
-        strokeWidth="8"
-        opacity="0.4"
-        fill="none"
+        d="M120 320 Q200 360 300 340"
+        fill="#00000020"
       />
 
-      {/* Ear hole */}
-      <Ellipse
-        cx="170"
-        cy="300"
-        rx="18"
-        ry="14"
-        fill="#111827"
-      />
-
-      {/* ================= VISOR ================= */}
+      {/* VISOR (curved) */}
       <Path
         d="
-          M260 210
-          C320 190, 400 210, 420 260
-          C400 300, 320 310, 260 290
-          C240 260, 240 230, 260 210
+          M270 190
+          Q360 180 420 230
+          Q360 300 270 290
+          Q240 260 240 230
+          Q240 200 270 190
           Z
         "
         fill={visorColor}
-        opacity="0.9"
       />
 
-      {/* visor shine */}
-      <Path
-        d="
-          M300 220
-          C350 210, 390 230, 400 250
-        "
-        stroke="#FFFFFF"
-        strokeWidth="6"
-        opacity="0.2"
+      {/* FACEMASK */}
+      <G
+        stroke={facemaskColor}
+        strokeWidth="12"
+        strokeLinecap="round"
         fill="none"
-      />
-
-      {/* ================= FACEMASK ================= */}
-      <G stroke={facemaskColor} strokeWidth="10" fill="none" strokeLinecap="round">
-
+      >
         {/* top bar */}
-        <Path d="M260 210 C340 180, 430 210, 440 250" />
+        <Path d="M260 210 Q340 200 420 240" />
 
-        {/* mid bar */}
-        <Path d="M260 260 C340 240, 420 260, 430 290" />
+        {/* middle bar */}
+        <Path d="M250 240 Q340 235 430 270" />
 
         {/* bottom bar */}
-        <Path d="M250 300 C330 290, 400 310, 410 340" />
+        <Path d="M250 270 Q340 275 420 300" />
 
-        {/* vertical bars */}
-        <Path d="M300 210 C300 260, 300 300, 300 340" />
-        <Path d="M360 215 C360 260, 360 300, 360 340" />
+        {/* vertical support */}
+        <Path d="M360 200 L360 310" />
 
-        {/* nose guard */}
-        <Path d="M320 270 C340 270, 350 290, 340 310" />
-
+        {/* front curve */}
+        <Path d="M420 240 Q450 270 420 300" />
       </G>
 
-      {/* ================= CHINSTRAP ================= */}
+      {/* CHINSTRAP */}
       <Path
-        d="
-          M260 360
-          C300 390, 360 390, 400 360
-        "
+        d="M300 320 Q360 360 420 320"
         stroke={chinstrapColor}
         strokeWidth="14"
         fill="none"
         strokeLinecap="round"
-      />
-
-      <Ellipse
-        cx="330"
-        cy="375"
-        rx="30"
-        ry="18"
-        fill={chinstrapColor}
-      />
-
-      {/* ================= SHADOW ================= */}
-      <Ellipse
-        cx="260"
-        cy="400"
-        rx="140"
-        ry="25"
-        fill="#000"
-        opacity="0.15"
       />
 
     </Svg>
