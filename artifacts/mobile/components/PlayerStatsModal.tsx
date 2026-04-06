@@ -316,10 +316,10 @@ function RatingsTab({ player, accent }: { player: Player; accent: string }) {
       {/* Overall strip */}
       <View style={[rt.ovrStrip, { backgroundColor: accent+"18", borderColor: accent+"35" }]}>
         <Text style={[rt.ovrLabel, { color: colors.mutedForeground }]}>OVERALL</Text>
-        <Text style={[rt.ovrVal, { color: ratingColor(player.overall) }]}>{player.overall}</Text>
+        <Text style={[rt.ovrVal, { color: accent }]}>{player.overall}</Text>
         <View style={{ flex: 1 }}>
           <View style={[rt.barTrack, { backgroundColor: colors.border }]}>
-            <View style={[rt.barFill, { width: `${player.overall}%` as any, backgroundColor: ratingColor(player.overall) }]} />
+            <View style={[rt.barFill, { width: `${player.overall}%` as any, backgroundColor: accent }]} />
           </View>
         </View>
       </View>
@@ -332,8 +332,8 @@ function RatingsTab({ player, accent }: { player: Player; accent: string }) {
           { label:"STR",     value: player.strength },
           { label:"AWR",     value: player.awareness },
         ].map(r => (
-          <View key={r.label} style={[rt.athlBox, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-            <Text style={[rt.athlVal, { color: ratingColor(r.value) }]}>{r.value}</Text>
+          <View key={r.label} style={[rt.athlBox, { backgroundColor: accent+"12", borderColor: accent+"30" }]}>
+            <Text style={[rt.athlVal, { color: accent }]}>{r.value}</Text>
             <Text style={[rt.athlLbl, { color: colors.mutedForeground }]}>{r.label}</Text>
           </View>
         ))}
@@ -345,17 +345,17 @@ function RatingsTab({ player, accent }: { player: Player; accent: string }) {
         {keys.map(key => {
           const val   = player.posRatings[key] ?? 0;
           const label = POS_RATING_LABELS[key];
-          const clr   = ratingColor(val);
+          const valClr = ratingColor(val); // keep tier color for the number only
           return (
             <View key={key} style={rt.ratingRow}>
               {/* Label */}
               <Text style={[rt.rLabel, { color: colors.mutedForeground }]}>{label}</Text>
-              {/* Bar */}
+              {/* Bar — team color fill */}
               <View style={[rt.track, { backgroundColor: colors.border }]}>
-                <View style={[rt.fill, { width: `${val}%` as any, backgroundColor: clr }]} />
+                <View style={[rt.fill, { width: `${val}%` as any, backgroundColor: accent }]} />
               </View>
-              {/* Value */}
-              <Text style={[rt.rVal, { color: clr }]}>{val}</Text>
+              {/* Value — tier color so 93 = gold, 75 = white, etc. */}
+              <Text style={[rt.rVal, { color: valClr }]}>{val}</Text>
             </View>
           );
         })}
@@ -420,7 +420,7 @@ export function PlayerStatsModal({ player, visible, onClose, teamPrimaryColor, g
           <View style={[modal.handle, { backgroundColor: colors.border }]} />
 
           {/* Gradient bg */}
-          <LinearGradient colors={[posColor+"30","transparent"]} style={modal.grad} pointerEvents="none" />
+          <LinearGradient colors={[accent+"30","transparent"]} style={modal.grad} pointerEvents="none" />
 
           {/* Header */}
           <View style={modal.header}>
@@ -434,8 +434,8 @@ export function PlayerStatsModal({ player, visible, onClose, teamPrimaryColor, g
                 )}
               </View>
               <View style={{ flexDirection:"row", alignItems:"center", gap:6 }}>
-                <View style={[modal.posBadge, { backgroundColor: posColor+"25", borderColor: posColor+"60" }]}>
-                  <Text style={[modal.posText, { color: posColor }]}>{player.position}</Text>
+                <View style={[modal.posBadge, { backgroundColor: accent+"25", borderColor: accent+"60" }]}>
+                  <Text style={[modal.posText, { color: accent }]}>{player.position}</Text>
                 </View>
                 <Text style={[modal.meta, { color: colors.mutedForeground }]}>
                   {player.age}yo · {player.yearsExperience}yr exp · {player.overall} OVR

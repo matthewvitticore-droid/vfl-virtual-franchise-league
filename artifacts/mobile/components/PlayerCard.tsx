@@ -109,7 +109,6 @@ export function PlayerCard({
   const primaryMid = darken(primary, -26);
   const secDk      = darken(secondary, -40);
 
-  const posColor = POS_COLOR[player.position]; // kept only for tiny position text label
   const devColor = DEV_COLOR[player.developmentTrait] ?? "#8B949E";
   const devIcon  = DEV_ICON[player.developmentTrait]  ?? "user";
   const ovrC     = ovrColor(player.overall);
