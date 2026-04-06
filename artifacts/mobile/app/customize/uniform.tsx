@@ -46,7 +46,7 @@ const LOGO_PLACEMENTS: { value: HelmetLogoPlacement; label: string }[] = [
 ];
 
 type PickerTarget =
-  | "helmetColor" | "helmetFacemaskColor" | "helmetChinstrapColor" | "helmetLogoColor"
+  | "helmetColor" | "helmetFacemaskColor" | "helmetChinstrapColor" | "helmetLogoColor" | "helmetVisorColor"
   | "jerseyColor" | "jerseyAccentColor"
   | "numberColor" | "numberOutlineColor" | "pantColor"
   | "pantStripeColor" | "sockColor" | "sockAccentColor";
@@ -67,7 +67,7 @@ export default function UniformScreen() {
     const pc = team?.primaryColor ?? "#4F46E5";
     const sc = team?.secondaryColor ?? "#0D9488";
     const base: UniformSet = {
-      helmetColor: pc, helmetFacemaskColor: sc, helmetChinstrapColor: sc, helmetLogoColor: "#FFFFFF",
+      helmetColor: pc, helmetFacemaskColor: sc, helmetChinstrapColor: sc, helmetLogoColor: "#FFFFFF", helmetVisorColor: "#111827",
       helmetLogoPlacement: "both",
       jerseyStyle: "traditional", jerseyColor: pc, jerseyAccentColor: sc,
       numberFont: "block", numberColor: "#FFFFFF", numberOutlineColor: sc,
@@ -180,12 +180,13 @@ export default function UniformScreen() {
         <View style={[st.helmetPreviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <HelmetSVGWithLogo
             helmetColor={u.helmetColor}
-            facemaskColor={u.helmetFacemaskColor ?? "#888888"}
+            facemaskColor={u.helmetFacemaskColor  ?? "#888888"}
             chinstrapColor={u.helmetChinstrapColor ?? "#888888"}
-            logoColor={u.helmetLogoColor ?? "#FFFFFF"}
+            logoColor={u.helmetLogoColor      ?? "#FFFFFF"}
+            visorColor={u.helmetVisorColor    ?? "#111827"}
             abbreviation={abbr}
-            width={220}
-            height={220}
+            width={240}
+            height={Math.round(240 * 380 / 420)}
           />
         </View>
 
@@ -197,6 +198,8 @@ export default function UniformScreen() {
           <ColorRow label="Chinstrap Color" color={u.helmetChinstrapColor ?? "#888888"} onPress={() => setPickerTarget("helmetChinstrapColor")} colors={colors} />
           <Divider colors={colors} />
           <ColorRow label="Logo Color"      color={u.helmetLogoColor      ?? "#FFFFFF"} onPress={() => setPickerTarget("helmetLogoColor")}      colors={colors} />
+          <Divider colors={colors} />
+          <ColorRow label="Visor Color"     color={u.helmetVisorColor     ?? "#111827"} onPress={() => setPickerTarget("helmetVisorColor")}     colors={colors} />
           <Divider colors={colors} />
           <Text style={[st.optLabel, { color: colors.mutedForeground }]}>LOGO PLACEMENT</Text>
           <View style={st.chipRow}>

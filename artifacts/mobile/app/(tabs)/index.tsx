@@ -49,11 +49,12 @@ export default function HomeScreen() {
   // Featured uniform background
   const featuredKey = teamCustomization?.featuredUniformSet ?? "home";
   const featuredUniform = teamCustomization?.uniforms?.[featuredKey];
-  const uniformBgColor       = featuredUniform?.jerseyColor         ?? teamColor;
-  const uniformHelmetColor   = featuredUniform?.helmetColor         ?? teamColor;
-  const uniformFacemaskColor = featuredUniform?.helmetFacemaskColor ?? (team?.secondaryColor ?? "#888888");
-  const uniformChinstrapColor= featuredUniform?.helmetChinstrapColor?? (team?.secondaryColor ?? "#888888");
-  const uniformLogoColor     = featuredUniform?.helmetLogoColor     ?? "#FFFFFF";
+  const uniformBgColor        = featuredUniform?.jerseyColor          ?? teamColor;
+  const uniformHelmetColor    = featuredUniform?.helmetColor          ?? teamColor;
+  const uniformFacemaskColor  = featuredUniform?.helmetFacemaskColor  ?? (team?.secondaryColor ?? "#888888");
+  const uniformChinstrapColor = featuredUniform?.helmetChinstrapColor ?? (team?.secondaryColor ?? "#888888");
+  const uniformLogoColor      = featuredUniform?.helmetLogoColor      ?? "#FFFFFF";
+  const uniformVisorColor     = featuredUniform?.helmetVisorColor     ?? "#111827";
 
   // News ticker animation
   useEffect(() => {
@@ -151,16 +152,17 @@ export default function HomeScreen() {
             locations={[0, 0.35, 0.7, 1]}
             style={StyleSheet.absoluteFill}
           />
-          {/* Helmet photo — fully colorized from uniform settings */}
+          {/* Helmet SVG — fully colorized from saved uniform */}
           <View style={st.helmetImg}>
             <HelmetSVGWithLogo
               helmetColor={uniformHelmetColor ?? teamColor}
               facemaskColor={uniformFacemaskColor}
               chinstrapColor={uniformChinstrapColor}
               logoColor={uniformLogoColor}
+              visorColor={uniformVisorColor}
               abbreviation={team?.abbreviation ?? "VFL"}
-              width={300}
-              height={300}
+              width={320}
+              height={Math.round(320 * 380 / 420)}
             />
           </View>
           {/* Bottom fade so team info blends into content */}
@@ -597,7 +599,7 @@ const st = StyleSheet.create({
   liveTag:        { paddingHorizontal:6, paddingVertical:2, borderRadius:4, marginRight:8 },
   // Helmet hero
   helmetHero:     { height:360, overflow:"hidden", position:"relative" },
-  helmetImg:      { position:"absolute", right:-35, top:-10, width:300, height:300 },
+  helmetImg:      { position:"absolute", right:-30, top:0, width:320, height:290 },
   helmetTopBar:   { flexDirection:"row", alignItems:"center", justifyContent:"space-between", paddingHorizontal:16, paddingBottom:8 },
   helmetTeamInfo: { position:"absolute", bottom:16, left:16, right:16 },
   // Header pieces still used
