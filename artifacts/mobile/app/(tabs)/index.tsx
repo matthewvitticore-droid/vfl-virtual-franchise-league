@@ -4,10 +4,11 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator, Alert, Animated, Image, Platform, ScrollView,
+  ActivityIndicator, Alert, Animated, Platform, ScrollView,
   StyleSheet, Text, TouchableOpacity, View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { HelmetSVGWithLogo } from "@/components/HelmetSVG";
 import { NFLTeamBadge } from "@/components/NFLTeamBadge";
 import { VFLLogo } from "@/components/VFLLogo";
 import { useColors } from "@/hooks/useColors";
@@ -48,8 +49,11 @@ export default function HomeScreen() {
   // Featured uniform background
   const featuredKey = teamCustomization?.featuredUniformSet ?? "home";
   const featuredUniform = teamCustomization?.uniforms?.[featuredKey];
-  const uniformBgColor = featuredUniform?.jerseyColor ?? teamColor;
-  const uniformHelmetColor = featuredUniform?.helmetColor ?? teamColor;
+  const uniformBgColor       = featuredUniform?.jerseyColor         ?? teamColor;
+  const uniformHelmetColor   = featuredUniform?.helmetColor         ?? teamColor;
+  const uniformFacemaskColor = featuredUniform?.helmetFacemaskColor ?? (team?.secondaryColor ?? "#888888");
+  const uniformChinstrapColor= featuredUniform?.helmetChinstrapColor?? (team?.secondaryColor ?? "#888888");
+  const uniformLogoColor     = featuredUniform?.helmetLogoColor     ?? "#FFFFFF";
 
   // News ticker animation
   useEffect(() => {
@@ -147,13 +151,18 @@ export default function HomeScreen() {
             locations={[0, 0.35, 0.7, 1]}
             style={StyleSheet.absoluteFill}
           />
-          {/* Helmet image — tinted to team helmet color */}
-          <Image
-            source={require("@/assets/helmet_base.png")}
-            style={st.helmetImg}
-            tintColor={helmetColor}
-            resizeMode="contain"
-          />
+          {/* Helmet SVG — fully colorized from uniform settings */}
+          <View style={st.helmetImg}>
+            <HelmetSVGWithLogo
+              helmetColor={uniformHelmetColor ?? teamColor}
+              facemaskColor={uniformFacemaskColor}
+              chinstrapColor={uniformChinstrapColor}
+              logoColor={uniformLogoColor}
+              abbreviation={team?.abbreviation ?? "VFL"}
+              width={310}
+              height={270}
+            />
+          </View>
           {/* Bottom fade so team info blends into content */}
           <LinearGradient
             colors={["transparent", colors.background + "cc", colors.background]}
@@ -588,7 +597,7 @@ const st = StyleSheet.create({
   liveTag:        { paddingHorizontal:6, paddingVertical:2, borderRadius:4, marginRight:8 },
   // Helmet hero
   helmetHero:     { height:360, overflow:"hidden", position:"relative" },
-  helmetImg:      { position:"absolute", right:-30, top:10, width:340, height:320 },
+  helmetImg:      { position:"absolute", right:-20, top:5, width:310, height:270 },
   helmetTopBar:   { flexDirection:"row", alignItems:"center", justifyContent:"space-between", paddingHorizontal:16, paddingBottom:8 },
   helmetTeamInfo: { position:"absolute", bottom:16, left:16, right:16 },
   // Header pieces still used

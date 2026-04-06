@@ -6,6 +6,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ColorPickerModal } from "@/components/ColorPickerModal";
+import { HelmetSVGWithLogo } from "@/components/HelmetSVG";
 import { UniformPreview } from "@/components/UniformPreview";
 import { useColors } from "@/hooks/useColors";
 import { useNFL } from "@/context/NFLContext";
@@ -45,7 +46,8 @@ const LOGO_PLACEMENTS: { value: HelmetLogoPlacement; label: string }[] = [
 ];
 
 type PickerTarget =
-  | "helmetColor" | "jerseyColor" | "jerseyAccentColor"
+  | "helmetColor" | "helmetFacemaskColor" | "helmetChinstrapColor" | "helmetLogoColor"
+  | "jerseyColor" | "jerseyAccentColor"
   | "numberColor" | "numberOutlineColor" | "pantColor"
   | "pantStripeColor" | "sockColor" | "sockAccentColor";
 
@@ -65,7 +67,8 @@ export default function UniformScreen() {
     const pc = team?.primaryColor ?? "#4F46E5";
     const sc = team?.secondaryColor ?? "#0D9488";
     const base: UniformSet = {
-      helmetColor: pc, helmetLogoPlacement: "both",
+      helmetColor: pc, helmetFacemaskColor: sc, helmetChinstrapColor: sc, helmetLogoColor: "#FFFFFF",
+      helmetLogoPlacement: "both",
       jerseyStyle: "traditional", jerseyColor: pc, jerseyAccentColor: sc,
       numberFont: "block", numberColor: "#FFFFFF", numberOutlineColor: sc,
       pantColor: pc, pantStripeStyle: "single", pantStripeColor: sc,
@@ -106,7 +109,7 @@ export default function UniformScreen() {
   };
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
-  const pickerColor = pickerTarget ? (u as any)[pickerTarget] as string : "#4F46E5";
+  const pickerColor = pickerTarget ? ((u as any)[pickerTarget] as string | undefined) ?? "#888888" : "#4F46E5";
   const pickerTitle = pickerTarget ? pickerTarget.replace(/([A-Z])/g, " $1").trim() : "";
 
   return (
@@ -172,8 +175,28 @@ export default function UniformScreen() {
 
         {/* ── HELMET ── */}
         <SectionHeader title="HELMET" icon="shield" colors={colors} />
+
+        {/* Helmet visual preview */}
+        <View style={[st.helmetPreviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <HelmetSVGWithLogo
+            helmetColor={u.helmetColor}
+            facemaskColor={u.helmetFacemaskColor ?? colors.mutedForeground}
+            chinstrapColor={u.helmetChinstrapColor ?? colors.mutedForeground}
+            logoColor={u.helmetLogoColor ?? "#FFFFFF"}
+            abbreviation={abbr}
+            width={200}
+            height={175}
+          />
+        </View>
+
         <OptionCard colors={colors}>
-          <ColorRow label="Helmet Color" color={u.helmetColor} onPress={() => setPickerTarget("helmetColor")} colors={colors} />
+          <ColorRow label="Helmet Color"    color={u.helmetColor}               onPress={() => setPickerTarget("helmetColor")}          colors={colors} />
+          <Divider colors={colors} />
+          <ColorRow label="Facemask Color"  color={u.helmetFacemaskColor  ?? "#888888"} onPress={() => setPickerTarget("helmetFacemaskColor")}  colors={colors} />
+          <Divider colors={colors} />
+          <ColorRow label="Chinstrap Color" color={u.helmetChinstrapColor ?? "#888888"} onPress={() => setPickerTarget("helmetChinstrapColor")} colors={colors} />
+          <Divider colors={colors} />
+          <ColorRow label="Logo Color"      color={u.helmetLogoColor      ?? "#FFFFFF"} onPress={() => setPickerTarget("helmetLogoColor")}      colors={colors} />
           <Divider colors={colors} />
           <Text style={[st.optLabel, { color: colors.mutedForeground }]}>LOGO PLACEMENT</Text>
           <View style={st.chipRow}>
@@ -323,7 +346,8 @@ const st = StyleSheet.create({
   tabInner:      { flexDirection: "row", alignItems: "center" },
   tabText:       { fontSize: 12, fontFamily: "Inter_700Bold", letterSpacing: 0.8 },
   content:       { padding: 14, gap: 6 },
-  previewCard:   { alignItems: "center", borderRadius: 18, borderWidth: 1, paddingVertical: 20, marginBottom: 6, gap: 14 },
+  previewCard:      { alignItems: "center", borderRadius: 18, borderWidth: 1, paddingVertical: 20, marginBottom: 6, gap: 14 },
+  helmetPreviewCard: { alignItems: "center", justifyContent: "center", borderRadius: 18, borderWidth: 1, paddingVertical: 12, marginBottom: 6 },
   bgToggleBtn:   { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 16, paddingVertical: 9, borderRadius: 10, borderWidth: 1.5, marginHorizontal: 16 },
   bgToggleText:  { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   sectionRow:    { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 12, marginBottom: 4, marginLeft: 4 },

@@ -443,6 +443,9 @@ export type LogoFontStyle       = "block" | "serif" | "script" | "stencil";
 
 export interface UniformSet {
   helmetColor: string;
+  helmetFacemaskColor?: string;
+  helmetChinstrapColor?: string;
+  helmetLogoColor?: string;
   helmetLogoPlacement: HelmetLogoPlacement;
   jerseyStyle: JerseyStyle;
   jerseyColor: string;
