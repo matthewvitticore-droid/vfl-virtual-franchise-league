@@ -10,6 +10,20 @@ import {
   type NFLPosition, type Player, type PlayerSeasonStats,
 } from "@/context/types";
 
+// ─── Contrast utility (matches KitToggle logic) ───────────────────────────────
+function hexLum(hex: string): number {
+  const h = hex.replace("#", "").slice(0, 6).padEnd(6, "0");
+  const [r, g, b] = [0, 2, 4].map(i => {
+    const v = parseInt(h.slice(i, i + 2), 16) / 255;
+    return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+// Returns "#111111" for light backgrounds, "#ffffff" for dark
+function onColor(hex: string): "#111111" | "#ffffff" {
+  return hexLum(hex.slice(0, 7)) > 0.35 ? "#111111" : "#ffffff";
+}
+
 // ─── Position colors ───────────────────────────────────────────────────────────
 const POS_COLOR: Record<NFLPosition, string> = {
   QB:"#E31837", RB:"#FB4F14", WR:"#FFC20E", TE:"#00B5E2",
@@ -452,26 +466,34 @@ export function PlayerStatsModal({ player, visible, onClose, teamPrimaryColor, t
             </View>
 
             {/* ── Tab bar ── */}
-            <View style={[modal.tabBar, { backgroundColor:colors.secondary, borderColor: accent + "40" }]}>
-              {TABS.map(t => {
-                const isActive = tab === t.key;
-                return (
-                  <TouchableOpacity key={t.key} onPress={() => setTab(t.key)}
-                    style={[modal.tabBtn, isActive
-                      ? { backgroundColor: accent }
-                      : { backgroundColor: accent + "15" }
-                    ]}>
-                    <Feather name={t.icon} size={10} color={isActive ? "#fff" : accent + "CC"} />
-                    <Text style={[modal.tabLabel, {
-                      color: isActive ? "#fff" : accent + "CC",
-                      fontFamily: isActive ? "Inter_700Bold" : "Inter_500Medium",
-                    }]}>
-                      {t.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            {(() => {
+              const activeOn   = onColor(accent);          // "#111111" or "#fff"
+              const isAccentLight = hexLum(accent.slice(0, 7)) > 0.35;
+              // Inactive text: if accent is light, use dark-ish; if dark, use accent tinted
+              const inactiveTxt = isAccentLight ? "#111111" + "88" : accent + "CC";
+              return (
+                <View style={[modal.tabBar, { backgroundColor: colors.secondary, borderColor: accent + "40" }]}>
+                  {TABS.map(t => {
+                    const isActive = tab === t.key;
+                    return (
+                      <TouchableOpacity key={t.key} onPress={() => setTab(t.key)}
+                        style={[modal.tabBtn, {
+                          backgroundColor: isActive ? accent : accent + "18",
+                        }]}>
+                        <Feather name={t.icon} size={10}
+                          color={isActive ? activeOn : inactiveTxt} />
+                        <Text style={[modal.tabLabel, {
+                          color: isActive ? activeOn : inactiveTxt,
+                          fontFamily: isActive ? "Inter_700Bold" : "Inter_500Medium",
+                        }]}>
+                          {t.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              );
+            })()}
 
             {/* ── Tab content ── */}
             <View style={{ padding:14, paddingTop:6 }}>
