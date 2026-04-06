@@ -472,7 +472,7 @@ const NFL_TEAMS: TeamTemplate[] = [
   { city:"Chattanooga",  name:"Thunder",      abbreviation:"CTR", conference:"Ironclad", division:"South", primaryColor:"#065F46", secondaryColor:"#B45309", stadium:"Thunder Gorge Arena",    overall:77 },
   // Ironclad Conference — West
   { city:"Denver",       name:"Peaks",        abbreviation:"DVP", conference:"Ironclad", division:"West",  primaryColor:"#3730A3", secondaryColor:"#FBBF24", stadium:"Summit Field",           overall:79 },
-  { city:"Reno",         name:"Royals",       abbreviation:"RNR", conference:"Ironclad", division:"West",  primaryColor:"#1E40AF", secondaryColor:"#D4AF37", stadium:"Crown Coliseum",         overall:91 },
+  { city:"Coastal",      name:"Sharks",       abbreviation:"CSH", conference:"Ironclad", division:"West",  primaryColor:"#CF2027", secondaryColor:"#003087", stadium:"Coastal Coliseum",       overall:91 },
   { city:"Salt Lake",    name:"Blizzard",     abbreviation:"SLB", conference:"Ironclad", division:"West",  primaryColor:"#1E3A8A", secondaryColor:"#E0F2FE", stadium:"Blizzard Basin",         overall:78 },
   { city:"Sacramento",   name:"Miners",       abbreviation:"SMN", conference:"Ironclad", division:"West",  primaryColor:"#D97706", secondaryColor:"#111827", stadium:"Gold Rush Field",        overall:81 },
   // Gridiron Conference — East
@@ -756,7 +756,7 @@ function initSeason(playerTeamId?: string): Season {
     };
   });
 
-  const finalPlayerTeamId = playerTeamId ?? teams[13].id; // Reno Royals default
+  const finalPlayerTeamId = playerTeamId ?? teams[13].id; // Coastal Sharks default
   const { games, byeWeeks } = generateSchedule(teams);
   const draftProspects = generateDraftClass(2025, 252);
   const teamIds = teams.map(t => t.id);
@@ -868,6 +868,37 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
 
   // ── Storage ────────────────────────────────────────────────────────────────
 
+  // Applies saved customization to a season and returns the patched copy
+  async function applyCustomizationToSeason(s: Season): Promise<Season> {
+    try {
+      const customRaw = await AsyncStorage.getItem(CUSTOM_KEY);
+      if (!customRaw) return s;
+      const custom = JSON.parse(customRaw) as TeamCustomization;
+      return {
+        ...s,
+        teams: s.teams.map(t =>
+          t.id === custom.teamId
+            ? { ...t, city: custom.city, name: custom.name, abbreviation: custom.abbreviation, primaryColor: custom.primaryColor, secondaryColor: custom.secondaryColor }
+            : t
+        ),
+      };
+    } catch { return s; }
+  }
+
+  // Migrates old Reno Royals identity → Coastal Sharks on cached seasons
+  function migrateTeams(s: Season): Season {
+    const needsMigration = s.teams.some(t => t.id === "team-13" && t.city === "Reno" && t.name === "Royals");
+    if (!needsMigration) return s;
+    return {
+      ...s,
+      teams: s.teams.map(t =>
+        t.id === "team-13"
+          ? { ...t, city: "Coastal", name: "Sharks", abbreviation: "CSH", primaryColor: "#CF2027", secondaryColor: "#003087", stadium: "Coastal Coliseum" }
+          : t
+      ),
+    };
+  }
+
   async function loadSeason() {
     setIsLoading(true);
     try {
@@ -877,9 +908,14 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
         let raw: string | null = null;
         try { raw = await AsyncStorage.getItem(CACHE_KEY); } catch {}
         if (raw) {
-          setSeason(JSON.parse(raw));
+          let s: Season = JSON.parse(raw);
+          s = migrateTeams(s);
+          s = await applyCustomizationToSeason(s);
+          setSeason(s);
+          try { await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(s)); } catch {}
         } else {
-          const s = initSeason();
+          let s = initSeason();
+          s = await applyCustomizationToSeason(s);
           setSeason(s);
           try { await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(s)); } catch {}
         }
