@@ -109,7 +109,7 @@ export function PlayerCard({
   const primaryMid = darken(primary, -26);
   const secDk      = darken(secondary, -40);
 
-  const posColor = POS_COLOR[player.position];
+  const posColor = POS_COLOR[player.position]; // kept only for tiny position text label
   const devColor = DEV_COLOR[player.developmentTrait] ?? "#8B949E";
   const devIcon  = DEV_ICON[player.developmentTrait]  ?? "user";
   const ovrC     = ovrColor(player.overall);
@@ -145,20 +145,20 @@ export function PlayerCard({
         {/* ── Left: OVR swatch ── */}
         <View style={card.ovrCol}>
           <LinearGradient
-            colors={[posColor + "50", posColor + "22", "transparent"]}
+            colors={[primary + "50", primary + "22", "transparent"]}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={StyleSheet.absoluteFill}
           />
-          {/* Position color accent stripe */}
-          <View style={[card.posStripe, { backgroundColor: posColor }]} />
+          {/* Team color accent stripe */}
+          <View style={[card.posStripe, { backgroundColor: secondary }]} />
           {/* OVR number */}
           <View style={card.ovrBlock}>
             <Text style={[card.ovrNum, { color: ovrC }]}>{player.overall}</Text>
             <Text style={[card.ovrLbl, { color: ovrC + "AA" }]}>OVR</Text>
           </View>
           {/* Position badge */}
-          <View style={[card.posBadge, { backgroundColor: posColor + "30", borderColor: posColor + "80" }]}>
-            <Text style={[card.posText, { color: posColor }]}>{player.position}</Text>
+          <View style={[card.posBadge, { backgroundColor: secondary + "30", borderColor: secondary + "80" }]}>
+            <Text style={[card.posText, { color: secondary }]}>{player.position}</Text>
           </View>
         </View>
 
@@ -230,7 +230,7 @@ export function PlayerCard({
               const isLast = i === (POS_RATING_KEYS[player.position].length - 1);
               return (
                 <RatingBar key={key} label={POS_RATING_LABELS[key]} value={val}
-                  fill={isLast ? ovrC : posColor} />
+                  fill={isLast ? ovrC : primary} />
               );
             })}
           </View>

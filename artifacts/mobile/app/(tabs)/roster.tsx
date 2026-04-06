@@ -7,6 +7,7 @@ import {
 import { exportRosterXLSX } from "@/utils/exportRoster";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useTeamTheme } from "@/hooks/useTeamTheme";
 import { useAuth } from "@/context/AuthContext";
 import {
   GamePlan, Formation, NFLPosition, OffenseScheme, Player, useNFL,
@@ -57,13 +58,9 @@ export default function RosterScreen() {
   const isGM    = role === "GM";
   const isCoach = role === "Coach";
   const team = getPlayerTeam();
-  const teamColor = team?.primaryColor ?? "#013369";
-
-  // Featured uniform background
-  const featuredKey = teamCustomization?.featuredUniformSet ?? "home";
-  const featuredUniform = teamCustomization?.uniforms?.[featuredKey];
-  const uniformBgColor = featuredUniform?.jerseyColor ?? teamColor;
-  const uniformHelmetColor = featuredUniform?.helmetColor ?? teamColor;
+  const theme = useTeamTheme();
+  const teamColor  = theme.primary;    // alias keeps the rest of the code unchanged
+  const teamSecondary = theme.secondary;
 
   const [tab, setTab] = useState<MainTab>(isCoach ? "gamePlan" : "depth");
   const [posFilter, setPosFilter] = useState<NFLPosition | "ALL">("ALL");
@@ -128,15 +125,6 @@ export default function RosterScreen() {
         style={{ position: "absolute", top: 0, left: 0, right: 0, height: 420, zIndex: 0 }}
         pointerEvents="none"
       />
-      {/* Uniform accent (if customized) */}
-      {featuredUniform && uniformBgColor !== teamColor && (
-        <LinearGradient
-          colors={[uniformBgColor + "18", "transparent"]}
-          locations={[0, 1]}
-          style={{ position: "absolute", top: 0, left: 0, right: 0, height: 220, zIndex: 0 }}
-          pointerEvents="none"
-        />
-      )}
       {/* Header */}
       <View style={[st.header, { paddingTop: topPad + 8, backgroundColor: "transparent", borderBottomColor: teamColor + "40" }]}>
         <View style={st.headerTop}>
@@ -177,7 +165,6 @@ export default function RosterScreen() {
                 .filter(p => p.position === pos)
                 .sort((a, b) => a.depthOrder - b.depthOrder);
               if (byPos.length === 0) return null;
-              const pc = POS_COLOR[pos];
 
               const movePlayer = (idx: number, dir: "up" | "down") => {
                 const arr = [...byPos];
@@ -189,8 +176,8 @@ export default function RosterScreen() {
               return (
                 <View key={pos} style={{ marginBottom: 1 }}>
                   {/* position header */}
-                  <View style={[st.posHeader, { backgroundColor: pc + "18", borderLeftColor: pc }]}>
-                    <Text style={[st.posLabel, { color: pc }]}>{pos}</Text>
+                  <View style={[st.posHeader, { backgroundColor: teamColor + "18", borderLeftColor: teamColor }]}>
+                    <Text style={[st.posLabel, { color: teamColor }]}>{pos}</Text>
                     <Text style={[st.posCount, { color: colors.mutedForeground }]}>{byPos.length} deep</Text>
                   </View>
 
@@ -200,12 +187,12 @@ export default function RosterScreen() {
                     return (
                       <TouchableOpacity key={p.id} onPress={() => setSelectedPlayer(p)} activeOpacity={0.75}
                         style={[st.depthRow, {
-                          backgroundColor: isStarter ? pc + "12" : colors.card,
+                          backgroundColor: isStarter ? teamColor + "12" : colors.card,
                           borderBottomColor: colors.border,
                         }]}>
 
                         {/* slot # */}
-                        <View style={[st.depthNum, { backgroundColor: isStarter ? pc : colors.secondary }]}>
+                        <View style={[st.depthNum, { backgroundColor: isStarter ? teamColor : colors.secondary }]}>
                           <Text style={[st.depthNumText, { color: isStarter ? "#fff" : colors.mutedForeground }]}>{idx + 1}</Text>
                         </View>
 
@@ -233,8 +220,8 @@ export default function RosterScreen() {
                         </View>
 
                         {/* OVR pill */}
-                        <View style={[st.depthOvr, { backgroundColor: pc + "20", borderColor: pc + "50" }]}>
-                          <Text style={[st.depthOvrText, { color: pc }]}>{p.overall}</Text>
+                        <View style={[st.depthOvr, { backgroundColor: teamColor + "20", borderColor: teamColor + "50" }]}>
+                          <Text style={[st.depthOvrText, { color: teamColor }]}>{p.overall}</Text>
                         </View>
 
                         {/* up/down controls */}
@@ -245,7 +232,7 @@ export default function RosterScreen() {
                             style={[st.arrowBtn, { opacity: idx === 0 ? 0.18 : 1 }]}
                             hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                           >
-                            <Feather name="chevron-up" size={15} color={pc} />
+                            <Feather name="chevron-up" size={15} color={teamColor} />
                           </TouchableOpacity>
                           <TouchableOpacity
                             onPress={e => { e.stopPropagation?.(); movePlayer(idx, "down"); }}
@@ -272,7 +259,7 @@ export default function RosterScreen() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, padding: 12 }}>
               {(["ALL", ...ALL_POS] as (NFLPosition | "ALL")[]).map(p => (
                 <TouchableOpacity key={p} onPress={() => setPosFilter(p)}
-                  style={[st.posChip, { backgroundColor: posFilter === p ? (p === "ALL" ? teamColor : POS_COLOR[p as NFLPosition]) : colors.secondary, borderColor: posFilter === p ? (p === "ALL" ? teamColor : POS_COLOR[p as NFLPosition]) : colors.border }]}>
+                  style={[st.posChip, { backgroundColor: posFilter === p ? teamColor : colors.secondary, borderColor: posFilter === p ? teamColor : colors.border }]}>
                   <Text style={[st.posChipText, { color: posFilter === p ? "#fff" : colors.mutedForeground }]}>{p}</Text>
                 </TouchableOpacity>
               ))}
@@ -283,7 +270,7 @@ export default function RosterScreen() {
                 <PlayerCard
                   player={p}
                   teamPrimaryColor={teamColor}
-                  teamSecondaryColor={team?.secondaryColor}
+                  teamSecondaryColor={teamSecondary}
                   expanded={expanded === p.id}
                   showInjury
                 />
@@ -347,7 +334,7 @@ export default function RosterScreen() {
                 <PlayerCard
                   player={p}
                   teamPrimaryColor={teamColor}
-                  teamSecondaryColor={team?.secondaryColor}
+                  teamSecondaryColor={teamSecondary}
                   expanded={expanded === p.id}
                   showInjury={false}
                 />
@@ -392,7 +379,7 @@ export default function RosterScreen() {
                 <PlayerCard
                   player={selectedPlayer}
                   teamPrimaryColor={teamColor}
-                  teamSecondaryColor={team?.secondaryColor}
+                  teamSecondaryColor={teamSecondary}
                   expanded
                   showInjury
                 />
