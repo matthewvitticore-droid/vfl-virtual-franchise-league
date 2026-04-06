@@ -139,7 +139,12 @@ export default function CustomizeIndexScreen() {
     if (!cityInput.trim() || !nameInput.trim()) { Alert.alert("Name required", "Please enter a city and team name."); return; }
     if (!isClean(cityInput) || !isClean(nameInput)) { Alert.alert("Content Filter", "Team name contains inappropriate language."); return; }
     setSaving(true);
-    try { await saveCustomization(custom!); router.back(); }
+    try {
+      await saveCustomization(custom!);
+      // Navigate to the customize tab — avoids the back-redirect loop
+      // that occurs when entering via the Customize tab
+      router.navigate("/(tabs)/customize" as any);
+    }
     catch { Alert.alert("Error", "Failed to save customization."); }
     finally { setSaving(false); }
   };

@@ -66,8 +66,6 @@ export default function HomeScreen() {
   const losses  = team?.losses ?? 0;
   const wPct    = (wins / Math.max(1, wins + losses)).toFixed(3).replace("0.", ".");
   const roster  = team?.roster ?? [];
-  const capUsed = roster.reduce((s, p) => s + p.salary, 0).toFixed(1);
-  const capLeft = team ? ((team.totalCap ?? 255) - parseFloat(capUsed)).toFixed(1) : "0";
 
   const standings = getStandings(team?.conference);
   const myRank    = standings.findIndex(t => t.id === season?.playerTeamId) + 1;
@@ -186,21 +184,8 @@ export default function HomeScreen() {
           </View>
         </LinearGradient>
 
-        {/* ── Stats strip ──────────────────────────────────────────────── */}
-        {team && (
-          <View style={[st.strip, { backgroundColor: colors.card, borderColor: theme.primary + "30" }]}>
-            <StatBit label="CAP" value={`$${capLeft}M`}
-              color={parseFloat(capLeft) > 0 ? colors.success : colors.danger} />
-            <View style={[st.div, { backgroundColor: colors.border }]} />
-            <StatBit label="PF"     value={String(team.pointsFor)}     color={theme.primary} />
-            <View style={[st.div, { backgroundColor: colors.border }]} />
-            <StatBit label="PA"     value={String(team.pointsAgainst)} color={colors.danger}  />
-            <View style={[st.div, { backgroundColor: colors.border }]} />
-            <StatBit label="ROSTER" value={String(roster.length)}      color={theme.secondary} />
-            <View style={[st.div, { backgroundColor: colors.border }]} />
-            <StatBit label="PICKS"  value={String(team?.draftPicks.length ?? 0)} color={colors.nflGold} />
-          </View>
-        )}
+        {/* ── Kit theme toggle ─────────────────────────────────────────── */}
+        <KitToggle />
 
         {/* ── Navigation tiles ─────────────────────────────────────────── */}
         <View style={[st.tilesSection, { paddingHorizontal: 14 }]}>
@@ -253,12 +238,54 @@ export default function HomeScreen() {
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function StatBit({ label, value, color }: { label: string; value: string; color: string }) {
+const KITS = [
+  { key: "home" as const,      label: "HOME" },
+  { key: "away" as const,      label: "AWAY" },
+  { key: "alternate" as const, label: "ALT"  },
+];
+
+function KitToggle() {
   const colors = useColors();
+  const theme  = useTeamTheme();
+  const { teamCustomization, saveCustomization } = useNFL();
+
+  const activeKit = (teamCustomization?.featuredUniformSet ?? "home") as "home" | "away" | "alternate";
+
+  const setKit = async (kit: "home" | "away" | "alternate") => {
+    if (!teamCustomization || kit === activeKit) return;
+    try { await saveCustomization({ ...teamCustomization, featuredUniformSet: kit }); }
+    catch {}
+  };
+
   return (
-    <View style={st.statItem}>
-      <Text style={[st.statVal, { color }]}>{value}</Text>
-      <Text style={[st.statLbl, { color: colors.mutedForeground }]}>{label}</Text>
+    <View style={[st.kitRow, { backgroundColor: colors.card, borderColor: theme.primary + "30" }]}>
+      <Text style={[st.kitRowLabel, { color: colors.mutedForeground }]}>THEME KIT</Text>
+      <View style={st.kitPills}>
+        {KITS.map(k => {
+          const isActive   = k.key === activeKit;
+          const kitUniform = teamCustomization?.uniforms?.[k.key];
+          const kitColor   = kitUniform?.jerseyColor ?? theme.primary;
+          return (
+            <TouchableOpacity
+              key={k.key}
+              onPress={() => setKit(k.key)}
+              activeOpacity={0.75}
+              style={[
+                st.kitPill,
+                {
+                  backgroundColor: isActive ? kitColor : kitColor + "12",
+                  borderColor: kitColor + (isActive ? "FF" : "50"),
+                },
+              ]}
+            >
+              <View style={[st.kitDot, { backgroundColor: isActive ? "#fff" : kitColor }]} />
+              <Text style={[st.kitPillTxt, { color: isActive ? "#fff" : kitColor }]}>
+                {k.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -308,14 +335,15 @@ const st = StyleSheet.create({
   heroRankLbl:{ fontSize:9, fontFamily:"Inter_500Medium", letterSpacing:1 },
   heroRankNum:{ fontSize:32, fontFamily:"Inter_700Bold", lineHeight:36 },
 
-  // Stats strip
-  strip:     { flexDirection:"row", alignItems:"center", borderRadius:0,
-               borderTopWidth:1, borderBottomWidth:1, paddingVertical:10, paddingHorizontal:8,
-               marginBottom: 12 },
-  statItem:  { flex:1, alignItems:"center", gap:2 },
-  statVal:   { fontSize:15, fontFamily:"Inter_700Bold" },
-  statLbl:   { fontSize:8,  fontFamily:"Inter_600SemiBold", letterSpacing:0.8 },
-  div:       { width:1, height:28, opacity:0.35 },
+  // Kit toggle
+  kitRow:    { flexDirection:"row", alignItems:"center", borderTopWidth:1, borderBottomWidth:1,
+               paddingVertical:10, paddingHorizontal:14, gap:10, marginBottom:12 },
+  kitRowLabel:{ fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:1.5, width:46 },
+  kitPills:  { flex:1, flexDirection:"row", gap:6 },
+  kitPill:   { flex:1, flexDirection:"row", alignItems:"center", justifyContent:"center",
+               gap:5, paddingVertical:7, borderRadius:9, borderWidth:1.5 },
+  kitDot:    { width:7, height:7, borderRadius:3.5 },
+  kitPillTxt:{ fontSize:10, fontFamily:"Inter_700Bold", letterSpacing:0.5 },
 
   // Nav tiles
   tilesSection: { gap: 8 },
