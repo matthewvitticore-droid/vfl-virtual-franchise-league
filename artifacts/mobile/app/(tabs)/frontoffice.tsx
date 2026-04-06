@@ -1,6 +1,7 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert, Platform, ScrollView, StyleSheet, Text, TextInput,
   TouchableOpacity, View,
@@ -47,6 +48,45 @@ export default function FrontOfficeScreen() {
   const [sortAsc, setSortAsc] = useState(false);
   const [expandedProspect, setExpandedProspect] = useState<string | null>(null);
   const [selectedProspect, setSelectedProspect] = useState<DraftProspect | null>(null);
+  const [warRoomIds, setWarRoomIds] = useState<string[]>([]);
+
+  // Persist war room board to AsyncStorage
+  useEffect(() => {
+    AsyncStorage.getItem("vfl_war_room_v1").then(raw => {
+      if (raw) setWarRoomIds(JSON.parse(raw));
+    });
+  }, []);
+
+  function saveWarRoom(ids: string[]) {
+    AsyncStorage.setItem("vfl_war_room_v1", JSON.stringify(ids));
+  }
+  function toggleWarRoom(id: string) {
+    setWarRoomIds(prev => {
+      const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
+      saveWarRoom(next);
+      return next;
+    });
+  }
+  function moveWarRoomUp(id: string) {
+    setWarRoomIds(prev => {
+      const idx = prev.indexOf(id);
+      if (idx <= 0) return prev;
+      const next = [...prev];
+      [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+      saveWarRoom(next);
+      return next;
+    });
+  }
+  function moveWarRoomDown(id: string) {
+    setWarRoomIds(prev => {
+      const idx = prev.indexOf(id);
+      if (idx < 0 || idx >= prev.length - 1) return prev;
+      const next = [...prev];
+      [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+      saveWarRoom(next);
+      return next;
+    });
+  }
   const [expandedFA, setExpandedFA] = useState<string | null>(null);
   const [tradeMode, setTradeMode] = useState<"browse"|"build">("browse");
   const [offeringPlayerIds, setOfferingPlayerIds] = useState<string[]>([]);
@@ -274,12 +314,14 @@ export default function FrontOfficeScreen() {
               {prospects.slice(0, 80).map((p, idx) => (
                 <ProspectCard key={p.id} p={p} rank={idx + 1} expanded={expandedProspect === p.id} teamColor={teamColor} colors={colors}
                   isGM={isGM} isUserTurn={ds?.isUserTurn ?? false}
+                  isOnBoard={warRoomIds.includes(p.id)}
                   onToggle={() => {
                     setExpandedProspect(expandedProspect === p.id ? null : p.id);
                     setSelectedProspect(p);
                   }}
                   onScout={() => unlockScouting(p.id)}
                   onDraft={() => userDraftPick(p.id)}
+                  onToggleWarRoom={() => toggleWarRoom(p.id)}
                 />
               ))}
             </ScrollView>
@@ -310,8 +352,10 @@ export default function FrontOfficeScreen() {
                   {prospects.slice(0, 60).map((p, idx) => (
                     <CombineRow key={p.id} p={p} rank={idx+1} colors={colors} teamColor={teamColor}
                       isUserTurn={ds?.isUserTurn ?? false} isGM={isGM}
+                      isOnBoard={warRoomIds.includes(p.id)}
                       onTap={() => setSelectedProspect(p)}
                       onDraft={() => userDraftPick(p.id)}
+                      onToggleWarRoom={() => toggleWarRoom(p.id)}
                     />
                   ))}
                 </View>
@@ -319,40 +363,100 @@ export default function FrontOfficeScreen() {
             </ScrollView>
           )}
 
-          {/* War Room — recent picks */}
+          {/* War Room — my targeted draft board */}
           {draftView === "warRoom" && (
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+              {/* Header */}
               <View style={[st.warRoomHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-                <Feather name="clock" size={14} color={teamColor} />
-                <Text style={[st.warRoomTitle, { color: colors.foreground }]}>Draft Board — {ds?.completedPicks.length ?? 0} picks made</Text>
+                <Feather name="target" size={14} color={teamColor} />
+                <Text style={[st.warRoomTitle, { color: colors.foreground }]}>My Draft Board</Text>
+                <View style={{ flex: 1 }} />
+                {warRoomIds.length > 0 && (
+                  <TouchableOpacity onPress={() => {
+                    Alert.alert("Clear Board", "Remove all targets from your draft board?", [
+                      { text: "Cancel" },
+                      { text: "Clear", style: "destructive", onPress: () => { setWarRoomIds([]); saveWarRoom([]); } },
+                    ]);
+                  }}>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground }}>CLEAR ALL</Text>
+                  </TouchableOpacity>
+                )}
               </View>
+
               {/* Positions of Need grid */}
               {team && <RosterNeedGrid team={team} colors={colors} teamColor={teamColor} />}
-              {(ds?.completedPicks ?? []).slice().reverse().map(pick => {
-                const pickTeam = season?.teams.find(t => t.id === pick.teamId);
-                const isUser = pick.teamId === season?.playerTeamId;
-                return (
-                  <View key={`${pick.round}-${pick.pickInRound}`} style={[st.pickRow, { backgroundColor: isUser ? teamColor + "15" : colors.card, borderBottomColor: colors.border }]}>
-                    <View style={[st.pickNum, { backgroundColor: isUser ? teamColor : colors.secondary }]}>
-                      <Text style={[st.pickNumText, { color: isUser ? "#fff" : colors.mutedForeground }]}>R{pick.round}.{pick.pickInRound}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection:"row", alignItems:"center", gap:6 }}>
-                        <Text style={[st.pickName, { color: isUser ? teamColor : colors.foreground }]}>{pick.prospectName}</Text>
-                        <View style={[st.posPill, { backgroundColor: POS_COLOR[pick.prospectPosition] + "25" }]}>
-                          <Text style={[st.posPillText, { color: POS_COLOR[pick.prospectPosition] }]}>{pick.prospectPosition}</Text>
-                        </View>
-                      </View>
-                      <Text style={[st.pickMeta, { color: colors.mutedForeground }]}>{pickTeam?.abbreviation ?? "?"} · {pick.prospectCollege} · Grade {pick.prospectGrade}</Text>
-                    </View>
-                    <Text style={[st.pickOverall, { color: colors.mutedForeground }]}>#{pick.overallPick}</Text>
-                  </View>
-                );
-              })}
-              {(ds?.completedPicks.length ?? 0) === 0 && (
+
+              {/* Tip bar */}
+              <View style={[st.boardTip, { backgroundColor: teamColor + "12", borderColor: teamColor + "30" }]}>
+                <Feather name="info" size={11} color={teamColor} />
+                <Text style={[st.boardTipText, { color: colors.mutedForeground }]}>
+                  Pin prospects from the <Text style={{ color: teamColor, fontFamily: "Inter_600SemiBold" }}>Board</Text> or <Text style={{ color: teamColor, fontFamily: "Inter_600SemiBold" }}>Combine</Text> tabs to build your targeting list
+                </Text>
+              </View>
+
+              {/* Board targets list */}
+              {warRoomIds.length === 0 ? (
                 <View style={[st.emptyState, { paddingVertical: 60 }]}>
-                  <Feather name="award" size={32} color={colors.mutedForeground} />
-                  <Text style={[st.emptyStateText, { color: colors.mutedForeground }]}>Draft hasn't started yet</Text>
+                  <Feather name="target" size={36} color={colors.mutedForeground} />
+                  <Text style={[st.emptyStateText, { color: colors.foreground }]}>No targets yet</Text>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center", paddingHorizontal: 30 }}>
+                    Tap the 📌 pin on any prospect in the Board or Combine views to add them to your war room
+                  </Text>
+                </View>
+              ) : (
+                warRoomIds.map((id, boardIdx) => {
+                  const prospect = season?.draftProspects.find(pr => pr.id === id);
+                  if (!prospect) return null;
+                  return (
+                    <WarRoomCard
+                      key={id}
+                      p={prospect}
+                      boardRank={boardIdx + 1}
+                      total={warRoomIds.length}
+                      teamColor={teamColor}
+                      colors={colors}
+                      isGM={isGM}
+                      isUserTurn={ds?.isUserTurn ?? false}
+                      onMoveUp={() => moveWarRoomUp(id)}
+                      onMoveDown={() => moveWarRoomDown(id)}
+                      onRemove={() => toggleWarRoom(id)}
+                      onDraft={() => userDraftPick(id)}
+                      onTap={() => setSelectedProspect(prospect)}
+                    />
+                  );
+                })
+              )}
+
+              {/* Recent picks sub-section */}
+              {(ds?.completedPicks.length ?? 0) > 0 && (
+                <View>
+                  <View style={[st.warRoomHeader, { backgroundColor: colors.card, borderBottomColor: colors.border, marginTop: 16 }]}>
+                    <Feather name="clock" size={13} color={colors.mutedForeground} />
+                    <Text style={[st.warRoomTitle, { color: colors.mutedForeground, fontSize: 12 }]}>
+                      Recent Picks — {ds?.completedPicks.length ?? 0} made
+                    </Text>
+                  </View>
+                  {(ds?.completedPicks ?? []).slice(-10).reverse().map(pick => {
+                    const pickTeam = season?.teams.find(t => t.id === pick.teamId);
+                    const isUser = pick.teamId === season?.playerTeamId;
+                    return (
+                      <View key={`${pick.round}-${pick.pickInRound}`} style={[st.pickRow, { backgroundColor: isUser ? teamColor + "15" : colors.card, borderBottomColor: colors.border }]}>
+                        <View style={[st.pickNum, { backgroundColor: isUser ? teamColor : colors.secondary }]}>
+                          <Text style={[st.pickNumText, { color: isUser ? "#fff" : colors.mutedForeground }]}>R{pick.round}.{pick.pickInRound}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection:"row", alignItems:"center", gap:6 }}>
+                            <Text style={[st.pickName, { color: isUser ? teamColor : colors.foreground }]}>{pick.prospectName}</Text>
+                            <View style={[st.posPill, { backgroundColor: POS_COLOR[pick.prospectPosition] + "25" }]}>
+                              <Text style={[st.posPillText, { color: POS_COLOR[pick.prospectPosition] }]}>{pick.prospectPosition}</Text>
+                            </View>
+                          </View>
+                          <Text style={[st.pickMeta, { color: colors.mutedForeground }]}>{pickTeam?.abbreviation ?? "?"} · {pick.prospectCollege} · Grade {pick.prospectGrade}</Text>
+                        </View>
+                        <Text style={[st.pickOverall, { color: colors.mutedForeground }]}>#{pick.overallPick}</Text>
+                      </View>
+                    );
+                  })}
                 </View>
               )}
             </ScrollView>
@@ -554,14 +658,15 @@ function FAPlayerCard({ p, expanded, teamColor, isGM, colors, onToggle, onSign }
   );
 }
 
-function ProspectCard({ p, rank, expanded, teamColor, colors, isGM, isUserTurn, onToggle, onScout, onDraft }: {
+function ProspectCard({ p, rank, expanded, teamColor, colors, isGM, isUserTurn, isOnBoard, onToggle, onScout, onDraft, onToggleWarRoom }: {
   p: DraftProspect; rank: number; expanded: boolean; teamColor: string; colors: any;
-  isGM: boolean; isUserTurn: boolean; onToggle: () => void; onScout: () => void; onDraft: () => void;
+  isGM: boolean; isUserTurn: boolean; isOnBoard?: boolean;
+  onToggle: () => void; onScout: () => void; onDraft: () => void; onToggleWarRoom?: () => void;
 }) {
   const gc = GRADE_COLORS[p.grade] ?? "#525252";
   return (
     <TouchableOpacity onPress={onToggle} activeOpacity={0.8}
-      style={[st.playerCard, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+      style={[st.playerCard, { backgroundColor: isOnBoard ? teamColor + "0C" : colors.card, borderBottomColor: colors.border }]}>
       <View style={st.playerRow}>
         <Text style={[st.prospectRank, { color: rank <= 32 ? colors.nflGold : colors.mutedForeground }]}>{rank}</Text>
         <View style={[st.posCircle, { backgroundColor: POS_COLOR[p.position] + "25" }]}>
@@ -585,6 +690,14 @@ function ProspectCard({ p, rank, expanded, teamColor, colors, isGM, isUserTurn, 
               </View>
             )}
           </>
+        )}
+        {/* Pin to War Room */}
+        {onToggleWarRoom && (
+          <TouchableOpacity onPress={e => { e.stopPropagation?.(); onToggleWarRoom(); }}
+            hitSlop={{ top:8, bottom:8, left:8, right:8 }}
+            style={[st.pinBtn, { backgroundColor: isOnBoard ? teamColor + "30" : colors.secondary, borderColor: isOnBoard ? teamColor : colors.border }]}>
+            <Feather name="bookmark" size={12} color={isOnBoard ? teamColor : colors.mutedForeground} />
+          </TouchableOpacity>
         )}
       </View>
       {expanded && (
@@ -727,8 +840,9 @@ function deriveCombineRating(key: "speed"|"acceleration"|"agility"|"strength", c
   }
 }
 
-function CombineRow({ p, rank, colors, teamColor, isUserTurn, isGM, onDraft, onTap }: {
-  p: DraftProspect; rank: number; colors: any; teamColor: string; isUserTurn: boolean; isGM: boolean; onDraft: () => void; onTap?: () => void;
+function CombineRow({ p, rank, colors, teamColor, isUserTurn, isGM, isOnBoard, onDraft, onTap, onToggleWarRoom }: {
+  p: DraftProspect; rank: number; colors: any; teamColor: string; isUserTurn: boolean; isGM: boolean;
+  isOnBoard?: boolean; onDraft: () => void; onTap?: () => void; onToggleWarRoom?: () => void;
 }) {
   const c = p.combine;
   const dnp = c.didNotParticipate;
@@ -768,6 +882,106 @@ function CombineRow({ p, rank, colors, teamColor, isUserTurn, isGM, onDraft, onT
           <Text style={st.draftBtnSmText}>Draft</Text>
         </TouchableOpacity>
       )}
+      {onToggleWarRoom && (
+        <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); onToggleWarRoom(); }}
+          hitSlop={{ top:6, bottom:6, left:6, right:6 }}
+          style={[st.pinBtn, { backgroundColor: isOnBoard ? teamColor+"30" : colors.secondary, borderColor: isOnBoard ? teamColor : colors.border }]}>
+          <Feather name="bookmark" size={11} color={isOnBoard ? teamColor : colors.mutedForeground} />
+        </TouchableOpacity>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+// ─── War Room Card ────────────────────────────────────────────────────────────
+function WarRoomCard({ p, boardRank, total, teamColor, colors, isGM, isUserTurn, onMoveUp, onMoveDown, onRemove, onDraft, onTap }: {
+  p: DraftProspect; boardRank: number; total: number; teamColor: string; colors: any;
+  isGM: boolean; isUserTurn: boolean;
+  onMoveUp: () => void; onMoveDown: () => void; onRemove: () => void; onDraft: () => void; onTap: () => void;
+}) {
+  const gc  = GRADE_COLORS[p.grade] ?? "#525252";
+  const pc  = POS_COLOR[p.position];
+  const devColor = DEV_COLORS[p.developmentTrait] ?? "#8B949E";
+  const drafted  = p.isPickedUp;
+
+  return (
+    <TouchableOpacity onPress={onTap} activeOpacity={0.8}
+      style={[st.wrCard, { backgroundColor: drafted ? colors.secondary : colors.card, borderBottomColor: colors.border, opacity: drafted ? 0.55 : 1 }]}>
+
+      {/* Board rank + reorder */}
+      <View style={st.wrRankCol}>
+        <TouchableOpacity onPress={onMoveUp} disabled={boardRank === 1 || drafted} hitSlop={{ top:6, bottom:6, left:8, right:8 }}>
+          <Feather name="chevron-up" size={14} color={boardRank === 1 || drafted ? colors.border : colors.mutedForeground} />
+        </TouchableOpacity>
+        <View style={[st.wrRankBadge, { backgroundColor: drafted ? colors.secondary : teamColor + "20", borderColor: drafted ? colors.border : teamColor + "50" }]}>
+          <Text style={[st.wrRankNum, { color: drafted ? colors.mutedForeground : teamColor }]}>{boardRank}</Text>
+        </View>
+        <TouchableOpacity onPress={onMoveDown} disabled={boardRank === total || drafted} hitSlop={{ top:6, bottom:6, left:8, right:8 }}>
+          <Feather name="chevron-down" size={14} color={boardRank === total || drafted ? colors.border : colors.mutedForeground} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Position circle */}
+      <View style={[st.posCircle, { backgroundColor: pc + "25" }]}>
+        <Text style={[st.posCircleText, { color: pc }]}>{p.position}</Text>
+      </View>
+
+      {/* Player info */}
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection:"row", alignItems:"center", gap:6, flexWrap:"wrap" }}>
+          <Text style={[st.playerName, { color: drafted ? colors.mutedForeground : colors.foreground }]}>{p.name}</Text>
+          {drafted && (
+            <View style={[st.wrDraftedBadge, { backgroundColor: colors.border }]}>
+              <Text style={{ fontSize:8, fontFamily:"Inter_700Bold", color: colors.mutedForeground, letterSpacing:0.5 }}>OFF BOARD</Text>
+            </View>
+          )}
+        </View>
+        <View style={{ flexDirection:"row", alignItems:"center", gap:5, marginTop:2, flexWrap:"wrap" }}>
+          <Text style={[st.playerMeta, { color: colors.mutedForeground }]}>{p.college}</Text>
+          <View style={[st.gradePill, { backgroundColor: gc+"20", borderColor: gc+"50", paddingHorizontal:5, paddingVertical:1 }]}>
+            <Text style={[st.gradePillText, { color: gc, fontSize:9 }]}>{p.grade}</Text>
+          </View>
+          {p.scoutingUnlocked && p.developmentTrait !== "Normal" && (
+            <View style={[st.devTraitPill, { backgroundColor: devColor+"20", borderColor: devColor+"40" }]}>
+              <Feather name={DEV_ICONS[p.developmentTrait] as any} size={8} color={devColor} />
+            </View>
+          )}
+        </View>
+        {/* Physical quick stats if scouted */}
+        {p.scoutingUnlocked && !p.combine.didNotParticipate && (
+          <View style={st.wrQuickStats}>
+            <Text style={[st.wrQuickStat, { color: colors.mutedForeground }]}>
+              40: <Text style={{ color: p.combine.fortyYardDash < 4.4 ? "#3FB950" : colors.foreground }}>{p.combine.fortyYardDash}s</Text>
+            </Text>
+            <Text style={[st.wrQuickStat, { color: colors.mutedForeground }]}>
+              Vert: <Text style={{ color: colors.foreground }}>{p.combine.verticalJump}"</Text>
+            </Text>
+            <Text style={[st.wrQuickStat, { color: colors.mutedForeground }]}>
+              POT: <Text style={{ color: p.potential >= 90 ? "#FFD700" : p.potential >= 80 ? "#3FB950" : colors.foreground }}>{p.potential}</Text>
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* OVR + actions */}
+      <View style={st.wrActions}>
+        {p.scoutingUnlocked && (
+          <View style={[st.ovrBadge, { backgroundColor: pc+"22", borderColor: pc+"55" }]}>
+            <Text style={[st.ovrText, { color: pc }]}>{p.overallGrade}</Text>
+          </View>
+        )}
+        {isGM && isUserTurn && !drafted && (
+          <TouchableOpacity onPress={e => { e.stopPropagation?.(); onDraft(); }}
+            style={[st.draftBtnSm, { backgroundColor: teamColor, marginTop: 4 }]}>
+            <Text style={st.draftBtnSmText}>Draft</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity onPress={e => { e.stopPropagation?.(); onRemove(); }}
+          hitSlop={{ top:6, bottom:6, left:6, right:6 }}
+          style={st.wrRemoveBtn}>
+          <Feather name="x" size={13} color={colors.mutedForeground} />
+        </TouchableOpacity>
+      </View>
     </TouchableOpacity>
   );
 }
@@ -945,6 +1159,25 @@ const st = StyleSheet.create({
   pickOverall:      { fontSize:13, fontFamily:"Inter_600SemiBold" },
   posPill:          { paddingHorizontal:5, paddingVertical:2, borderRadius:5 },
   posPillText:      { fontSize:10, fontFamily:"Inter_700Bold" },
+  // Board tip banner
+  boardTip:         { flexDirection:"row", alignItems:"center", gap:8, marginHorizontal:12, marginVertical:8,
+                      paddingHorizontal:12, paddingVertical:8, borderRadius:8, borderWidth:1 },
+  boardTipText:     { flex:1, fontSize:11, fontFamily:"Inter_400Regular", lineHeight:16 },
+  // Pin button (shared by ProspectCard + CombineRow)
+  pinBtn:           { width:26, height:26, borderRadius:7, borderWidth:1,
+                      alignItems:"center", justifyContent:"center", marginLeft:4 },
+  // War Room Card
+  wrCard:           { flexDirection:"row", alignItems:"center", gap:10,
+                      paddingHorizontal:12, paddingVertical:10, borderBottomWidth:1 },
+  wrRankCol:        { alignItems:"center", gap:2, width:32 },
+  wrRankBadge:      { width:28, height:28, borderRadius:7, borderWidth:1,
+                      alignItems:"center", justifyContent:"center" },
+  wrRankNum:        { fontSize:13, fontFamily:"Inter_700Bold" },
+  wrDraftedBadge:   { paddingHorizontal:5, paddingVertical:2, borderRadius:4 },
+  wrQuickStats:     { flexDirection:"row", gap:10, marginTop:3 },
+  wrQuickStat:      { fontSize:10, fontFamily:"Inter_500Medium" },
+  wrActions:        { alignItems:"center", gap:4 },
+  wrRemoveBtn:      { width:26, height:26, alignItems:"center", justifyContent:"center" },
   // Trade builder
   tradeBuilder:     { borderBottomWidth:1, padding:14, gap:10 },
   tradeHeader:      { flexDirection:"row", alignItems:"center", gap:8 },
