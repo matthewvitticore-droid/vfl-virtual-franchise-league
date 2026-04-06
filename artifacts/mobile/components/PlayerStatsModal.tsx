@@ -4,7 +4,6 @@ import React, { useState } from "react";
 import {
   Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import {
   POS_RATING_KEYS, POS_RATING_LABELS,
@@ -18,40 +17,53 @@ const POS_COLOR: Record<NFLPosition, string> = {
   CB:"#6E40C9", S:"#9C27B0",  K:"#FF7043", P:"#795548",
 };
 
+const ROUND_COLORS: Record<string, string> = {
+  "1":"#FFD700","2":"#FF6B35","3":"#3FB950","4":"#00B5E2",
+  "5":"#8B949E","6":"#795548","7":"#525252",
+};
+
+const DEV_COLORS: Record<string, string> = {
+  "X-Factor":"#FFD700", Superstar:"#FF6B35", Star:"#3FB950",
+  Normal:"#8B949E", "Late Bloomer":"#00B5E2",
+};
+const DEV_ICONS: Record<string, string> = {
+  "X-Factor":"zap", Superstar:"star", Star:"award",
+  Normal:"user", "Late Bloomer":"trending-up",
+};
+
+function ovrColor(v: number) {
+  if (v >= 90) return "#FFD700";
+  if (v >= 80) return "#3FB950";
+  if (v >= 70) return "#FFC107";
+  return "#E31837";
+}
+
 // ─── Compact stat card (Topps-style) ──────────────────────────────────────────
-function StatCard({
-  label, value, accent,
-}: { label: string; value: string | number; accent?: string }) {
+function StatCard({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
   const colors = useColors();
   return (
     <View style={[card.box, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-      <Text style={[card.val, { color: accent ?? colors.foreground }]} numberOfLines={1}>
-        {value}
-      </Text>
+      <Text style={[card.val, { color: accent ?? colors.foreground }]} numberOfLines={1}>{value}</Text>
       <Text style={[card.lbl, { color: colors.mutedForeground }]}>{label}</Text>
     </View>
   );
 }
 const card = StyleSheet.create({
-  box: {
-    flex: 1, alignItems: "center", justifyContent: "center",
-    paddingVertical: 8, paddingHorizontal: 4,
-    borderRadius: 8, borderWidth: 1, minWidth: 0,
-  },
-  val: { fontSize: 16, fontFamily: "Inter_700Bold", letterSpacing: -0.3 },
-  lbl: { fontSize: 8, fontFamily: "Inter_700Bold", letterSpacing: 0.8, marginTop: 2 },
+  box: { flex:1, alignItems:"center", justifyContent:"center",
+         paddingVertical:8, paddingHorizontal:4,
+         borderRadius:8, borderWidth:1, minWidth:0 },
+  val: { fontSize:16, fontFamily:"Inter_700Bold", letterSpacing:-0.3 },
+  lbl: { fontSize:8, fontFamily:"Inter_700Bold", letterSpacing:0.8, marginTop:2 },
 });
 
-// ─── Card row (4 per row by default) ──────────────────────────────────────────
 function CardRow({ cells }: { cells: { label: string; value: string | number; accent?: string }[] }) {
   return (
-    <View style={{ flexDirection: "row", gap: 5, marginBottom: 5 }}>
+    <View style={{ flexDirection:"row", gap:5, marginBottom:5 }}>
       {cells.map(c => <StatCard key={c.label} {...c} />)}
     </View>
   );
 }
 
-// ─── Section header ───────────────────────────────────────────────────────────
 function SectionLabel({ text, accent }: { text: string; accent?: string }) {
   const colors = useColors();
   return (
@@ -61,142 +73,118 @@ function SectionLabel({ text, accent }: { text: string; accent?: string }) {
   );
 }
 const sec = StyleSheet.create({
-  wrap: { borderLeftWidth: 2, paddingLeft: 7, marginBottom: 7, marginTop: 12 },
-  text: { fontSize: 9, fontFamily: "Inter_700Bold", letterSpacing: 1.2 },
+  wrap: { borderLeftWidth:2, paddingLeft:7, marginBottom:7, marginTop:12 },
+  text: { fontSize:9, fontFamily:"Inter_700Bold", letterSpacing:1.2 },
 });
 
-// ─── Empty placeholder ────────────────────────────────────────────────────────
 function Empty({ message }: { message: string }) {
   const colors = useColors();
   return (
-    <View style={{ alignItems: "center", paddingVertical: 32, gap: 10 }}>
+    <View style={{ alignItems:"center", paddingVertical:32, gap:10 }}>
       <Feather name="bar-chart-2" size={28} color={colors.border} />
-      <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium",
-        textAlign: "center", lineHeight: 18 }}>
-        {message}
-      </Text>
+      <Text style={{ color:colors.mutedForeground, fontSize:12, fontFamily:"Inter_500Medium",
+        textAlign:"center", lineHeight:18 }}>{message}</Text>
     </View>
   );
 }
 
-// ─── Season stats grid by position ────────────────────────────────────────────
+// ─── Season stats grid ─────────────────────────────────────────────────────────
 function SeasonStats({ pos, stats, accent, gp }: {
   pos: NFLPosition; stats: PlayerSeasonStats; accent: string; gp?: number;
 }) {
   const colors = useColors();
   const hasAny = stats.passingYards + stats.rushingYards + stats.receivingYards +
     stats.tackles + stats.sacks + stats.fieldGoalsMade + stats.puntsAverage > 0;
-
   if (!hasAny) return <Empty message="No stats recorded this season yet." />;
 
   const pct  = (n: number, d: number) => d === 0 ? "—" : `${((n/d)*100).toFixed(1)}%`;
   const dec  = (n: number, p = 1)    => n.toFixed(p);
   const fmt  = (n: number)           => n === 0 ? "—" : n.toLocaleString();
-  const green = "#3FB950";
-  const red   = "#E31837";
+  const green = "#3FB950"; const red = "#E31837";
 
   return (
     <View>
       {gp !== undefined && (
-        <Text style={{ color: colors.mutedForeground, fontSize: 9, fontFamily: "Inter_700Bold",
-          letterSpacing: 1, marginBottom: 6 }}>
-          {gp} GAMES PLAYED
-        </Text>
+        <Text style={{ color:colors.mutedForeground, fontSize:9, fontFamily:"Inter_700Bold",
+          letterSpacing:1, marginBottom:6 }}>{gp} GAMES PLAYED</Text>
       )}
-
-      {/* QB */}
       {pos === "QB" && <>
         <SectionLabel text="PASSING" accent={accent} />
         <CardRow cells={[
-          { label:"ATT",  value: fmt(stats.attempts) },
-          { label:"CMP",  value: fmt(stats.completions) },
-          { label:"CMP%", value: stats.attempts>0 ? pct(stats.completions, stats.attempts) : "—", accent },
-          { label:"YDS",  value: fmt(stats.passingYards), accent },
+          { label:"ATT",  value:fmt(stats.attempts) },
+          { label:"CMP",  value:fmt(stats.completions) },
+          { label:"CMP%", value:stats.attempts>0 ? pct(stats.completions, stats.attempts) : "—", accent },
+          { label:"YDS",  value:fmt(stats.passingYards), accent },
         ]} />
         <CardRow cells={[
-          { label:"TD",   value: fmt(stats.passingTDs), accent: green },
-          { label:"INT",  value: fmt(stats.interceptions), accent: stats.interceptions>0 ? red : undefined },
-          { label:"RTG",  value: stats.qbRating>0 ? dec(stats.qbRating) : "—", accent },
-          { label:"YPA",  value: stats.attempts>0 ? dec(stats.passingYards/stats.attempts) : "—" },
+          { label:"TD",  value:fmt(stats.passingTDs), accent:green },
+          { label:"INT", value:fmt(stats.interceptions), accent:stats.interceptions>0 ? red : undefined },
+          { label:"RTG", value:stats.qbRating>0 ? dec(stats.qbRating) : "—", accent },
+          { label:"YPA", value:stats.attempts>0 ? dec(stats.passingYards/stats.attempts) : "—" },
         ]} />
         {stats.carries > 0 && <>
           <SectionLabel text="RUSHING" accent={accent} />
           <CardRow cells={[
-            { label:"CAR", value: fmt(stats.carries) },
-            { label:"YDS", value: fmt(stats.rushingYards), accent },
-            { label:"TD",  value: fmt(stats.rushingTDs), accent: green },
-            { label:"AVG", value: stats.carries>0 ? dec(stats.rushingYards/stats.carries) : "—" },
+            { label:"CAR", value:fmt(stats.carries) },
+            { label:"YDS", value:fmt(stats.rushingYards), accent },
+            { label:"TD",  value:fmt(stats.rushingTDs), accent:green },
+            { label:"AVG", value:stats.carries>0 ? dec(stats.rushingYards/stats.carries) : "—" },
           ]} />
         </>}
       </>}
-
-      {/* RB */}
       {pos === "RB" && <>
         <SectionLabel text="RUSHING" accent={accent} />
         <CardRow cells={[
-          { label:"CAR", value: fmt(stats.carries) },
-          { label:"YDS", value: fmt(stats.rushingYards), accent },
-          { label:"YPC", value: stats.carries>0 ? dec(stats.rushingYards/stats.carries) : "—", accent },
-          { label:"TD",  value: fmt(stats.rushingTDs), accent: green },
+          { label:"CAR", value:fmt(stats.carries) },
+          { label:"YDS", value:fmt(stats.rushingYards), accent },
+          { label:"YPC", value:stats.carries>0 ? dec(stats.rushingYards/stats.carries) : "—", accent },
+          { label:"TD",  value:fmt(stats.rushingTDs), accent:green },
         ]} />
         {stats.targets > 0 && <>
           <SectionLabel text="RECEIVING" accent={accent} />
           <CardRow cells={[
-            { label:"TGT", value: fmt(stats.targets) },
-            { label:"REC", value: fmt(stats.receptions) },
-            { label:"YDS", value: fmt(stats.receivingYards), accent },
-            { label:"TD",  value: fmt(stats.receivingTDs), accent: green },
+            { label:"TGT", value:fmt(stats.targets) },
+            { label:"REC", value:fmt(stats.receptions) },
+            { label:"YDS", value:fmt(stats.receivingYards), accent },
+            { label:"TD",  value:fmt(stats.receivingTDs), accent:green },
           ]} />
         </>}
       </>}
-
-      {/* WR / TE */}
       {(pos === "WR" || pos === "TE") && <>
         <SectionLabel text="RECEIVING" accent={accent} />
         <CardRow cells={[
-          { label:"TGT",  value: fmt(stats.targets) },
-          { label:"REC",  value: fmt(stats.receptions), accent },
-          { label:"YDS",  value: fmt(stats.receivingYards), accent },
-          { label:"YPR",  value: stats.receptions>0 ? dec(stats.receivingYards/stats.receptions) : "—" },
+          { label:"TGT",  value:fmt(stats.targets) },
+          { label:"REC",  value:fmt(stats.receptions), accent },
+          { label:"YDS",  value:fmt(stats.receivingYards), accent },
+          { label:"YPR",  value:stats.receptions>0 ? dec(stats.receivingYards/stats.receptions) : "—" },
         ]} />
         <CardRow cells={[
-          { label:"TD",   value: fmt(stats.receivingTDs), accent: green },
-          { label:"CTH%", value: stats.targets>0 ? pct(stats.receptions, stats.targets) : "—" },
+          { label:"TD",   value:fmt(stats.receivingTDs), accent:green },
+          { label:"CTH%", value:stats.targets>0 ? pct(stats.receptions, stats.targets) : "—" },
         ]} />
       </>}
-
-      {/* Defense */}
       {["DE","DT","LB","CB","S"].includes(pos) && <>
         <SectionLabel text="DEFENSE" accent={accent} />
         <CardRow cells={[
-          { label:"TCK",  value: fmt(stats.tackles), accent },
-          { label:"SACK", value: stats.sacks>0 ? dec(stats.sacks) : "—", accent: stats.sacks>0 ? green : undefined },
-          { label:"INT",  value: fmt(stats.defensiveINTs), accent: stats.defensiveINTs>0 ? "#FFC20E" : undefined },
-          { label:"PD",   value: fmt(stats.passDeflections) },
+          { label:"TCK",  value:fmt(stats.tackles), accent },
+          { label:"SACK", value:stats.sacks>0 ? dec(stats.sacks) : "—", accent:stats.sacks>0 ? green : undefined },
+          { label:"INT",  value:fmt(stats.defensiveINTs), accent:stats.defensiveINTs>0 ? "#FFC20E" : undefined },
+          { label:"PD",   value:fmt(stats.passDeflections) },
         ]} />
-        <CardRow cells={[
-          { label:"FF",   value: fmt(stats.forcedFumbles) },
-        ]} />
+        <CardRow cells={[{ label:"FF", value:fmt(stats.forcedFumbles) }]} />
       </>}
-
-      {/* K */}
       {pos === "K" && <>
         <SectionLabel text="KICKING" accent={accent} />
         <CardRow cells={[
-          { label:"FGM", value: fmt(stats.fieldGoalsMade), accent },
-          { label:"FGA", value: fmt(stats.fieldGoalsAttempted) },
-          { label:"FG%", value: stats.fieldGoalsAttempted>0 ? pct(stats.fieldGoalsMade, stats.fieldGoalsAttempted) : "—", accent },
+          { label:"FGM", value:fmt(stats.fieldGoalsMade), accent },
+          { label:"FGA", value:fmt(stats.fieldGoalsAttempted) },
+          { label:"FG%", value:stats.fieldGoalsAttempted>0 ? pct(stats.fieldGoalsMade, stats.fieldGoalsAttempted) : "—", accent },
         ]} />
       </>}
-
-      {/* P */}
       {pos === "P" && <>
         <SectionLabel text="PUNTING" accent={accent} />
-        <CardRow cells={[
-          { label:"P.AVG", value: stats.puntsAverage>0 ? dec(stats.puntsAverage) : "—", accent },
-        ]} />
+        <CardRow cells={[{ label:"P.AVG", value:stats.puntsAverage>0 ? dec(stats.puntsAverage) : "—", accent }]} />
       </>}
-
       {pos === "OL" && <Empty message="OL grades available in a future update." />}
     </View>
   );
@@ -208,67 +196,62 @@ function CareerSection({ career, pos, accent }: {
 }) {
   const colors = useColors();
   if (career.length === 0) return <Empty message="No career history yet. Stats archive after each season." />;
-
   return (
-    <View style={{ gap: 6 }}>
+    <View style={{ gap:6 }}>
       {[...career].reverse().map((s, i) => {
         const yr = s.season ?? "—";
-        let cells: { label: string; value: string }[] = [];
         const dec = (n: number, p = 1) => n > 0 ? n.toFixed(p) : "—";
         const fmt = (n: number) => n > 0 ? n.toString() : "—";
-
+        let cells: { label: string; value: string }[] = [];
         if (pos === "QB") {
           cells = [
-            { label:"YDS",  value: s.passingYards > 0 ? s.passingYards.toLocaleString() : "—" },
-            { label:"TD",   value: fmt(s.passingTDs) },
-            { label:"INT",  value: fmt(s.interceptions) },
-            { label:"CMP%", value: s.attempts>0 ? `${((s.completions/s.attempts)*100).toFixed(0)}%` : "—" },
-            { label:"RTG",  value: s.qbRating>0 ? s.qbRating.toFixed(1) : "—" },
+            { label:"YDS",  value:s.passingYards>0 ? s.passingYards.toLocaleString() : "—" },
+            { label:"TD",   value:fmt(s.passingTDs) },
+            { label:"INT",  value:fmt(s.interceptions) },
+            { label:"CMP%", value:s.attempts>0 ? `${((s.completions/s.attempts)*100).toFixed(0)}%` : "—" },
+            { label:"RTG",  value:s.qbRating>0 ? s.qbRating.toFixed(1) : "—" },
           ];
         } else if (pos === "RB") {
           cells = [
-            { label:"CAR", value: fmt(s.carries) },
-            { label:"YDS", value: s.rushingYards>0 ? s.rushingYards.toLocaleString() : "—" },
-            { label:"YPC", value: s.carries>0 ? dec(s.rushingYards/s.carries) : "—" },
-            { label:"TD",  value: fmt(s.rushingTDs) },
+            { label:"CAR", value:fmt(s.carries) },
+            { label:"YDS", value:s.rushingYards>0 ? s.rushingYards.toLocaleString() : "—" },
+            { label:"YPC", value:s.carries>0 ? dec(s.rushingYards/s.carries) : "—" },
+            { label:"TD",  value:fmt(s.rushingTDs) },
           ];
         } else if (pos === "WR" || pos === "TE") {
           cells = [
-            { label:"REC", value: fmt(s.receptions) },
-            { label:"YDS", value: s.receivingYards>0 ? s.receivingYards.toLocaleString() : "—" },
-            { label:"YPR", value: s.receptions>0 ? dec(s.receivingYards/s.receptions) : "—" },
-            { label:"TD",  value: fmt(s.receivingTDs) },
+            { label:"REC", value:fmt(s.receptions) },
+            { label:"YDS", value:s.receivingYards>0 ? s.receivingYards.toLocaleString() : "—" },
+            { label:"YPR", value:s.receptions>0 ? dec(s.receivingYards/s.receptions) : "—" },
+            { label:"TD",  value:fmt(s.receivingTDs) },
           ];
         } else if (pos === "K") {
           cells = [
-            { label:"FGM", value: fmt(s.fieldGoalsMade) },
-            { label:"FGA", value: fmt(s.fieldGoalsAttempted) },
-            { label:"FG%", value: s.fieldGoalsAttempted>0 ? `${((s.fieldGoalsMade/s.fieldGoalsAttempted)*100).toFixed(0)}%` : "—" },
+            { label:"FGM", value:fmt(s.fieldGoalsMade) },
+            { label:"FGA", value:fmt(s.fieldGoalsAttempted) },
+            { label:"FG%", value:s.fieldGoalsAttempted>0 ? `${((s.fieldGoalsMade/s.fieldGoalsAttempted)*100).toFixed(0)}%` : "—" },
           ];
         } else if (pos === "P") {
-          cells = [{ label:"AVG", value: dec(s.puntsAverage) }];
+          cells = [{ label:"AVG", value:dec(s.puntsAverage) }];
         } else {
           cells = [
-            { label:"TCK",  value: fmt(s.tackles) },
-            { label:"SACK", value: s.sacks>0 ? s.sacks.toFixed(1) : "—" },
-            { label:"INT",  value: fmt(s.defensiveINTs) },
-            { label:"PD",   value: fmt(s.passDeflections) },
+            { label:"TCK",  value:fmt(s.tackles) },
+            { label:"SACK", value:s.sacks>0 ? s.sacks.toFixed(1) : "—" },
+            { label:"INT",  value:fmt(s.defensiveINTs) },
+            { label:"PD",   value:fmt(s.passDeflections) },
           ];
         }
-
         return (
-          <View key={i} style={[cr.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {/* Year badge */}
-            <View style={[cr.badge, { backgroundColor: accent+"20", borderColor: accent+"40" }]}>
-              <Text style={[cr.yr, { color: accent }]}>{yr}</Text>
-              <Text style={[cr.gp, { color: colors.mutedForeground }]}>{s.gamesPlayed}G</Text>
+          <View key={i} style={[cr.row, { backgroundColor:colors.card, borderColor:colors.border }]}>
+            <View style={[cr.badge, { backgroundColor:accent+"20", borderColor:accent+"40" }]}>
+              <Text style={[cr.yr, { color:accent }]}>{yr}</Text>
+              <Text style={[cr.gp, { color:colors.mutedForeground }]}>{s.gamesPlayed}G</Text>
             </View>
-            {/* Stat chips */}
             <View style={cr.chips}>
               {cells.map(c => (
                 <View key={c.label} style={cr.chip}>
-                  <Text style={[cr.chipVal, { color: colors.foreground }]}>{c.value}</Text>
-                  <Text style={[cr.chipLbl, { color: colors.mutedForeground }]}>{c.label}</Text>
+                  <Text style={[cr.chipVal, { color:colors.foreground }]}>{c.value}</Text>
+                  <Text style={[cr.chipLbl, { color:colors.mutedForeground }]}>{c.label}</Text>
                 </View>
               ))}
             </View>
@@ -279,75 +262,57 @@ function CareerSection({ career, pos, accent }: {
   );
 }
 const cr = StyleSheet.create({
-  row:     { flexDirection:"row", alignItems:"center", borderRadius:10, borderWidth:1,
-             padding:10, gap:8 },
-  badge:   { width:42, alignItems:"center", paddingVertical:4, borderRadius:7, borderWidth:1 },
-  yr:      { fontSize:12, fontFamily:"Inter_700Bold" },
-  gp:      { fontSize:8,  fontFamily:"Inter_500Medium" },
-  chips:   { flex:1, flexDirection:"row", justifyContent:"space-around" },
-  chip:    { alignItems:"center" },
-  chipVal: { fontSize:13, fontFamily:"Inter_700Bold" },
-  chipLbl: { fontSize:8, fontFamily:"Inter_700Bold", letterSpacing:0.6, opacity:0.55, marginTop:1 },
+  row:    { flexDirection:"row", alignItems:"center", borderRadius:10, borderWidth:1, padding:10, gap:8 },
+  badge:  { width:42, alignItems:"center", paddingVertical:4, borderRadius:7, borderWidth:1 },
+  yr:     { fontSize:12, fontFamily:"Inter_700Bold" },
+  gp:     { fontSize:8,  fontFamily:"Inter_500Medium" },
+  chips:  { flex:1, flexDirection:"row", justifyContent:"space-around" },
+  chip:   { alignItems:"center" },
+  chipVal:{ fontSize:13, fontFamily:"Inter_700Bold" },
+  chipLbl:{ fontSize:8, fontFamily:"Inter_700Bold", letterSpacing:0.6, opacity:0.55, marginTop:1 },
 });
 
 // ─── Ratings tab ───────────────────────────────────────────────────────────────
 function RatingsTab({ player, accent, secondary }: { player: Player; accent: string; secondary: string }) {
   const colors = useColors();
   const keys   = POS_RATING_KEYS[player.position];
-
-  // General ratings
-  const generals: { label: string; value: number }[] = [
-    { label: "OVERALL", value: player.overall },
-    { label: "SPEED",   value: player.speed },
-    { label: "STR",     value: player.strength },
-    { label: "AWR",     value: player.awareness },
-  ];
-
   return (
-    <View style={{ gap: 0 }}>
+    <View style={{ gap:0 }}>
       {/* Overall strip */}
-      <View style={[rt.ovrStrip, { backgroundColor: accent+"18", borderColor: accent+"35" }]}>
-        <Text style={[rt.ovrLabel, { color: colors.mutedForeground }]}>OVERALL</Text>
-        <Text style={[rt.ovrVal, { color: accent }]}>{player.overall}</Text>
-        <View style={{ flex: 1 }}>
-          <View style={[rt.barTrack, { backgroundColor: colors.border }]}>
-            <View style={[rt.barFill, { width: `${player.overall}%` as any, backgroundColor: accent }]} />
+      <View style={[rt.ovrStrip, { backgroundColor:accent+"18", borderColor:accent+"35" }]}>
+        <Text style={[rt.ovrLabel, { color:colors.mutedForeground }]}>OVERALL</Text>
+        <Text style={[rt.ovrVal, { color:accent }]}>{player.overall}</Text>
+        <View style={{ flex:1 }}>
+          <View style={[rt.barTrack, { backgroundColor:colors.border }]}>
+            <View style={[rt.barFill, { width:`${player.overall}%` as any, backgroundColor:accent }]} />
           </View>
         </View>
       </View>
-
-      {/* General athleticism */}
+      {/* Athleticism */}
       <SectionLabel text="ATHLETICISM" accent={accent} />
       <View style={rt.grid}>
-        {[
-          { label:"SPEED",   value: player.speed },
-          { label:"STR",     value: player.strength },
-          { label:"AWR",     value: player.awareness },
-        ].map(r => (
-          <View key={r.label} style={[rt.athlBox, { backgroundColor: accent+"12", borderColor: accent+"30" }]}>
-            <Text style={[rt.athlVal, { color: accent }]}>{r.value}</Text>
-            <Text style={[rt.athlLbl, { color: colors.mutedForeground }]}>{r.label}</Text>
+        {[{ label:"SPEED", value:player.speed },{ label:"STR", value:player.strength },{ label:"AWR", value:player.awareness }]
+          .map(r => (
+          <View key={r.label} style={[rt.athlBox, { backgroundColor:accent+"12", borderColor:accent+"30" }]}>
+            <Text style={[rt.athlVal, { color:accent }]}>{r.value}</Text>
+            <Text style={[rt.athlLbl, { color:colors.mutedForeground }]}>{r.label}</Text>
           </View>
         ))}
       </View>
-
-      {/* Position-specific ratings */}
+      {/* Position ratings */}
       <SectionLabel text="POSITION RATINGS" accent={accent} />
-      <View style={{ gap: 7 }}>
+      <View style={{ gap:7 }}>
         {keys.map(key => {
           const val   = player.posRatings[key] ?? 0;
           const label = POS_RATING_LABELS[key];
           const valClr = val >= 85 ? secondary : "#CBD5E1";
           return (
             <View key={key} style={rt.ratingRow}>
-              {/* Label */}
-              <Text style={[rt.rLabel, { color: colors.mutedForeground }]}>{label}</Text>
-              {/* Bar — team primary fill */}
-              <View style={[rt.track, { backgroundColor: colors.border }]}>
-                <View style={[rt.fill, { width: `${val}%` as any, backgroundColor: accent }]} />
+              <Text style={[rt.rLabel, { color:colors.mutedForeground }]}>{label}</Text>
+              <View style={[rt.track, { backgroundColor:colors.border }]}>
+                <View style={[rt.fill, { width:`${val}%` as any, backgroundColor:accent }]} />
               </View>
-              {/* Value — secondary for elite (≥85), white otherwise */}
-              <Text style={[rt.rVal, { color: valClr }]}>{val}</Text>
+              <Text style={[rt.rVal, { color:valClr }]}>{val}</Text>
             </View>
           );
         })}
@@ -388,14 +353,20 @@ interface Props {
 
 export function PlayerStatsModal({ player, visible, onClose, teamPrimaryColor, teamSecondaryColor, gamesPlayedThisSeason }: Props) {
   const colors  = useColors();
-  const insets  = useSafeAreaInsets();
   const [tab, setTab] = useState<ModalTab>("season");
 
   if (!player) return null;
 
-  const accent    = teamPrimaryColor   ?? POS_COLOR[player.position];
+  const pc        = POS_COLOR[player.position];
+  const accent    = teamPrimaryColor   ?? pc;
   const secondary = teamSecondaryColor ?? accent;
-  const career   = player.careerStats ?? [];
+  const career    = player.careerStats ?? [];
+
+  const devColor  = DEV_COLORS[player.developmentTrait] ?? "#8B949E";
+  const devIcon   = (DEV_ICONS[player.developmentTrait]  ?? "user") as any;
+  const roundStr  = player.draftRound ? String(player.draftRound) : null;
+  const roundColor= roundStr ? (ROUND_COLORS[roundStr] ?? "#525252") : null;
+  const oc        = ovrColor(player.overall);
 
   const TABS: { key: ModalTab; label: string; icon: any }[] = [
     { key:"season",  label:"Season",  icon:"trending-up" },
@@ -408,69 +379,104 @@ export function PlayerStatsModal({ player, visible, onClose, teamPrimaryColor, t
       <View style={{ flex:1, justifyContent:"flex-end", backgroundColor:"rgba(0,0,0,0.75)" }}>
         <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} />
 
-        <View style={[modal.sheet, { backgroundColor: colors.background, paddingBottom: insets.bottom + 16 }]}>
+        <View style={[modal.sheet, { backgroundColor:colors.background }]}>
           {/* Drag handle */}
-          <View style={[modal.handle, { backgroundColor: colors.border }]} />
+          <View style={[modal.handle, { backgroundColor:colors.border }]} />
 
-          {/* Gradient bg */}
-          <LinearGradient colors={[accent+"30","transparent"]} style={modal.grad} pointerEvents="none" />
+          {/* Close button */}
+          <TouchableOpacity onPress={onClose} style={modal.closeBtn}>
+            <Feather name="x" size={20} color={colors.mutedForeground} />
+          </TouchableOpacity>
 
-          {/* Header */}
-          <View style={modal.header}>
-            <View style={{ flex:1 }}>
-              <View style={{ flexDirection:"row", alignItems:"center", gap:7, marginBottom:4 }}>
-                <Text style={[modal.name, { color: colors.foreground }]}>{player.name}</Text>
-                {player.yearsExperience === 0 && (
-                  <View style={modal.rookieBadge}>
-                    <Text style={modal.rookieTxt}>R</Text>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom:60 }}>
+
+            {/* ── HERO HEADER (ProspectModal-style) ── */}
+            <View style={[modal.hero, { backgroundColor: pc + "14" }]}>
+              <LinearGradient
+                colors={[pc+"30", "transparent"]}
+                style={StyleSheet.absoluteFill}
+                pointerEvents="none"
+              />
+
+              {/* Top row: draft pill + position badge + OVR badge */}
+              <View style={modal.heroTop}>
+                <View style={modal.heroTopLeft}>
+                  {roundColor && (
+                    <View style={[modal.gradePill, { backgroundColor:roundColor+"25", borderColor:roundColor+"60" }]}>
+                      <Text style={[modal.gradeText, { color:roundColor }]}>
+                        Rd {player.draftRound}
+                      </Text>
+                    </View>
+                  )}
+                  {!roundColor && player.yearsExperience === 0 && (
+                    <View style={[modal.gradePill, { backgroundColor:"#FF6B35"+"25", borderColor:"#FF6B35"+"60" }]}>
+                      <Text style={[modal.gradeText, { color:"#FF6B35" }]}>ROOKIE</Text>
+                    </View>
+                  )}
+                  <View style={[modal.posBadge, { backgroundColor:pc+"22", borderColor:pc+"50" }]}>
+                    <Text style={[modal.posText, { color:pc }]}>{player.position}</Text>
                   </View>
-                )}
-              </View>
-              <View style={{ flexDirection:"row", alignItems:"center", gap:6 }}>
-                <View style={[modal.posBadge, { backgroundColor: accent+"25", borderColor: accent+"60" }]}>
-                  <Text style={[modal.posText, { color: accent }]}>{player.position}</Text>
                 </View>
-                <Text style={[modal.meta, { color: colors.mutedForeground }]}>
-                  {player.age}yo · {player.yearsExperience}yr exp · {player.overall} OVR
-                </Text>
+                {/* OVR big badge */}
+                <View style={[modal.ovrBig, { borderColor:oc+"70", backgroundColor:oc+"18" }]}>
+                  <Text style={[modal.ovrNum, { color:oc }]}>{player.overall}</Text>
+                  <Text style={[modal.ovrLbl, { color:oc+"AA" }]}>OVR</Text>
+                </View>
               </View>
+
+              {/* Name */}
+              <Text style={[modal.heroName, { color:colors.foreground }]}>{player.name}</Text>
+              <Text style={[modal.heroSub, { color:colors.mutedForeground }]}>
+                {[player.college, `${player.yearsExperience}yr exp`].filter(Boolean).join(" · ")}
+              </Text>
+
+              {/* Dev trait + POT */}
+              <View style={modal.devRow}>
+                <View style={[modal.devChip, { backgroundColor:devColor+"20", borderColor:devColor+"50" }]}>
+                  <Feather name={devIcon} size={11} color={devColor} />
+                  <Text style={[modal.devText, { color:devColor }]}>{player.developmentTrait}</Text>
+                </View>
+                <View style={[modal.potChip, { backgroundColor:colors.secondary }]}>
+                  <Text style={[modal.potLabel, { color:colors.mutedForeground }]}>POT </Text>
+                  <Text style={[modal.potVal, { color:ovrColor(player.potential) }]}>{player.potential}</Text>
+                </View>
+              </View>
+
+              {/* Draft bio */}
               {!!player.draftYear && (
-                <Text style={[modal.draftBio, { color: colors.mutedForeground }]}>
+                <Text style={[modal.draftBio, { color:colors.mutedForeground }]}>
                   Drafted {player.draftYear} · Round {player.draftRound} · Pick #{player.draftPick}
+                  {player.draftTeamId ? "" : ""}
                 </Text>
               )}
             </View>
-            <TouchableOpacity onPress={onClose} style={modal.closeBtn}>
-              <Feather name="x" size={18} color={colors.mutedForeground} />
-            </TouchableOpacity>
-          </View>
 
-          {/* Three-tab toggle */}
-          <View style={[modal.tabBar, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-            {TABS.map(t => (
-              <TouchableOpacity key={t.key} onPress={() => setTab(t.key)}
-                style={[modal.tabBtn, tab===t.key && { backgroundColor: accent }]}>
-                <Feather name={t.icon} size={10} color={tab===t.key ? "#fff" : colors.mutedForeground} />
-                <Text style={[modal.tabLabel, { color: tab===t.key ? "#fff" : colors.mutedForeground }]}>
-                  {t.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+            {/* ── Tab bar ── */}
+            <View style={[modal.tabBar, { backgroundColor:colors.secondary, borderColor:colors.border }]}>
+              {TABS.map(t => (
+                <TouchableOpacity key={t.key} onPress={() => setTab(t.key)}
+                  style={[modal.tabBtn, tab===t.key && { backgroundColor:accent }]}>
+                  <Feather name={t.icon} size={10} color={tab===t.key ? "#fff" : colors.mutedForeground} />
+                  <Text style={[modal.tabLabel, { color:tab===t.key ? "#fff" : colors.mutedForeground }]}>
+                    {t.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
-          {/* Content */}
-          <ScrollView showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ padding:14, paddingTop:6 }}>
-            {tab === "season" && (
-              <SeasonStats pos={player.position} stats={player.stats}
-                accent={accent} gp={gamesPlayedThisSeason} />
-            )}
-            {tab === "career" && (
-              <CareerSection career={career} pos={player.position} accent={accent} />
-            )}
-            {tab === "ratings" && (
-              <RatingsTab player={player} accent={accent} secondary={secondary} />
-            )}
+            {/* ── Tab content ── */}
+            <View style={{ padding:14, paddingTop:6 }}>
+              {tab === "season" && (
+                <SeasonStats pos={player.position} stats={player.stats}
+                  accent={accent} gp={gamesPlayedThisSeason} />
+              )}
+              {tab === "career" && (
+                <CareerSection career={career} pos={player.position} accent={accent} />
+              )}
+              {tab === "ratings" && (
+                <RatingsTab player={player} accent={accent} secondary={secondary} />
+              )}
+            </View>
           </ScrollView>
         </View>
       </View>
@@ -478,27 +484,52 @@ export function PlayerStatsModal({ player, visible, onClose, teamPrimaryColor, t
   );
 }
 
-// ─── Modal shell styles ────────────────────────────────────────────────────────
+// ─── Styles ────────────────────────────────────────────────────────────────────
 const modal = StyleSheet.create({
   sheet: {
     borderTopLeftRadius:22, borderTopRightRadius:22,
-    maxHeight:"88%", minHeight:"60%", overflow:"hidden",
+    maxHeight:"92%", minHeight:"60%", overflow:"hidden",
   },
-  handle:   { width:38, height:4, borderRadius:2, alignSelf:"center", marginTop:10, marginBottom:4 },
-  grad:     { position:"absolute", top:0, left:0, right:0, height:80 },
-  header:   { flexDirection:"row", alignItems:"flex-start", justifyContent:"space-between",
-              paddingHorizontal:16, paddingTop:6, paddingBottom:10 },
-  name:     { fontSize:20, fontFamily:"Inter_700Bold", letterSpacing:-0.3 },
-  posBadge: { paddingHorizontal:7, paddingVertical:2, borderRadius:5, borderWidth:1 },
-  posText:  { fontSize:10, fontFamily:"Inter_700Bold" },
-  meta:     { fontSize:11, fontFamily:"Inter_400Regular" },
-  rookieBadge: { backgroundColor:"#FF6B35", paddingHorizontal:6, paddingVertical:2, borderRadius:5, alignSelf:"flex-start" },
-  rookieTxt:   { fontSize:9, fontFamily:"Inter_700Bold", color:"#fff", letterSpacing:0.5 },
-  draftBio:    { fontSize:10, fontFamily:"Inter_500Medium", marginTop:4, opacity:0.7 },
-  closeBtn: { padding:6, marginTop:2 },
-  tabBar:   { flexDirection:"row", marginHorizontal:14, marginBottom:6,
-              borderRadius:10, borderWidth:1, padding:3, gap:3 },
+  handle:   { width:38, height:4, borderRadius:2, alignSelf:"center", marginTop:10, marginBottom:0 },
+  closeBtn: { position:"absolute", top:14, right:14, zIndex:10, padding:6 },
+
+  // Hero
+  hero:     { paddingHorizontal:16, paddingTop:12, paddingBottom:16, overflow:"hidden" },
+  heroTop:  { flexDirection:"row", alignItems:"center", justifyContent:"space-between", marginBottom:10 },
+  heroTopLeft: { flexDirection:"row", alignItems:"center", gap:6, flex:1 },
+
+  gradePill: { paddingHorizontal:10, paddingVertical:4, borderRadius:8,
+               borderWidth:1, alignSelf:"flex-start" },
+  gradeText: { fontSize:11, fontFamily:"Inter_700Bold" },
+
+  posBadge: { paddingHorizontal:9, paddingVertical:3, borderRadius:7, borderWidth:1 },
+  posText:  { fontSize:12, fontFamily:"Inter_700Bold" },
+
+  ovrBig:   { flexDirection:"row", alignItems:"baseline", gap:3,
+               paddingHorizontal:10, paddingVertical:6,
+               borderRadius:10, borderWidth:1.5 },
+  ovrNum:   { fontSize:26, fontFamily:"Inter_700Bold", lineHeight:30 },
+  ovrLbl:   { fontSize:10, fontFamily:"Inter_700Bold", letterSpacing:0.5 },
+
+  heroName: { fontSize:28, fontFamily:"Inter_700Bold", letterSpacing:-0.5, marginBottom:2 },
+  heroSub:  { fontSize:12, fontFamily:"Inter_400Regular", marginBottom:10 },
+
+  devRow:   { flexDirection:"row", alignItems:"center", gap:8, flexWrap:"wrap" },
+  devChip:  { flexDirection:"row", alignItems:"center", gap:5,
+               paddingHorizontal:9, paddingVertical:4,
+               borderRadius:8, borderWidth:1 },
+  devText:  { fontSize:11, fontFamily:"Inter_600SemiBold" },
+  potChip:  { flexDirection:"row", alignItems:"baseline", gap:1,
+               paddingHorizontal:8, paddingVertical:4, borderRadius:8 },
+  potLabel: { fontSize:10, fontFamily:"Inter_500Medium" },
+  potVal:   { fontSize:14, fontFamily:"Inter_700Bold" },
+
+  draftBio: { fontSize:10, fontFamily:"Inter_500Medium", marginTop:8, opacity:0.7 },
+
+  // Tabs
+  tabBar:   { flexDirection:"row", marginHorizontal:14, marginTop:10, marginBottom:0,
+               borderRadius:10, borderWidth:1, padding:3, gap:3 },
   tabBtn:   { flex:1, flexDirection:"row", alignItems:"center", justifyContent:"center",
-              gap:4, paddingVertical:7, borderRadius:8 },
+               gap:4, paddingVertical:7, borderRadius:8 },
   tabLabel: { fontSize:11, fontFamily:"Inter_600SemiBold" },
 });
