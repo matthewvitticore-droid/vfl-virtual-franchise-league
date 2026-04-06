@@ -11,8 +11,8 @@ export default function App() {
         chinstrapColor="#DC2828"
         visorColor="#0F172A"
         outlineColor="#111827"
-        width={320}
-        height={320}
+        width={340}
+        height={311}
       />
     </View>
   );
