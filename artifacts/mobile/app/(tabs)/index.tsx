@@ -294,7 +294,7 @@ export default function HomeScreen() {
                   <View style={st.draftCardHeader}>
                     <View>
                       <Text style={[st.draftCardEyebrow, { color: theme.secondary }]}>
-                        {isDraftComplete ? "DRAFT COMPLETE" : "DRAFT IN PROGRESS"}
+                        {isDraftComplete ? `${season.year} DRAFT COMPLETE` : "DRAFT IN PROGRESS"}
                       </Text>
                       <Text style={[st.draftCardTitle, { color: colors.foreground }]}>
                         {isDraftComplete ? "Rookie Class Set" : `Round ${ds?.currentRound ?? 1} · Pick ${ds?.currentPickInRound ?? 1}`}
@@ -316,39 +316,59 @@ export default function HomeScreen() {
                     </View>
                   )}
 
-                  {/* Stats row */}
-                  <View style={st.draftStatsRow}>
-                    <View style={st.draftStat}>
-                      <Text style={[st.draftStatNum, { color: theme.primary }]}>{warRoomCount}</Text>
-                      <Text style={[st.draftStatLbl, { color: colors.mutedForeground }]}>TARGETED</Text>
+                  {/* Stats row — only while draft is live */}
+                  {!isDraftComplete && (
+                    <View style={st.draftStatsRow}>
+                      <View style={st.draftStat}>
+                        <Text style={[st.draftStatNum, { color: theme.primary }]}>{warRoomCount}</Text>
+                        <Text style={[st.draftStatLbl, { color: colors.mutedForeground }]}>TARGETED</Text>
+                      </View>
+                      <View style={[st.draftStatDivider, { backgroundColor: colors.border }]} />
+                      <View style={st.draftStat}>
+                        <Text style={[st.draftStatNum, { color: colors.foreground }]}>
+                          {season.draftProspects?.filter(p => p.isPickedUp).length ?? 0}
+                        </Text>
+                        <Text style={[st.draftStatLbl, { color: colors.mutedForeground }]}>DRAFTED</Text>
+                      </View>
+                      <View style={[st.draftStatDivider, { backgroundColor: colors.border }]} />
+                      <View style={st.draftStat}>
+                        <Text style={[st.draftStatNum, { color: colors.foreground }]}>
+                          {season.draftProspects?.filter(p => !p.isPickedUp).length ?? 0}
+                        </Text>
+                        <Text style={[st.draftStatLbl, { color: colors.mutedForeground }]}>AVAILABLE</Text>
+                      </View>
                     </View>
-                    <View style={[st.draftStatDivider, { backgroundColor: colors.border }]} />
-                    <View style={st.draftStat}>
-                      <Text style={[st.draftStatNum, { color: colors.foreground }]}>
-                        {season.draftProspects?.filter(p => p.isPickedUp).length ?? 0}
-                      </Text>
-                      <Text style={[st.draftStatLbl, { color: colors.mutedForeground }]}>DRAFTED</Text>
-                    </View>
-                    <View style={[st.draftStatDivider, { backgroundColor: colors.border }]} />
-                    <View style={st.draftStat}>
-                      <Text style={[st.draftStatNum, { color: colors.foreground }]}>
-                        {season.draftProspects?.filter(p => !p.isPickedUp).length ?? 0}
-                      </Text>
-                      <Text style={[st.draftStatLbl, { color: colors.mutedForeground }]}>AVAILABLE</Text>
-                    </View>
-                  </View>
+                  )}
 
                   {/* CTA buttons */}
                   <View style={st.draftBtns}>
-                    <TouchableOpacity
-                      onPress={() => goTo("draft")}
-                      style={[st.draftCTABtn, { backgroundColor: theme.secondary, flex: 2 }]}
-                    >
-                      <Feather name="award" size={15} color="#000" />
-                      <Text style={[st.draftCTABtnTxt, { color: "#000" }]}>
-                        {isDraftComplete ? "View Rookie Class" : "Enter Draft Room"}
-                      </Text>
-                    </TouchableOpacity>
+                    {isDraftComplete ? (
+                      <TouchableOpacity
+                        onPress={async () => {
+                          setAdvancing(true);
+                          try {
+                            await advancePhase(); // draft → preseason
+                            await advancePhase(); // preseason → regular (new season)
+                          } finally { setAdvancing(false); }
+                        }}
+                        disabled={advancing}
+                        style={[st.draftCTABtn, { backgroundColor: theme.primary, flex: 2 }]}
+                      >
+                        {advancing
+                          ? <ActivityIndicator color="#fff" size="small" />
+                          : <Feather name="chevrons-right" size={15} color="#fff" />
+                        }
+                        <Text style={[st.draftCTABtnTxt, { color: "#fff" }]}>Start Next Season</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity
+                        onPress={() => goTo("draft")}
+                        style={[st.draftCTABtn, { backgroundColor: theme.secondary, flex: 2 }]}
+                      >
+                        <Feather name="award" size={15} color="#000" />
+                        <Text style={[st.draftCTABtnTxt, { color: "#000" }]}>Enter Draft Room</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </LinearGradient>
               </View>
@@ -568,26 +588,46 @@ function DraftClassPanel({ season, team, primary, secondary, colors, onPress }:
     .sort((a: any, b: any) => (a.draftPick ?? 999) - (b.draftPick ?? 999));
 
   const prospects: any[] = season?.draftProspects ?? [];
+  const draftYear = season?.year ? season.year + 1 : "";
 
   return (
-    <View style={[st.homePanel, { backgroundColor: colors.card, borderColor: secondary + "40",
-      flexDirection: "column", padding: 0, overflow: "hidden" }]}>
-      {/* Header row */}
-      <TouchableOpacity onPress={onPress} activeOpacity={0.82}
-        style={{ flexDirection: "row", alignItems: "center", padding: 14, gap: 10 }}>
-        <View style={[st.homePanelIcon, { backgroundColor: secondary + "22" }]}>
-          <Feather name="users" size={20} color={secondary} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[st.homePanelTitle, { color: colors.foreground }]}>Draft Class</Text>
-          <Text style={[st.homePanelSub, { color: colors.mutedForeground }]}>
-            {rookies.length > 0 ? `${rookies.length} rookies · ${season?.year ? season.year + 1 : ""} Draft` : "No picks yet — draft starts soon"}
-          </Text>
-        </View>
-        <Feather name="chevron-right" size={18} color={secondary} />
-      </TouchableOpacity>
+    <View style={{
+      borderRadius: 14, overflow: "hidden",
+      borderWidth: 1, borderColor: primary + "55",
+      backgroundColor: colors.card,
+    }}>
+      {/* Colored header band */}
+      <LinearGradient
+        colors={[primary + "33", primary + "10"]}
+        style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 12, gap: 10 }}
+      >
+        <TouchableOpacity onPress={onPress} activeOpacity={0.82}
+          style={{ flexDirection: "row", alignItems: "center", flex: 1, gap: 10 }}>
+          <View style={{
+            width: 36, height: 36, borderRadius: 10,
+            backgroundColor: primary + "30", borderWidth: 1, borderColor: primary + "60",
+            alignItems: "center", justifyContent: "center",
+          }}>
+            <Feather name="users" size={18} color={primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: colors.foreground, letterSpacing: 0.2 }}>
+              Draft Class
+            </Text>
+            <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: primary, marginTop: 1 }}>
+              {rookies.length > 0 ? `${rookies.length} rookies · ${draftYear} Draft` : "No picks yet — draft starts soon"}
+            </Text>
+          </View>
+          <Feather name="chevron-right" size={16} color={primary} />
+        </TouchableOpacity>
+      </LinearGradient>
 
-      {/* Rookie rows — Topps card compact */}
+      {/* Divider */}
+      {rookies.length > 0 && (
+        <View style={{ height: 1, backgroundColor: primary + "25" }} />
+      )}
+
+      {/* Rookie rows */}
       {rookies.map((p: any, i: number) => {
         const ovrColor = p.overall >= 80 ? "#FFD700" : p.overall >= 70 ? "#3FB950" : p.overall >= 60 ? "#aaa" : "#8B949E";
         const pc = DC_POS_COL[p.position] ?? primary;
@@ -599,28 +639,35 @@ function DraftClassPanel({ season, team, primary, secondary, colors, onPress }:
         return (
           <View key={p.id} style={{
             flexDirection: "row", alignItems: "center",
-            paddingHorizontal: 10, paddingVertical: 5,
-            borderTopWidth: 1, borderTopColor: primary + "20",
-            backgroundColor: i % 2 === 0 ? "transparent" : primary + "07",
-            gap: 6,
+            paddingHorizontal: 12, paddingVertical: 7,
+            borderTopWidth: i === 0 ? 0 : 1, borderTopColor: primary + "15",
+            backgroundColor: i % 2 === 0 ? "transparent" : primary + "08",
+            gap: 8,
           }}>
+            {/* Round badge */}
+            <View style={{
+              width: 22, height: 22, borderRadius: 5,
+              backgroundColor: primary + "25", borderWidth: 1, borderColor: primary + "50",
+              alignItems: "center", justifyContent: "center",
+            }}>
+              <Text style={{ fontSize: 9, fontFamily: "Inter_700Bold", color: primary }}>{p.draftRound}</Text>
+            </View>
+
             {/* POS tag */}
             <View style={{
-              width: 28, paddingVertical: 1, borderRadius: 3,
+              width: 30, paddingVertical: 2, borderRadius: 4,
               alignItems: "center", justifyContent: "center",
               backgroundColor: pc + "20", borderWidth: 1, borderColor: pc + "50",
             }}>
               <Text style={{ fontSize: 8, fontFamily: "Inter_700Bold", color: pc }}>{p.position}</Text>
             </View>
 
-            {/* Single-line: Name  OVR  RND  HT/WT */}
-            <Text style={{ flex: 1, fontSize: 10, fontFamily: "Inter_400Regular", color: colors.foreground }} numberOfLines={1}>
-              <Text style={{ fontFamily: "Inter_700Bold", color: primary }}>{p.name}</Text>
+            {/* Name + stats */}
+            <Text style={{ flex: 1, fontSize: 11, fontFamily: "Inter_400Regular", color: colors.foreground }} numberOfLines={1}>
+              <Text style={{ fontFamily: "Inter_700Bold", color: colors.foreground }}>{p.name}</Text>
               {"  "}
               <Text style={{ fontFamily: "Inter_700Bold", color: ovrColor }}>{p.overall}</Text>
-              <Text style={{ color: colors.mutedForeground }}> OVR, RND </Text>
-              <Text style={{ fontFamily: "Inter_700Bold", color: secondary }}>{p.draftRound}</Text>
-              <Text style={{ color: colors.mutedForeground }}>. {htStr}, {wtStr}</Text>
+              <Text style={{ color: colors.mutedForeground, fontSize: 10 }}> OVR · {htStr}, {wtStr}</Text>
             </Text>
           </View>
         );
