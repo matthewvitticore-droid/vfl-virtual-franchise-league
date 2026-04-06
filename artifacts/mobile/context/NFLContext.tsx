@@ -1415,6 +1415,18 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
     newTeams[fromTeamIdx] = { ...newTeams[fromTeamIdx], roster: [...newTeams[fromTeamIdx].roster.filter(p => !offer.offeringPlayerIds.includes(p.id)), ...toOffPlayers] };
     newTeams[toTeamIdx] = { ...newTeams[toTeamIdx], roster: [...newTeams[toTeamIdx].roster.filter(p => !offer.receivingPlayerIds.includes(p.id)), ...fromOffPlayers] };
 
+    // Move draft picks — transfer ownership between teams
+    if (offer.offeringPickIds.length > 0 || offer.receivingPickIds.length > 0) {
+      newTeams = newTeams.map(t => ({
+        ...t,
+        draftPicks: t.draftPicks.map(pk => {
+          if (offer.offeringPickIds.includes(pk.id)) return { ...pk, ownedByTeamId: offer.toTeamId };
+          if (offer.receivingPickIds.includes(pk.id)) return { ...pk, ownedByTeamId: offer.fromTeamId };
+          return pk;
+        }),
+      }));
+    }
+
     const fromTeamName = newTeams[fromTeamIdx].abbreviation;
     const toTeamName = newTeams[toTeamIdx].abbreviation;
     const newsItem: Omit<NewsItem,"id"|"timestamp"> = {
@@ -1429,18 +1441,19 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
 
   function evaluateTradeValue(offer: Omit<TradeOffer,"id"|"status"|"aiValue"|"expiresWeek">, s: Season): number {
     if (!s) return 0;
+    const PICK_ROUND_VALUES: Record<number, number> = { 1:150, 2:100, 3:70, 4:50, 5:35, 6:25, 7:15 };
     const allPlayers = s.teams.flatMap(t => t.roster);
-    const givingValue = offer.offeringPlayerIds.reduce((sum, id) => {
-      const p = allPlayers.find(pl => pl.id === id);
-      return sum + (p ? p.overall * 1.2 + p.potential * 0.5 : 0);
-    }, 0) + offer.offeringPickIds.length * 15;
-
-    const gettingValue = offer.receivingPlayerIds.reduce((sum, id) => {
-      const p = allPlayers.find(pl => pl.id === id);
-      return sum + (p ? p.overall * 1.2 + p.potential * 0.5 : 0);
-    }, 0) + offer.receivingPickIds.length * 15;
-
-    return Math.round(gettingValue - givingValue);
+    const allPicks   = s.teams.flatMap(t => t.draftPicks);
+    const scoreSet = (playerIds: string[], pickIds: string[]) =>
+      playerIds.reduce((sum, id) => {
+        const p = allPlayers.find(pl => pl.id === id);
+        return sum + (p ? p.overall * 1.2 + p.potential * 0.5 : 0);
+      }, 0) +
+      pickIds.reduce((sum, id) => {
+        const pk = allPicks.find(p => p.id === id);
+        return sum + (pk ? (PICK_ROUND_VALUES[pk.round] ?? 15) : 0);
+      }, 0);
+    return Math.round(scoreSet(offer.receivingPlayerIds, offer.receivingPickIds) - scoreSet(offer.offeringPlayerIds, offer.offeringPickIds));
   }
 
   // ── Offseason ──────────────────────────────────────────────────────────────

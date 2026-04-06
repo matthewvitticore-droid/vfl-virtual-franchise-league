@@ -23,7 +23,8 @@ An original football franchise simulator built in Expo React Native. 32 fully fi
 ### Tab Screens
 - `artifacts/mobile/app/(tabs)/index.tsx` — ESPN-style home: animated news ticker, team hero card (cap bar, stat chips), quick-action grid, weather game card, conference standings, recent news feed
 - `artifacts/mobile/app/(tabs)/roster.tsx` — Depth chart by position + dev trait badges (X-Factor/Superstar/etc.), injury indicators, contract details, game plan / formation / scheme selectors, FA signing panel; depth chart rows tap to open full PlayerCard modal
-- `artifacts/mobile/app/(tabs)/frontoffice.tsx` — Free Agency (interest meter, 1/2/3yr offers), Draft (Board/Combine/War Room sub-views, sortable combine table, scouting lock); tapping any prospect opens ProspectModal with combine bars + derived ratings; Trades (player chip builder, AI value meter, incoming offer accept/decline)
+- `artifacts/mobile/app/(tabs)/frontoffice.tsx` — Free Agency (interest meter, 1/2/3yr offers), Draft (Board/Combine/War Room sub-views, sortable combine table, scouting lock); tapping any prospect opens ProspectModal with combine bars + derived ratings; Trades (Build Trade CTA → full TradeBuilder modal, legacy player pool browse with OFFER/GET buttons, incoming offer accept/decline)
+- `artifacts/mobile/components/TradeBuilder.tsx` — Full-screen trade builder modal: team picker (conference/division organized), 3 sub-tabs (My Players / Their Players / Draft Picks), live summary card with removable chips, round-based value meter (R1=150pts → R7=15pts), send/clear flow
 - `artifacts/mobile/app/(tabs)/stats.tsx` — League stats leaderboards: Passing, Rushing, Receiving, Defense (sortable), Special Teams, All-Time Records; tapping any player opens PlayerCard + season/career stats panel
 - `artifacts/mobile/app/(tabs)/schedule.tsx` — Season schedule with week selector
 - `artifacts/mobile/app/(tabs)/standings.tsx` — Full NFL standings by conference/division

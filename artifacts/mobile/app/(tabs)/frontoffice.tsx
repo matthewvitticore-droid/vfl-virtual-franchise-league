@@ -14,6 +14,7 @@ import { PlayerCard } from "@/components/PlayerCard";
 import { PlayerStatsModal } from "@/components/PlayerStatsModal";
 import { ProspectModal } from "@/components/ProspectModal";
 import { CombineMeasurables } from "@/context/types";
+import { TradeBuilder } from "@/components/TradeBuilder";
 
 type Tab = "freeAgency" | "draft" | "trades";
 type DraftView = "combine" | "warRoom";
@@ -94,6 +95,7 @@ export default function FrontOfficeScreen() {
   }
   const [expandedFA, setExpandedFA] = useState<string | null>(null);
   const [tradeMode, setTradeMode] = useState<"browse"|"build">("browse");
+  const [tradeBuilderOpen, setTradeBuilderOpen] = useState(false);
   const [offeringPlayerIds, setOfferingPlayerIds] = useState<string[]>([]);
   const [receivingPlayerIds, setReceivingPlayerIds] = useState<string[]>([]);
   const [tradeTargetTeamId, setTradeTargetTeamId] = useState<string | null>(null);
@@ -527,9 +529,30 @@ export default function FrontOfficeScreen() {
         </View>
       )}
 
+      {/* ── TRADE BUILDER MODAL ─────────────────────────────────────────────── */}
+      <TradeBuilder
+        visible={tradeBuilderOpen}
+        onClose={() => setTradeBuilderOpen(false)}
+        teamColor={teamColor}
+        onPropose={(offer) => proposeTrade(offer)}
+      />
+
       {/* ── TRADES ─────────────────────────────────────────────────────────── */}
       {tab === "trades" && (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+
+          {/* ── Build Trade CTA ───────────────────────────────── */}
+          <TouchableOpacity
+            onPress={() => setTradeBuilderOpen(true)}
+            style={[st.buildTradeCTA, { backgroundColor: teamColor }]}
+            activeOpacity={0.85}>
+            <Feather name="git-merge" size={18} color="#fff" />
+            <View style={{ flex: 1 }}>
+              <Text style={st.buildTradeCTATitle}>Build a Trade</Text>
+              <Text style={st.buildTradeCTASub}>Players · Draft picks · Value meter</Text>
+            </View>
+            <Feather name="chevron-right" size={18} color="rgba(255,255,255,0.7)" />
+          </TouchableOpacity>
 
           {/* ── Position filter pills ─────────────────────────────── */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false}
@@ -1466,6 +1489,10 @@ const st = StyleSheet.create({
   wrQuickStat:      { fontSize:10, fontFamily:"Inter_500Medium" },
   wrActions:        { alignItems:"center", gap:4 },
   wrRemoveBtn:      { width:26, height:26, alignItems:"center", justifyContent:"center" },
+  // Trade CTA button
+  buildTradeCTA:      { flexDirection:"row", alignItems:"center", gap:14, margin:12, borderRadius:14, paddingHorizontal:16, paddingVertical:14 },
+  buildTradeCTATitle: { fontSize:15, fontFamily:"Inter_700Bold", color:"#fff" },
+  buildTradeCTASub:   { fontSize:11, fontFamily:"Inter_400Regular", color:"rgba(255,255,255,0.75)", marginTop:1 },
   // Trade builder
   tradeBuilder:       { borderBottomWidth:1, padding:14, gap:10 },
   tradeSummaryCard:   { margin:12, borderRadius:12, borderWidth:1, padding:14, gap:10 },
