@@ -15,8 +15,8 @@ import { ProspectModal } from "@/components/ProspectModal";
 import { CombineMeasurables } from "@/context/types";
 
 type Tab = "freeAgency" | "draft" | "trades";
-type DraftView = "board" | "combine" | "warRoom";
-type SortKey = "grade" | "fortyYardDash" | "tenYardSplit" | "benchPress" | "verticalJump" | "broadJump" | "shuttleRun" | "threeCone" | "speed" | "acceleration" | "agility" | "explosion" | "strength";
+type DraftView = "combine" | "warRoom";
+type SortKey = "grade" | "fortyYardDash" | "benchPress" | "verticalJump" | "broadJump" | "shuttleRun" | "threeCone" | "speed" | "acceleration" | "agility" | "explosion" | "strength";
 
 const ALL_POS: NFLPosition[] = ["QB","RB","WR","TE","OL","DE","DT","LB","CB","S","K","P"];
 const POS_COLOR: Record<NFLPosition, string> = {
@@ -42,7 +42,7 @@ export default function FrontOfficeScreen() {
   const params = useLocalSearchParams<{ tab?: string }>();
   const [isSimming, setIsSimming] = useState(false);
   const [tab, setTab] = useState<Tab>(() => (params.tab === "draft" || params.tab === "trades") ? params.tab : "freeAgency");
-  const [draftView, setDraftView] = useState<DraftView>("board");
+  const [draftView, setDraftView] = useState<DraftView>("combine");
   const [posFilter, setPosFilter] = useState<NFLPosition | "ALL">("ALL");
   const [sortKey, setSortKey] = useState<SortKey>("grade");
   const [sortAsc, setSortAsc] = useState(false);
@@ -146,7 +146,7 @@ export default function FrontOfficeScreen() {
     let list = season.draftProspects.filter(p => !p.isPickedUp);
     if (posFilter !== "ALL") list = list.filter(p => p.position === posFilter);
     const DERIVED_KEYS = ["speed", "acceleration", "agility", "explosion", "strength"];
-    const TIME_KEYS = ["fortyYardDash", "tenYardSplit", "shuttleRun", "threeCone"];
+    const TIME_KEYS = ["fortyYardDash", "shuttleRun", "threeCone"];
     return list.sort((a, b) => {
       if (sortKey === "grade") return sortAsc ? a.overallGrade - b.overallGrade : b.overallGrade - a.overallGrade;
       const getVal = (p: DraftProspect) => {
@@ -289,8 +289,8 @@ export default function FrontOfficeScreen() {
           )}
           {/* View switcher */}
           <View style={[st.draftViewBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-            {(["board","combine","warRoom"] as DraftView[]).map(v => {
-              const labels: Record<DraftView,string> = { board:"Board", combine:"Combine", warRoom:"War Room" };
+            {(["combine","warRoom"] as DraftView[]).map(v => {
+              const labels: Record<DraftView,string> = { combine:"Combine", warRoom:"War Room" };
               return (
                 <TouchableOpacity key={v} onPress={() => setDraftView(v)} style={[st.draftViewBtn, { borderBottomColor: draftView===v ? teamColor : "transparent", borderBottomWidth: 2.5 }]}>
                   <Text style={[st.draftViewLabel, { color: draftView===v ? teamColor : colors.mutedForeground }]}>{labels[v]}</Text>
@@ -308,25 +308,6 @@ export default function FrontOfficeScreen() {
             ))}
           </ScrollView>
 
-          {/* Board view */}
-          {draftView === "board" && (
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-              {prospects.slice(0, 80).map((p, idx) => (
-                <ProspectCard key={p.id} p={p} rank={idx + 1} expanded={expandedProspect === p.id} teamColor={teamColor} colors={colors}
-                  isGM={isGM} isUserTurn={ds?.isUserTurn ?? false}
-                  isOnBoard={warRoomIds.includes(p.id)}
-                  onToggle={() => {
-                    setExpandedProspect(expandedProspect === p.id ? null : p.id);
-                    setSelectedProspect(p);
-                  }}
-                  onScout={() => unlockScouting(p.id)}
-                  onDraft={() => userDraftPick(p.id)}
-                  onToggleWarRoom={() => toggleWarRoom(p.id)}
-                />
-              ))}
-            </ScrollView>
-          )}
-
           {/* Combine view — sortable table */}
           {draftView === "combine" && (
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
@@ -335,16 +316,16 @@ export default function FrontOfficeScreen() {
                 <View>
                   <View style={[st.combineHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
                     <Text style={[st.colFixHdr, { color: colors.mutedForeground }]}># POS PLAYER</Text>
+                    <View style={{ width: 30 }} />
                     <SortHeader label="GRD" sortKey="grade" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
                     <SortHeader label="40yd" sortKey="fortyYardDash" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
-                    <SortHeader label="10yd" sortKey="tenYardSplit" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
+                    <SortHeader label="SPD" sortKey="speed" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
+                    <SortHeader label="ACC" sortKey="acceleration" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
                     <SortHeader label="Bench" sortKey="benchPress" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
                     <SortHeader label="Vert" sortKey="verticalJump" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
                     <SortHeader label="Broad" sortKey="broadJump" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
                     <SortHeader label="Shuttle" sortKey="shuttleRun" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
                     <SortHeader label="3-Cone" sortKey="threeCone" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
-                    <SortHeader label="SPD" sortKey="speed" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
-                    <SortHeader label="ACC" sortKey="acceleration" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
                     <SortHeader label="AGI" sortKey="agility" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
                     <SortHeader label="EXP" sortKey="explosion" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
                     <SortHeader label="STR" sortKey="strength" current={sortKey} asc={sortAsc} onSort={handleSort} colors={colors} teamColor={teamColor} />
@@ -861,29 +842,29 @@ function CombineRow({ p, rank, colors, teamColor, isUserTurn, isGM, isOnBoard, o
           {p.name.split(" ").slice(1).join(" ")}
         </Text>
       </View>
+      {/* Bookmark — between name and grade */}
+      {onToggleWarRoom ? (
+        <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); onToggleWarRoom(); }}
+          hitSlop={{ top:6, bottom:6, left:6, right:6 }}
+          style={[st.pinBtn, { backgroundColor: isOnBoard ? teamColor+"30" : colors.secondary, borderColor: isOnBoard ? teamColor : colors.border }]}>
+          <Feather name="bookmark" size={11} color={isOnBoard ? teamColor : colors.mutedForeground} />
+        </TouchableOpacity>
+      ) : <View style={{ width: 30 }} />}
       <ColCell value={`${p.overallGrade}`} color={colors.nflGold} />
       <ColCell value={dnp ? "—" : `${c.fortyYardDash}`} color={!dnp && c.fortyYardDash < 4.4 ? colors.success : colors.foreground} />
-      <ColCell value={dnp ? "—" : `${c.tenYardSplit ?? "—"}`} color={!dnp && (c.tenYardSplit ?? 99) < 1.52 ? colors.success : colors.foreground} />
+      <ColCell value={dnp ? "—" : `${spd}`} color={ratingColor(spd)} />
+      <ColCell value={dnp ? "—" : `${acc}`} color={ratingColor(acc)} />
       <ColCell value={dnp ? "—" : `${c.benchPress}`} color={!dnp && c.benchPress > 28 ? colors.success : colors.foreground} />
       <ColCell value={dnp ? "—" : `${c.verticalJump}"`} color={!dnp && c.verticalJump > 38 ? colors.success : colors.foreground} />
       <ColCell value={dnp ? "—" : `${c.broadJump}"`} color={colors.foreground} />
       <ColCell value={dnp ? "—" : `${c.shuttleRun}`} color={!dnp && c.shuttleRun < 4.1 ? colors.success : colors.foreground} />
       <ColCell value={dnp ? "—" : `${c.threeCone}`} color={!dnp && c.threeCone < 6.8 ? colors.success : colors.foreground} />
-      <ColCell value={dnp ? "—" : `${spd}`} color={ratingColor(spd)} />
-      <ColCell value={dnp ? "—" : `${acc}`} color={ratingColor(acc)} />
       <ColCell value={dnp ? "—" : `${agi}`} color={ratingColor(agi)} />
       <ColCell value={dnp ? "—" : `${exp}`} color={ratingColor(exp)} />
       <ColCell value={dnp ? "—" : `${str}`} color={ratingColor(str)} />
       {isGM && isUserTurn && (
         <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); onDraft(); }} style={[st.draftBtnSm, { backgroundColor: teamColor }]}>
           <Text style={st.draftBtnSmText}>Draft</Text>
-        </TouchableOpacity>
-      )}
-      {onToggleWarRoom && (
-        <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); onToggleWarRoom(); }}
-          hitSlop={{ top:6, bottom:6, left:6, right:6 }}
-          style={[st.pinBtn, { backgroundColor: isOnBoard ? teamColor+"30" : colors.secondary, borderColor: isOnBoard ? teamColor : colors.border }]}>
-          <Feather name="bookmark" size={11} color={isOnBoard ? teamColor : colors.mutedForeground} />
         </TouchableOpacity>
       )}
     </TouchableOpacity>
