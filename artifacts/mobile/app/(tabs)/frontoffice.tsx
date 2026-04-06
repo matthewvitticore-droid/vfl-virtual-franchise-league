@@ -870,8 +870,8 @@ function FASortHeader({ label, sortKey: key, current, asc, onSort, colors, teamC
   { label: string; sortKey: FASortKey; current: FASortKey; asc: boolean; onSort: (k: FASortKey) => void; colors: any; teamColor: string }) {
   const active = key === current;
   return (
-    <TouchableOpacity onPress={() => onSort(key)} style={[st.sortHeader, active && { borderBottomWidth: 2, borderBottomColor: teamColor }]}>
-      <Text style={[st.sortHeaderText, { color: active ? teamColor : colors.mutedForeground }]}>{label}</Text>
+    <TouchableOpacity onPress={() => onSort(key)} style={[st.colHeader, { borderBottomColor: active ? teamColor : "transparent", borderBottomWidth: active ? 2 : 0 }]}>
+      <Text style={[st.colHeaderText, { color: active ? teamColor : colors.mutedForeground }]}>{label}</Text>
       {active && <Feather name={asc ? "chevron-up" : "chevron-down"} size={9} color={teamColor} />}
     </TouchableOpacity>
   );
