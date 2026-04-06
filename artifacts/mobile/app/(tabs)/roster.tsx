@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useMemo, useState } from "react";
 import {
-  Alert, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from "react-native";
 import { exportRosterXLSX } from "@/utils/exportRoster";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -12,7 +12,6 @@ import { useAuth } from "@/context/AuthContext";
 import {
   GamePlan, Formation, NFLPosition, OffenseScheme, Player, useNFL,
 } from "@/context/NFLContext";
-import { PlayerCard } from "@/components/PlayerCard";
 import { PlayerStatsModal } from "@/components/PlayerStatsModal";
 
 const ALL_POS: NFLPosition[] = ["QB","RB","WR","TE","OL","DE","DT","LB","CB","S","K","P"];
@@ -21,14 +20,12 @@ const POS_COLOR: Record<NFLPosition, string> = {
   DE:"#3FB950", DT:"#26A69A", LB:"#1F6FEB", CB:"#6E40C9", S:"#9C27B0",
   K:"#FF7043", P:"#795548",
 };
-const DEV_ICONS: Record<string, any> = {
-  "X-Factor": "zap", "Superstar": "star", "Star": "award", "Normal": "user", "Late Bloomer": "trending-up",
-};
 const DEV_COLORS: Record<string, string> = {
   "X-Factor": "#FFD700", "Superstar": "#FF6B35", "Star": "#3FB950", "Normal": "#8B949E", "Late Bloomer": "#00B5E2",
 };
 
-type MainTab = "depth" | "roster" | "gamePlan" | "freeAgency";
+type MainTab = "depth" | "roster" | "gamePlan";
+type RosterSortKey = "overall" | "age" | "speed" | "acceleration" | "agility" | "yearsExperience" | "salary";
 
 const GAME_PLANS: { value: GamePlan; label: string; desc: string }[] = [
   { value:"aggressive",   label:"Aggressive",   desc:"More deep shots, aggressive blitzes. Higher variance." },
@@ -49,47 +46,79 @@ const SCHEMES: { value: OffenseScheme; label: string; desc: string }[] = [
 ];
 
 export default function RosterScreen() {
-  const colors = useColors();
-  const insets = useSafeAreaInsets();
+  const colors    = useColors();
+  const insets    = useSafeAreaInsets();
   const { membership } = useAuth();
-  const { season, teamCustomization, getPlayerTeam, signFreeAgent, releasePlayer, restructureContract, updateDepthOrder, updateGamePlan, updateFormation, updateOffenseScheme } = useNFL();
+  const { season, teamCustomization, getPlayerTeam, releasePlayer, restructureContract, updateDepthOrder, updateGamePlan, updateFormation, updateOffenseScheme } = useNFL();
 
-  const role = membership?.role ?? "GM";
+  const role    = membership?.role ?? "GM";
   const isGM    = role === "GM";
   const isCoach = role === "Coach";
-  const team = getPlayerTeam();
-  const theme = useTeamTheme();
-  const teamColor  = theme.primary;    // alias keeps the rest of the code unchanged
+  const team    = getPlayerTeam();
+  const theme   = useTeamTheme();
+  const teamColor     = theme.primary;
   const teamSecondary = theme.secondary;
 
-  const [tab, setTab] = useState<MainTab>(isCoach ? "gamePlan" : "depth");
-  const [posFilter, setPosFilter] = useState<NFLPosition | "ALL">("ALL");
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
-  const [statsPlayer, setStatsPlayer] = useState<Player | null>(null);
+  const [tab,           setTab]           = useState<MainTab>(isCoach ? "gamePlan" : "depth");
+  const [posFilter,     setPosFilter]     = useState<NFLPosition | "ALL">("ALL");
+  const [viewTeamId,    setViewTeamId]    = useState<string>("");
+  const [rosterSortKey, setRosterSortKey] = useState<RosterSortKey>("overall");
+  const [rosterSortAsc, setRosterSortAsc] = useState(false);
+  const [statsPlayer,   setStatsPlayer]   = useState<Player | null>(null);
+  const [selectedPlayer,setSelectedPlayer]= useState<Player | null>(null);
+  const [expanded,      setExpanded]      = useState<string | null>(null);
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
   const gamesPlayed = season?.games.filter(g => g.status === "final").length ?? 0;
 
-  const roster = useMemo(() => {
-    if (!team) return [];
-    const sorted = [...team.roster].sort((a, b) => {
-      if (a.position < b.position) return -1;
-      if (a.position > b.position) return 1;
-      return a.depthOrder - b.depthOrder || b.overall - a.overall;
+  const viewTeam = useMemo(() =>
+    season?.teams.find(t => t.id === (viewTeamId || team?.id)) ?? team,
+    [season, viewTeamId, team]
+  );
+  const isViewingOwnTeam = !viewTeamId || viewTeamId === team?.id;
+  const viewColor     = viewTeam?.primaryColor   ?? teamColor;
+  const viewSecondary = viewTeam?.secondaryColor ?? teamSecondary;
+
+  const pageColor = tab === "roster" ? viewColor : teamColor;
+
+  const sortedRoster = useMemo(() => {
+    if (!viewTeam) return [];
+    const LOW_BETTER: RosterSortKey[] = ["age", "salary", "yearsExperience"];
+    const list = posFilter === "ALL"
+      ? [...viewTeam.roster]
+      : viewTeam.roster.filter(p => p.position === posFilter);
+    return list.sort((a, b) => {
+      const getVal = (p: Player): number => {
+        switch (rosterSortKey) {
+          case "overall":        return p.overall;
+          case "age":            return p.age;
+          case "speed":          return p.speed;
+          case "acceleration":   return (p.positionRatings as any)?.acceleration ?? 50;
+          case "agility":        return (p.positionRatings as any)?.agility ?? 50;
+          case "yearsExperience":return p.yearsExperience;
+          case "salary":         return p.salary;
+          default:               return p.overall;
+        }
+      };
+      const invert = LOW_BETTER.includes(rosterSortKey);
+      const diff = getVal(a) - getVal(b);
+      return (rosterSortAsc !== invert) ? diff : -diff;
     });
-    return posFilter === "ALL" ? sorted : sorted.filter(p => p.position === posFilter);
-  }, [team, posFilter]);
+  }, [viewTeam, posFilter, rosterSortKey, rosterSortAsc]);
+
+  const handleRosterSort = (key: RosterSortKey) => {
+    if (rosterSortKey === key) setRosterSortAsc(a => !a);
+    else { setRosterSortKey(key); setRosterSortAsc(false); }
+  };
 
   const capUsed = team?.roster.reduce((s, p) => s + p.salary, 0).toFixed(1) ?? "0";
   const capLeft = ((team?.totalCap ?? 255) - parseFloat(capUsed)).toFixed(1);
   const deadCap = team?.roster.reduce((s, p) => s + (p.deadCap ?? 0), 0).toFixed(1) ?? "0";
 
   const TABS: { key: MainTab; label: string; icon: any; allowed: boolean }[] = [
-    { key:"depth",     label:"Depth Chart", icon:"align-left",   allowed: true },
-    { key:"roster",    label:"Players",     icon:"users",         allowed: true },
-    { key:"gamePlan",  label:"Game Plan",   icon:"sliders",       allowed: isGM || isCoach },
-    { key:"freeAgency",label:"Free Agents", icon:"user-plus",     allowed: isGM },
+    { key:"depth",    label:"Depth Chart", icon:"align-left", allowed: true },
+    { key:"roster",   label:"Players",     icon:"users",      allowed: true },
+    { key:"gamePlan", label:"Game Plan",   icon:"sliders",    allowed: isGM || isCoach },
   ];
 
   function handleRelease(p: Player) {
@@ -116,39 +145,64 @@ export default function RosterScreen() {
 
   if (!team) return null;
 
+  const headerTeam = tab === "roster" ? viewTeam : team;
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Team-color ambient wash */}
+
+      {/* Team-color ambient wash — follows viewColor when on Players tab */}
       <LinearGradient
-        colors={[teamColor + "40", teamColor + "18", teamColor + "06", "transparent"]}
+        colors={[pageColor + "40", pageColor + "18", pageColor + "06", "transparent"]}
         locations={[0, 0.25, 0.55, 1]}
         style={{ position: "absolute", top: 0, left: 0, right: 0, height: 420, zIndex: 0 }}
         pointerEvents="none"
       />
-      {/* Header */}
-      <View style={[st.header, { paddingTop: topPad + 8, backgroundColor: "transparent", borderBottomColor: teamColor + "40" }]}>
+
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <View style={[st.header, { paddingTop: topPad + 8, backgroundColor: "transparent", borderBottomColor: pageColor + "40" }]}>
         <View style={st.headerTop}>
           <View style={{ flex: 1 }}>
-            <Text style={[st.headerTitle, { color: colors.foreground }]}>{team.city} {team.name}</Text>
-            <Text style={[st.headerSub, { color: colors.mutedForeground }]}>
-              Cap: ${capUsed}M used · ${capLeft}M avail · ${deadCap}M dead
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Text style={[st.headerTitle, { color: colors.foreground }]}>
+                {headerTeam?.city} {headerTeam?.name}
+              </Text>
+              {tab === "roster" && !isViewingOwnTeam && (
+                <View style={[st.scoutingBadge, { backgroundColor: viewColor + "25", borderColor: viewColor + "60" }]}>
+                  <Text style={[st.scoutingText, { color: viewColor }]}>SCOUTING</Text>
+                </View>
+              )}
+            </View>
+            {isViewingOwnTeam || tab !== "roster"
+              ? <Text style={[st.headerSub, { color: colors.mutedForeground }]}>
+                  Cap: ${capUsed}M used · ${capLeft}M avail · ${deadCap}M dead
+                </Text>
+              : <Text style={[st.headerSub, { color: colors.mutedForeground }]}>
+                  {viewTeam?.roster.length ?? 0} players · {viewTeam?.conference} · {viewTeam?.division}
+                </Text>
+            }
           </View>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <TouchableOpacity onPress={handleExportCSV} style={[st.exportBtn, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-              <Feather name="download" size={13} color={colors.mutedForeground} />
-              <Text style={[st.exportBtnText, { color: colors.mutedForeground }]}>Export</Text>
-            </TouchableOpacity>
+            {isViewingOwnTeam && (
+              <TouchableOpacity onPress={handleExportCSV} style={[st.exportBtn, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                <Feather name="download" size={13} color={colors.mutedForeground} />
+                <Text style={[st.exportBtnText, { color: colors.mutedForeground }]}>Export</Text>
+              </TouchableOpacity>
+            )}
             <View style={[st.roleBadge, { backgroundColor: teamColor + "25", borderColor: teamColor }]}>
               <Text style={[st.roleText, { color: teamColor }]}>{role}</Text>
             </View>
           </View>
         </View>
+
         {/* Tab bar */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.tabScroll} contentContainerStyle={{ gap: 6, paddingHorizontal: 16, paddingBottom: 10 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.tabScroll}
+          contentContainerStyle={{ gap: 6, paddingHorizontal: 16, paddingBottom: 10 }}>
           {TABS.filter(t => t.allowed).map(t => (
             <TouchableOpacity key={t.key} onPress={() => setTab(t.key)}
-              style={[st.tabBtn, { backgroundColor: tab === t.key ? teamColor : colors.secondary, borderColor: tab === t.key ? teamColor : colors.border }]}>
+              style={[st.tabBtn, {
+                backgroundColor: tab === t.key ? teamColor : colors.secondary,
+                borderColor: tab === t.key ? teamColor : colors.border,
+              }]}>
               <Feather name={t.icon} size={12} color={tab === t.key ? "#fff" : colors.mutedForeground} />
               <Text style={[st.tabLabel, { color: tab === t.key ? "#fff" : colors.mutedForeground }]}>{t.label}</Text>
             </TouchableOpacity>
@@ -157,7 +211,8 @@ export default function RosterScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-        {/* ── Depth Chart ── */}
+
+        {/* ── Depth Chart ─────────────────────────────────────────────────── */}
         {tab === "depth" && (
           <View>
             {ALL_POS.map(pos => {
@@ -165,22 +220,18 @@ export default function RosterScreen() {
                 .filter(p => p.position === pos)
                 .sort((a, b) => a.depthOrder - b.depthOrder);
               if (byPos.length === 0) return null;
-
               const movePlayer = (idx: number, dir: "up" | "down") => {
                 const arr = [...byPos];
                 const swap = dir === "up" ? idx - 1 : idx + 1;
                 [arr[idx], arr[swap]] = [arr[swap], arr[idx]];
                 updateDepthOrder(pos, arr.map(pl => pl.id));
               };
-
               return (
                 <View key={pos} style={{ marginBottom: 1 }}>
-                  {/* position header */}
                   <View style={[st.posHeader, { backgroundColor: teamColor + "18", borderLeftColor: teamColor }]}>
                     <Text style={[st.posLabel, { color: teamColor }]}>{pos}</Text>
                     <Text style={[st.posCount, { color: colors.mutedForeground }]}>{byPos.length} deep</Text>
                   </View>
-
                   {byPos.map((p, idx) => {
                     const isStarter = idx === 0;
                     const salaryStr = typeof p.salary === "number" ? p.salary.toFixed(1) : String(p.salary);
@@ -190,13 +241,9 @@ export default function RosterScreen() {
                           backgroundColor: isStarter ? teamColor + "12" : colors.card,
                           borderBottomColor: colors.border,
                         }]}>
-
-                        {/* slot # */}
                         <View style={[st.depthNum, { backgroundColor: isStarter ? teamColor : colors.secondary }]}>
                           <Text style={[st.depthNumText, { color: isStarter ? "#fff" : colors.mutedForeground }]}>{idx + 1}</Text>
                         </View>
-
-                        {/* name + badges + meta */}
                         <View style={{ flex: 1, minWidth: 0 }}>
                           <View style={st.depthNameRow}>
                             <Text style={[st.depthName, { color: isStarter ? colors.foreground : colors.mutedForeground }]} numberOfLines={1}>{p.name}</Text>
@@ -218,28 +265,19 @@ export default function RosterScreen() {
                             {p.age}yo · ${salaryStr}M · {p.contractYears}yr
                           </Text>
                         </View>
-
-                        {/* OVR pill */}
                         <View style={[st.depthOvr, { backgroundColor: teamColor + "20", borderColor: teamColor + "50" }]}>
                           <Text style={[st.depthOvrText, { color: teamColor }]}>{p.overall}</Text>
                         </View>
-
-                        {/* up/down controls */}
                         <View style={st.arrowCol}>
-                          <TouchableOpacity
-                            onPress={e => { e.stopPropagation?.(); movePlayer(idx, "up"); }}
-                            disabled={idx === 0}
-                            style={[st.arrowBtn, { opacity: idx === 0 ? 0.18 : 1 }]}
-                            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-                          >
+                          <TouchableOpacity onPress={e => { e.stopPropagation?.(); movePlayer(idx, "up"); }}
+                            disabled={idx === 0} style={[st.arrowBtn, { opacity: idx === 0 ? 0.18 : 1 }]}
+                            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}>
                             <Feather name="chevron-up" size={15} color={teamColor} />
                           </TouchableOpacity>
-                          <TouchableOpacity
-                            onPress={e => { e.stopPropagation?.(); movePlayer(idx, "down"); }}
+                          <TouchableOpacity onPress={e => { e.stopPropagation?.(); movePlayer(idx, "down"); }}
                             disabled={idx === byPos.length - 1}
                             style={[st.arrowBtn, { opacity: idx === byPos.length - 1 ? 0.18 : 1 }]}
-                            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-                          >
+                            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}>
                             <Feather name="chevron-down" size={15} color={colors.mutedForeground} />
                           </TouchableOpacity>
                         </View>
@@ -252,68 +290,80 @@ export default function RosterScreen() {
           </View>
         )}
 
-        {/* ── Players ── */}
+        {/* ── Players (sortable table) ─────────────────────────────────────── */}
         {tab === "roster" && (
           <View>
-            {/* Position filter */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, padding: 12 }}>
-              {(["ALL", ...ALL_POS] as (NFLPosition | "ALL")[]).map(p => (
-                <TouchableOpacity key={p} onPress={() => setPosFilter(p)}
-                  style={[st.posChip, { backgroundColor: posFilter === p ? teamColor : colors.secondary, borderColor: posFilter === p ? teamColor : colors.border }]}>
-                  <Text style={[st.posChipText, { color: posFilter === p ? "#fff" : colors.mutedForeground }]}>{p}</Text>
-                </TouchableOpacity>
-              ))}
+            {/* Team selector */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}
+              style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}
+              contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 10, gap: 6 }}>
+              {(season?.teams ?? []).map(t => {
+                const active = (viewTeamId === t.id) || (!viewTeamId && t.id === team?.id);
+                return (
+                  <TouchableOpacity key={t.id} onPress={() => setViewTeamId(active ? "" : t.id)}
+                    style={[st.teamChip, {
+                      backgroundColor: active ? t.primaryColor + "30" : colors.secondary,
+                      borderColor: active ? t.primaryColor : colors.border,
+                    }]}>
+                    <Text style={[st.teamChipText, { color: active ? t.primaryColor : colors.mutedForeground }]}>
+                      {t.abbreviation}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
-            {roster.map(p => (
-              <TouchableOpacity key={p.id} onPress={() => setExpanded(expanded === p.id ? null : p.id)}
-                activeOpacity={0.88}>
-                <PlayerCard
-                  player={p}
-                  teamPrimaryColor={teamColor}
-                  teamSecondaryColor={teamSecondary}
-                  expanded={expanded === p.id}
-                  showInjury
-                />
-                {expanded === p.id && (
-                  <View style={[st.expandedActions, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    {/* Contract details */}
-                    <View style={[st.contractBlock, { backgroundColor: colors.secondary }]}>
-                      <ContractRow label="Signing Bonus" value={`$${p.signingBonus?.toFixed(1)}M`} />
-                      <ContractRow label="Guaranteed" value={`$${p.guaranteedMoney?.toFixed(1)}M`} />
-                      <ContractRow label="Dead Cap" value={`$${p.deadCap?.toFixed(1)}M`} color={colors.danger} />
-                      <ContractRow label="Years Remaining" value={`${p.contractYears}`} />
-                    </View>
-                    {/* Stats button always visible */}
-                    <TouchableOpacity
-                      onPress={() => setStatsPlayer(p)}
-                      style={[st.actionBtn, { backgroundColor: teamColor + "18", borderColor: teamColor + "40" }]}>
-                      <Feather name="bar-chart-2" size={12} color={teamColor} />
-                      <Text style={[st.actionBtnText, { color: teamColor }]}>View Stats</Text>
-                    </TouchableOpacity>
-                    {isGM && (
-                      <View style={st.actionRow}>
-                        {p.contractYears >= 2 && (
-                          <TouchableOpacity onPress={() => handleRestructure(p)}
-                            style={[st.actionBtn, { backgroundColor: colors.nflBlue + "20", borderColor: colors.nflBlue + "50" }]}>
-                            <Feather name="refresh-cw" size={12} color={colors.nflBlue} />
-                            <Text style={[st.actionBtnText, { color: colors.nflBlue }]}>Restructure</Text>
-                          </TouchableOpacity>
-                        )}
-                        <TouchableOpacity onPress={() => handleRelease(p)}
-                          style={[st.actionBtn, { backgroundColor: colors.danger + "15", borderColor: colors.danger + "40" }]}>
-                          <Feather name="x-circle" size={12} color={colors.danger} />
-                          <Text style={[st.actionBtnText, { color: colors.danger }]}>Release</Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
+
+            {/* Position filter pills */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}
+              style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}
+              contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 10, gap: 6 }}>
+              {(["ALL", ...ALL_POS] as (NFLPosition | "ALL")[]).map(pos => {
+                const active = posFilter === pos;
+                const pillColor = pos === "ALL" ? viewColor : POS_COLOR[pos as NFLPosition];
+                return (
+                  <TouchableOpacity key={pos} onPress={() => setPosFilter(pos)}
+                    style={[st.posPill, {
+                      backgroundColor: active ? pillColor : colors.secondary,
+                      borderColor: active ? pillColor : colors.border,
+                    }]}>
+                    <Text style={[st.posPillText, { color: active ? "#fff" : colors.mutedForeground }]}>{pos}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            {/* Sortable table */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ minWidth: 640 }}>
+                {/* Header row */}
+                <View style={[st.tableHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+                  <Text style={[st.colFixHdr, { color: colors.mutedForeground }]}># POS PLAYER</Text>
+                  <RSortHeader label="OVR"  sortKey="overall"          current={rosterSortKey} asc={rosterSortAsc} onSort={handleRosterSort} colors={colors} accent={viewColor} />
+                  <RSortHeader label="SPD"  sortKey="speed"            current={rosterSortKey} asc={rosterSortAsc} onSort={handleRosterSort} colors={colors} accent={viewColor} />
+                  <RSortHeader label="ACC"  sortKey="acceleration"     current={rosterSortKey} asc={rosterSortAsc} onSort={handleRosterSort} colors={colors} accent={viewColor} />
+                  <RSortHeader label="AGI"  sortKey="agility"          current={rosterSortKey} asc={rosterSortAsc} onSort={handleRosterSort} colors={colors} accent={viewColor} />
+                  <RSortHeader label="EXP"  sortKey="yearsExperience"  current={rosterSortKey} asc={rosterSortAsc} onSort={handleRosterSort} colors={colors} accent={viewColor} />
+                  <RSortHeader label="SAL"  sortKey="salary"           current={rosterSortKey} asc={rosterSortAsc} onSort={handleRosterSort} colors={colors} accent={viewColor} />
+                </View>
+
+                {sortedRoster.map((p, idx) => (
+                  <RosterPlayerRow
+                    key={p.id}
+                    p={p}
+                    rank={idx + 1}
+                    colors={colors}
+                    accent={viewColor}
+                    onPress={() => setStatsPlayer(p)}
+                    isOwnTeam={isViewingOwnTeam}
+                    onManage={isGM && isViewingOwnTeam ? () => setSelectedPlayer(p) : undefined}
+                  />
+                ))}
+              </View>
+            </ScrollView>
           </View>
         )}
 
-        {/* ── Game Plan ── */}
+        {/* ── Game Plan ──────────────────────────────────────────────────── */}
         {tab === "gamePlan" && (
           <View style={{ padding: 16, gap: 16 }}>
             <PlanSection title="Game Plan" desc="Overall offensive and defensive strategy" options={GAME_PLANS} value={team.gamePlan} onSelect={(v) => updateGamePlan(v as GamePlan)} colors={colors} teamColor={teamColor} />
@@ -321,230 +371,280 @@ export default function RosterScreen() {
             <PlanSection title="Offense Scheme" desc="How your offense attacks the defense" options={SCHEMES} value={team.offenseScheme} onSelect={(v) => updateOffenseScheme(v as OffenseScheme)} colors={colors} teamColor={teamColor} />
           </View>
         )}
+      </ScrollView>
 
-        {/* ── Free Agency (from roster) ── */}
-        {tab === "freeAgency" && (
-          <View style={{ padding: 16, gap: 12 }}>
-            <Text style={[st.faNote, { color: colors.mutedForeground }]}>
-              Tap a player to negotiate a contract. Interest level shows how much they want to join your team.
-            </Text>
-            {(season?.freeAgents ?? []).sort((a, b) => b.overall - a.overall).slice(0, 30).map(p => (
-              <TouchableOpacity key={p.id} onPress={() => setExpanded(expanded === p.id ? null : p.id)}
-                activeOpacity={0.88}>
-                <PlayerCard
-                  player={p}
-                  teamPrimaryColor={teamColor}
-                  teamSecondaryColor={teamSecondary}
-                  expanded={expanded === p.id}
-                  showInjury={false}
-                />
-                {expanded === p.id && (
-                  <View style={[st.expandedActions, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <InterestBar level={p.faInterestLevel} teamColor={teamColor} />
-                    {isGM && (
-                      <View style={st.signBtnRow}>
-                        {[1, 2, 3].map(yrs => (
-                          <TouchableOpacity key={yrs} onPress={() => {
-                            const sal = parseFloat((p.salary * (1 + (yrs - 1) * 0.03)).toFixed(1));
-                            Alert.alert(`Sign ${p.name}?`, `${yrs}-year deal at $${sal}M/yr (${p.faInterestLevel >= 4 ? "likely to accept" : p.faInterestLevel >= 3 ? "may accept" : "low interest"})`, [
-                              { text: "Cancel" },
-                              { text: "Offer Contract", onPress: () => signFreeAgent(p.id, yrs, sal) },
-                            ]);
-                          }}
-                          style={[st.signBtn, { backgroundColor: teamColor + "20", borderColor: teamColor + "60" }]}>
-                            <Text style={[st.signBtnText, { color: teamColor }]}>{yrs}yr · ${(p.salary * (1 + (yrs-1)*0.03)).toFixed(1)}M</Text>
-                          </TouchableOpacity>
-                        ))}
+      {/* ── Depth chart player detail — slide-up sheet ── */}
+      {selectedPlayer && (
+        <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
+          <TouchableOpacity style={StyleSheet.absoluteFillObject}
+            onPress={() => setSelectedPlayer(null)}
+            activeOpacity={1}
+            style={[StyleSheet.absoluteFillObject, { backgroundColor: "rgba(0,0,0,0.55)" }]}
+          />
+          <View style={[st.sheet, { backgroundColor: colors.card }]}>
+            <View style={st.sheetHandle} />
+            <TouchableOpacity onPress={() => setSelectedPlayer(null)} style={st.sheetClose}>
+              <Feather name="x" size={18} color={colors.mutedForeground} />
+            </TouchableOpacity>
+            <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 12 }}>
+              {/* Player hero */}
+              <View style={[st.sheetHero, { backgroundColor: teamColor + "18", borderColor: teamColor + "40" }]}>
+                <View style={[st.sheetOvrBadge, { backgroundColor: teamColor + "30", borderColor: teamColor }]}>
+                  <Text style={[st.sheetOvrText, { color: teamColor }]}>{selectedPlayer.overall}</Text>
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={[st.sheetName, { color: colors.foreground }]}>{selectedPlayer.name}</Text>
+                  <Text style={[st.sheetMeta, { color: colors.mutedForeground }]}>
+                    {selectedPlayer.position} · {selectedPlayer.age}yo · {selectedPlayer.yearsExperience}yr exp
+                  </Text>
+                  <View style={{ flexDirection: "row", gap: 6, marginTop: 2 }}>
+                    {selectedPlayer.developmentTrait !== "Normal" && (
+                      <View style={[st.devTag, { backgroundColor: DEV_COLORS[selectedPlayer.developmentTrait] + "25" }]}>
+                        <Text style={[st.devText, { color: DEV_COLORS[selectedPlayer.developmentTrait] }]}>{selectedPlayer.developmentTrait}</Text>
+                      </View>
+                    )}
+                    {selectedPlayer.injury && (
+                      <View style={[st.injTag, { backgroundColor: colors.danger + "25" }]}>
+                        <Feather name="alert-circle" size={9} color={colors.danger} />
+                        <Text style={{ fontSize: 9, color: colors.danger, fontFamily: "Inter_600SemiBold" }}>
+                          {selectedPlayer.injury.location} ({selectedPlayer.injury.severity})
+                        </Text>
                       </View>
                     )}
                   </View>
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-      </ScrollView>
+                </View>
+              </View>
 
-      {/* ── Player Detail Modal ── */}
-      <Modal visible={!!selectedPlayer} animationType="slide" transparent onRequestClose={() => setSelectedPlayer(null)}>
-        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.72)" }}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setSelectedPlayer(null)} />
-          <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "90%", paddingTop: 12 }}>
-            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: "center", marginBottom: 6 }} />
-            <TouchableOpacity onPress={() => setSelectedPlayer(null)} style={{ position: "absolute", right: 16, top: 14, zIndex: 10 }}>
-              <Feather name="x" size={20} color={colors.mutedForeground} />
-            </TouchableOpacity>
-            {selectedPlayer && (
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
-                <PlayerCard
-                  player={selectedPlayer}
-                  teamPrimaryColor={teamColor}
-                  teamSecondaryColor={teamSecondary}
-                  expanded
-                  showInjury
-                />
-                {/* Stats shortcut */}
-                <TouchableOpacity
-                  onPress={() => { setStatsPlayer(selectedPlayer); setSelectedPlayer(null); }}
-                  style={[st.statsBtn, { backgroundColor: teamColor + "18", borderColor: teamColor + "50" }]}
-                >
-                  <Feather name="bar-chart-2" size={14} color={teamColor} />
-                  <Text style={[st.statsBtnText, { color: teamColor }]}>Season &amp; Career Stats</Text>
-                  <Feather name="chevron-right" size={14} color={teamColor} style={{ opacity: 0.6 }} />
-                </TouchableOpacity>
-              </ScrollView>
-            )}
+              {/* Contract block */}
+              <View style={[st.contractBlock, { backgroundColor: colors.secondary }]}>
+                <ContractRow label="Annual Salary"    value={`$${selectedPlayer.salary.toFixed(1)}M`} />
+                <ContractRow label="Signing Bonus"    value={`$${selectedPlayer.signingBonus?.toFixed(1) ?? "0"}M`} />
+                <ContractRow label="Guaranteed"       value={`$${selectedPlayer.guaranteedMoney?.toFixed(1) ?? "0"}M`} />
+                <ContractRow label="Dead Cap"         value={`$${selectedPlayer.deadCap?.toFixed(1) ?? "0"}M`} color={colors.danger} />
+                <ContractRow label="Years Remaining"  value={`${selectedPlayer.contractYears}`} />
+              </View>
+
+              {/* Actions */}
+              <TouchableOpacity onPress={() => { setStatsPlayer(selectedPlayer); setSelectedPlayer(null); }}
+                style={[st.actionBtn, { backgroundColor: teamColor + "18", borderColor: teamColor + "40" }]}>
+                <Feather name="bar-chart-2" size={12} color={teamColor} />
+                <Text style={[st.actionBtnText, { color: teamColor }]}>Season &amp; Career Stats</Text>
+              </TouchableOpacity>
+              {isGM && (
+                <View style={st.actionRow}>
+                  {selectedPlayer.contractYears >= 2 && (
+                    <TouchableOpacity onPress={() => handleRestructure(selectedPlayer)}
+                      style={[st.actionBtn, { flex: 1, backgroundColor: colors.nflBlue + "20", borderColor: colors.nflBlue + "50" }]}>
+                      <Feather name="refresh-cw" size={12} color={colors.nflBlue} />
+                      <Text style={[st.actionBtnText, { color: colors.nflBlue }]}>Restructure</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity onPress={() => handleRelease(selectedPlayer)}
+                    style={[st.actionBtn, { flex: 1, backgroundColor: colors.danger + "15", borderColor: colors.danger + "40" }]}>
+                    <Feather name="x-circle" size={12} color={colors.danger} />
+                    <Text style={[st.actionBtnText, { color: colors.danger }]}>Release</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </ScrollView>
           </View>
         </View>
-      </Modal>
+      )}
 
       {/* ── Stats Modal ── */}
       <PlayerStatsModal
         player={statsPlayer}
         visible={!!statsPlayer}
         onClose={() => setStatsPlayer(null)}
-        teamPrimaryColor={teamColor}
-        teamSecondaryColor={teamSecondary}
+        teamPrimaryColor={isViewingOwnTeam ? teamColor : viewColor}
+        teamSecondaryColor={isViewingOwnTeam ? teamSecondary : viewSecondary}
         gamesPlayedThisSeason={gamesPlayed}
       />
     </View>
   );
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function OvrBadge({ value, color }: { value: number; color: string }) {
-  const colors = useColors();
+// ─── RSortHeader ─────────────────────────────────────────────────────────────
+function RSortHeader({ label, sortKey: key, current, asc, onSort, colors, accent }:
+  { label: string; sortKey: RosterSortKey; current: RosterSortKey; asc: boolean;
+    onSort: (k: RosterSortKey) => void; colors: any; accent: string }) {
+  const active = key === current;
   return (
-    <View style={[ovrSt.badge, { backgroundColor: color + "22", borderColor: color + "55" }]}>
-      <Text style={[ovrSt.text, { color }]}>{value}</Text>
-    </View>
+    <TouchableOpacity onPress={() => onSort(key)}
+      style={[st.colHeader, { borderBottomColor: active ? accent : "transparent", borderBottomWidth: active ? 2 : 0 }]}>
+      <Text style={[st.colHeaderText, { color: active ? accent : colors.mutedForeground }]}>{label}</Text>
+      {active && <Feather name={asc ? "chevron-up" : "chevron-down"} size={9} color={accent} />}
+    </TouchableOpacity>
   );
 }
-const ovrSt = StyleSheet.create({
-  badge: { width: 40, height: 40, borderRadius: 10, alignItems: "center", justifyContent: "center", borderWidth: 1.5 },
-  text:  { fontSize: 15, fontFamily: "Inter_700Bold" },
-});
 
-function RatingBar({ label, value, color }: { label: string; value: number; color: string }) {
-  const colors = useColors();
+// ─── RosterPlayerRow ─────────────────────────────────────────────────────────
+function RosterPlayerRow({ p, rank, colors, accent, onPress, isOwnTeam, onManage }:
+  { p: Player; rank: number; colors: any; accent: string;
+    onPress: () => void; isOwnTeam: boolean; onManage?: () => void }) {
+  const ratingColor = (v: number) => v >= 90 ? "#FFD700" : v >= 80 ? colors.success : v >= 70 ? colors.foreground : colors.mutedForeground;
+  const acc = (p.positionRatings as any)?.acceleration ?? 50;
+  const agi = (p.positionRatings as any)?.agility ?? 50;
+
   return (
-    <View style={{ flex: 1, gap: 3 }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-        <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground }}>{label}</Text>
-        <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color }}>{value}</Text>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.75}
+      style={[st.rosterRow, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+      {/* Fixed left name cell */}
+      <View style={{ width: 185, paddingRight: 6 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_500Medium", width: 20, textAlign: "right" }}>{rank}</Text>
+          <View style={[st.posBadge, { backgroundColor: POS_COLOR[p.position] + "25" }]}>
+            <Text style={[st.posBadgeText, { color: POS_COLOR[p.position] }]}>{p.position}</Text>
+          </View>
+          <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground, flexShrink: 1 }} numberOfLines={1}>
+            {p.name.split(" ").slice(-1)[0]}
+          </Text>
+          {p.developmentTrait !== "Normal" && (
+            <Text style={{ fontSize: 9, color: DEV_COLORS[p.developmentTrait], fontFamily: "Inter_700Bold" }}>
+              {p.developmentTrait === "X-Factor" ? "⚡" : p.developmentTrait === "Superstar" ? "★" : p.developmentTrait === "Star" ? "◆" : "↑"}
+            </Text>
+          )}
+        </View>
+        <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_400Regular", marginTop: 1, paddingLeft: 24 }}>
+          Age {p.age} · {p.yearsExperience === 0 ? "Rookie" : `${p.yearsExperience}yr`}
+        </Text>
       </View>
-      <View style={{ height: 4, backgroundColor: colors.secondary, borderRadius: 2 }}>
-        <View style={{ height: "100%", width: `${value}%`, backgroundColor: color, borderRadius: 2 }} />
+
+      {/* Stat cells */}
+      <ColCell value={`${p.overall}`}           color={ratingColor(p.overall)} />
+      <ColCell value={`${p.speed}`}             color={ratingColor(p.speed)} />
+      <ColCell value={`${acc}`}                 color={ratingColor(acc)} />
+      <ColCell value={`${agi}`}                 color={ratingColor(agi)} />
+      <ColCell value={`${p.yearsExperience}yr`} color={colors.foreground} />
+      <ColCell value={`$${p.salary.toFixed(1)}M`} color={p.salary >= 20 ? colors.danger : p.salary >= 10 ? colors.nflGold : colors.success} />
+
+      {/* Manage button (own team only) */}
+      {onManage && (
+        <TouchableOpacity onPress={e => { e.stopPropagation?.(); onManage(); }}
+          style={{ width: 40, alignItems: "center", justifyContent: "center" }}>
+          <Feather name="more-horizontal" size={16} color={accent} />
+        </TouchableOpacity>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+function ColCell({ value, color }: { value: string; color: string }) {
+  return <Text style={[st.colCell, { color }]}>{value}</Text>;
+}
+
+// ─── PlanSection ─────────────────────────────────────────────────────────────
+function PlanSection({ title, desc, options, value, onSelect, colors, teamColor }:
+  { title: string; desc: string; options: { value: string; label: string; desc: string }[];
+    value: string; onSelect: (v: string) => void; colors: any; teamColor: string }) {
+  return (
+    <View style={[st.planCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <Text style={[st.planTitle, { color: colors.foreground }]}>{title}</Text>
+      <Text style={[st.planDesc, { color: colors.mutedForeground }]}>{desc}</Text>
+      <View style={{ gap: 6, marginTop: 8 }}>
+        {options.map(opt => (
+          <TouchableOpacity key={opt.value} onPress={() => onSelect(opt.value)}
+            style={[st.planOption, {
+              backgroundColor: value === opt.value ? teamColor + "18" : colors.secondary,
+              borderColor: value === opt.value ? teamColor : colors.border,
+            }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[st.planOptionLabel, { color: value === opt.value ? teamColor : colors.foreground }]}>{opt.label}</Text>
+              <Text style={[st.planOptionDesc, { color: colors.mutedForeground }]}>{opt.desc}</Text>
+            </View>
+            {value === opt.value && <Feather name="check-circle" size={16} color={teamColor} />}
+          </TouchableOpacity>
+        ))}
       </View>
     </View>
   );
 }
 
-function InterestBar({ level, teamColor }: { level: number; teamColor: string }) {
-  return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3 }}>
-      {[1,2,3,4,5].map(i => (
-        <View key={i} style={{ width: 12, height: 4, borderRadius: 2, backgroundColor: i <= level ? teamColor : "#ffffff20" }} />
-      ))}
-      <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: "#8B949E", marginLeft: 2 }}>
-        {level >= 5 ? "Very Interested" : level >= 4 ? "Interested" : level >= 3 ? "Open to Offers" : level >= 2 ? "Low Interest" : "Not Interested"}
-      </Text>
-    </View>
-  );
-}
-
+// ─── ContractRow ─────────────────────────────────────────────────────────────
 function ContractRow({ label, value, color }: { label: string; value: string; color?: string }) {
   const colors = useColors();
   return (
-    <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 }}>
-      <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{label}</Text>
-      <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: color ?? colors.foreground }}>{value}</Text>
+    <View style={st.contractRow}>
+      <Text style={[st.contractLabel, { color: colors.mutedForeground }]}>{label}</Text>
+      <Text style={[st.contractValue, { color: color ?? colors.foreground }]}>{value}</Text>
     </View>
   );
 }
 
-function PlanSection({ title, desc, options, value, onSelect, colors, teamColor }: {
-  title: string; desc: string; options: { value: string; label: string; desc: string }[];
-  value: string; onSelect: (v: string) => void; colors: any; teamColor: string;
-}) {
-  return (
-    <View>
-      <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: colors.foreground, marginBottom: 2 }}>{title}</Text>
-      <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginBottom: 10 }}>{desc}</Text>
-      {options.map(opt => (
-        <TouchableOpacity key={opt.value} onPress={() => onSelect(opt.value)}
-          style={[{ borderRadius: 12, padding: 12, borderWidth: 1.5, marginBottom: 8, flexDirection: "row", alignItems: "center", gap: 10 },
-            { backgroundColor: value === opt.value ? teamColor + "18" : colors.card, borderColor: value === opt.value ? teamColor : colors.border }]}>
-          <View style={[{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, alignItems: "center", justifyContent: "center" },
-            { borderColor: value === opt.value ? teamColor : colors.border }]}>
-            {value === opt.value && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: teamColor }} />}
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: value === opt.value ? teamColor : colors.foreground }}>{opt.label}</Text>
-            <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{opt.desc}</Text>
-          </View>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-}
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
+// ─── Styles ──────────────────────────────────────────────────────────────────
 const st = StyleSheet.create({
-  header:         { paddingHorizontal: 16, borderBottomWidth: 1 },
-  headerTop:      { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
-  headerTitle:    { fontSize: 18, fontFamily: "Inter_700Bold" },
-  headerSub:      { fontSize: 11, fontFamily: "Inter_400Regular" },
-  roleBadge:      { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1 },
-  exportBtn:      { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
-  exportBtnText:  { fontSize: 11, fontFamily: "Inter_600SemiBold" },
-  roleText:       { fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
-  tabScroll:      {},
-  tabBtn:         { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1 },
-  tabLabel:       { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  posHeader:      { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 4, borderLeftWidth: 3 },
-  posLabel:       { fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.8 },
-  posCount:       { fontSize: 10, fontFamily: "Inter_400Regular" },
-  depthRow:       { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 5, borderBottomWidth: 1 },
-  depthNum:       { width: 20, height: 20, borderRadius: 5, alignItems: "center", justifyContent: "center" },
-  depthNumText:   { fontSize: 10, fontFamily: "Inter_700Bold" },
-  depthNameRow:   { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1 },
-  depthName:      { fontSize: 12, fontFamily: "Inter_600SemiBold", flexShrink: 1 },
-  depthMeta:      { fontSize: 10, fontFamily: "Inter_400Regular", marginTop: 1 },
-  depthOvr:       { width: 32, height: 28, borderRadius: 6, alignItems: "center", justifyContent: "center", borderWidth: 1 },
-  depthOvrText:   { fontSize: 12, fontFamily: "Inter_700Bold" },
-  arrowCol:       { flexDirection: "column", gap: 0, alignItems: "center" },
-  arrowBtn:       { padding: 2 },
-  rookieBadge:    { backgroundColor: "#FF6B35", paddingHorizontal: 4, paddingVertical: 1, borderRadius: 3 },
-  rookieText:     { fontSize: 8, fontFamily: "Inter_700Bold", color: "#fff", letterSpacing: 0.5 },
-  devTag:         { flexDirection: "row", alignItems: "center", paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4 },
-  devText:        { fontSize: 8, fontFamily: "Inter_700Bold" },
-  injTag:         { flexDirection: "row", alignItems: "center", gap: 2, paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4 },
-  injText:        { fontSize: 8, fontFamily: "Inter_600SemiBold" },
-  posChip:        { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
-  posChipText:    { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  playerCard:     { borderBottomWidth: 1, paddingHorizontal: 16, paddingVertical: 12 },
-  playerRow:      { flexDirection: "row", alignItems: "center", gap: 10 },
-  posCircle:      { width: 36, height: 36, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-  posCircleText:  { fontSize: 11, fontFamily: "Inter_700Bold" },
-  playerNameRow:  { flexDirection: "row", alignItems: "center", gap: 6 },
-  playerName:     { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  playerMeta:     { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },
-  playerExpanded: { borderTopWidth: 1, marginTop: 10, paddingTop: 10, gap: 10 },
-  ratingsRow:     { flexDirection: "row", gap: 10 },
-  contractBlock:  { borderRadius: 10, padding: 10, gap: 2 },
-  injBlock:       { flexDirection: "row", alignItems: "center", gap: 6, padding: 8, borderRadius: 8, borderWidth: 1 },
-  injBlockText:   { fontSize: 12, fontFamily: "Inter_500Medium", flex: 1 },
-  actionRow:      { flexDirection: "row", gap: 8 },
-  actionBtn:      { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 8, borderRadius: 8, borderWidth: 1 },
-  actionBtnText:  { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  signBtnRow:     { flexDirection: "row", gap: 8 },
-  signBtn:        { flex: 1, alignItems: "center", paddingVertical: 8, borderRadius: 8, borderWidth: 1 },
-  signBtnText:    { fontSize: 12, fontFamily: "Inter_700Bold" },
-  faNote:         { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
-  expandedActions: { borderWidth: 1, borderTopWidth: 0, borderBottomLeftRadius: 16, borderBottomRightRadius: 16, padding: 14, gap: 10 },
-  statsBtn:        { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 12, borderWidth: 1, paddingVertical: 12, paddingHorizontal: 16, marginTop: 8 },
-  statsBtnText:    { flex: 1, fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  header:       { borderBottomWidth: 1, zIndex: 10 },
+  headerTop:    { flexDirection: "row", alignItems: "flex-start", paddingHorizontal: 16, paddingBottom: 10, gap: 8 },
+  headerTitle:  { fontSize: 20, fontFamily: "Inter_700Bold" },
+  headerSub:    { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
+  scoutingBadge:{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, borderWidth: 1 },
+  scoutingText: { fontSize: 9, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
+  exportBtn:    { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
+  exportBtnText:{ fontSize: 12, fontFamily: "Inter_500Medium" },
+  roleBadge:    { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1 },
+  roleText:     { fontSize: 11, fontFamily: "Inter_700Bold" },
+  tabScroll:    { flexGrow: 0 },
+  tabBtn:       { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
+  tabLabel:     { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  teamChip:     { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1 },
+  teamChipText: { fontSize: 11, fontFamily: "Inter_700Bold" },
+  posPill:      { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1 },
+  posPillText:  { fontSize: 10, fontFamily: "Inter_700Bold" },
+
+  // Sortable table
+  tableHeader:  { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1, gap: 4 },
+  colFixHdr:    { width: 185, fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  colHeader:    { width: 60, alignItems: "center", flexDirection: "row", gap: 2, justifyContent: "center" },
+  colHeaderText:{ fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  colCell:      { width: 60, textAlign: "center", fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  rosterRow:    { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 9, borderBottomWidth: 1, gap: 4 },
+  posBadge:     { paddingHorizontal: 4, paddingVertical: 2, borderRadius: 4 },
+  posBadgeText: { fontSize: 9, fontFamily: "Inter_700Bold" },
+
+  // Depth chart
+  posHeader:    { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingVertical: 7, borderLeftWidth: 3 },
+  posLabel:     { fontSize: 12, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
+  posCount:     { fontSize: 11, fontFamily: "Inter_400Regular" },
+  depthRow:     { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1, gap: 10 },
+  depthNum:     { width: 24, height: 24, borderRadius: 6, alignItems: "center", justifyContent: "center" },
+  depthNumText: { fontSize: 11, fontFamily: "Inter_700Bold" },
+  depthNameRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  depthName:    { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  depthMeta:    { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },
+  depthOvr:     { width: 40, height: 36, borderRadius: 8, alignItems: "center", justifyContent: "center", borderWidth: 1.5 },
+  depthOvrText: { fontSize: 15, fontFamily: "Inter_700Bold" },
+  arrowCol:     { gap: 0 },
+  arrowBtn:     { padding: 2 },
+  rookieBadge:  { backgroundColor: "#D97706", borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 },
+  rookieText:   { fontSize: 8, fontFamily: "Inter_700Bold", color: "#fff" },
+  devTag:       { paddingHorizontal: 4, paddingVertical: 1, borderRadius: 3 },
+  devText:      { fontSize: 8, fontFamily: "Inter_600SemiBold" },
+  injTag:       { flexDirection: "row", alignItems: "center", gap: 2, paddingHorizontal: 4, paddingVertical: 1, borderRadius: 3 },
+
+  // Slide-up sheet
+  sheet:        { position: "absolute", bottom: 0, left: 0, right: 0, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "85%", paddingTop: 12 },
+  sheetHandle:  { width: 40, height: 4, borderRadius: 2, backgroundColor: "#ffffff30", alignSelf: "center", marginBottom: 6 },
+  sheetClose:   { position: "absolute", right: 16, top: 14, zIndex: 10 },
+  sheetHero:    { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, borderRadius: 12, borderWidth: 1 },
+  sheetOvrBadge:{ width: 52, height: 52, borderRadius: 12, alignItems: "center", justifyContent: "center", borderWidth: 1.5 },
+  sheetOvrText: { fontSize: 22, fontFamily: "Inter_700Bold" },
+  sheetName:    { fontSize: 16, fontFamily: "Inter_700Bold" },
+  sheetMeta:    { fontSize: 12, fontFamily: "Inter_400Regular" },
+
+  // Contract + actions
+  contractBlock:{ borderRadius: 10, padding: 12, gap: 8 },
+  contractRow:  { flexDirection: "row", justifyContent: "space-between" },
+  contractLabel:{ fontSize: 12, fontFamily: "Inter_400Regular" },
+  contractValue:{ fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  actionRow:    { flexDirection: "row", gap: 8 },
+  actionBtn:    { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1 },
+  actionBtnText:{ fontSize: 12, fontFamily: "Inter_600SemiBold" },
+
+  // Game plan
+  planCard:     { borderRadius: 12, padding: 14, borderWidth: 1, gap: 4 },
+  planTitle:    { fontSize: 15, fontFamily: "Inter_700Bold" },
+  planDesc:     { fontSize: 11, fontFamily: "Inter_400Regular" },
+  planOption:   { flexDirection: "row", alignItems: "center", padding: 10, borderRadius: 10, borderWidth: 1, gap: 10 },
+  planOptionLabel:{ fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  planOptionDesc: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },
 });
