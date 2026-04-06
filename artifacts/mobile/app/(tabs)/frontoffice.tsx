@@ -557,6 +557,44 @@ export default function FrontOfficeScreen() {
             <Feather name="chevron-right" size={18} color="rgba(255,255,255,0.7)" />
           </TouchableOpacity>
 
+          {/* ── My Draft Picks ────────────────────────────────────── */}
+          {userPicks.length > 0 && (
+            <View style={{ marginHorizontal:12, marginTop:4, marginBottom:4 }}>
+              <View style={{ flexDirection:"row", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
+                <Text style={{ fontSize:13, fontFamily:"Inter_700Bold", color:colors.foreground, letterSpacing:0.4 }}>MY DRAFT PICKS</Text>
+                <Text style={{ fontSize:11, fontFamily:"Inter_500Medium", color:colors.mutedForeground }}>{userPicks.length} picks · 2026 Draft</Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap:8 }}>
+                {userPicks.map(pk => {
+                  const ROUND_COLORS = ["","#D97706","#EA580C","#2563EB","#059669","#6B7280","#6B7280","#6B7280"];
+                  const accent = ROUND_COLORS[pk.round] ?? "#6B7280";
+                  const isAcquired = pk.fromTeam !== team?.id;
+                  const fromAbbr = season?.teams.find(t => t.id === pk.fromTeam)?.abbreviation ?? "???";
+                  return (
+                    <View key={pk.id} style={{
+                      borderRadius:10, borderWidth:1.5,
+                      borderColor: accent + "80",
+                      backgroundColor: accent + "18",
+                      paddingHorizontal:12, paddingVertical:8,
+                      alignItems:"center", minWidth:72,
+                    }}>
+                      <Text style={{ fontSize:10, fontFamily:"Inter_700Bold", color:accent, letterSpacing:0.5 }}>RD {pk.round}</Text>
+                      <Text style={{ fontSize:16, fontFamily:"Inter_700Bold", color:colors.foreground, marginTop:1 }}>#{pk.pick}</Text>
+                      {isAcquired ? (
+                        <View style={{ flexDirection:"row", alignItems:"center", gap:2, marginTop:3 }}>
+                          <Feather name="repeat" size={8} color={accent} />
+                          <Text style={{ fontSize:9, fontFamily:"Inter_600SemiBold", color:accent }}>{fromAbbr}</Text>
+                        </View>
+                      ) : (
+                        <Text style={{ fontSize:9, fontFamily:"Inter_400Regular", color:colors.mutedForeground, marginTop:3 }}>Original</Text>
+                      )}
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
           {/* ── Position filter pills ─────────────────────────────── */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false}
             style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}

@@ -361,7 +361,14 @@ function generateRoster(teamOverall: number): Player[] {
       age,
       overall,
       potential: Math.min(99, overall + irng(0, age < 26 ? 12 : 5)),
-      speed: genRating(teamOverall + (["WR","CB","RB"].includes(pos) ? 3 : -2), isStarter, false),
+      speed: (() => {
+        if (["WR","CB"].includes(pos))           return gaussian(teamOverall + 5, 5, 80, 99);
+        if (["RB","S"].includes(pos))            return gaussian(teamOverall + 2, 5, 74, 96);
+        if (["DE","LB","QB","TE"].includes(pos)) return gaussian(teamOverall - 3, 5, 65, 88);
+        if (["OL"].includes(pos))                return gaussian(58, 7, 45, 71);
+        if (["DT"].includes(pos))                return gaussian(60, 6, 48, 72);
+        return gaussian(teamOverall - 5, 5, 58, 80);
+      })(),
       strength: genRating(teamOverall + (["OL","DE","DT"].includes(pos) ? 3 : -2), isStarter, false),
       awareness: genRating(teamOverall + (["QB","S","LB"].includes(pos) ? 3 : -2), isStarter, false),
       specific: genRating(teamOverall + 2, isStarter, isElite),
@@ -1394,14 +1401,18 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
     // AI decision — aiValue is from USER perspective:
     //   positive = good for user = bad for AI → AI more likely to reject
     //   negative = bad for user = good for AI → AI more likely to accept
-    const aiPov = -aiValue; // positive means AI benefits
+    const aiPov = -aiValue; // positive means AI benefits, negative = user benefits
     const r = Math.random();
     let aiDecision: "accepted" | "rejected" | "considering";
-    if      (aiPov > 50)  aiDecision = r < 0.92 ? "accepted"    : "considering";
-    else if (aiPov > 20)  aiDecision = r < 0.72 ? "accepted"    : (r < 0.88 ? "considering" : "rejected");
-    else if (aiPov > -5)  aiDecision = r < 0.38 ? "accepted"    : (r < 0.65 ? "considering" : "rejected");
-    else if (aiPov > -25) aiDecision = r < 0.15 ? "considering" : "rejected";
-    else                  aiDecision = r < 0.04 ? "considering" : "rejected";
+    // aiPov > 0  → AI wins the trade   (accept eagerly)
+    // aiPov 0..-15 → roughly even / user ≤15 pts up (usually accept)
+    // aiPov -15..-35 → user clearly winning (lean reject / considering)
+    // aiPov < -35 → user big winner (almost always reject)
+    if      (aiPov > 50)   aiDecision = r < 0.95 ? "accepted"    : "considering";
+    else if (aiPov > 15)   aiDecision = r < 0.82 ? "accepted"    : (r < 0.92 ? "considering" : "rejected");
+    else if (aiPov > -15)  aiDecision = r < 0.65 ? "accepted"    : (r < 0.82 ? "considering" : "rejected");
+    else if (aiPov > -35)  aiDecision = r < 0.18 ? "considering" : "rejected";
+    else                   aiDecision = r < 0.04 ? "considering" : "rejected";
 
     const newOffer: TradeOffer = {
       ...offer, id: offerId,
