@@ -14,6 +14,11 @@ const SIZES = {
   xl: { badge: 96, font: 30, accent: 6,   radius: 20, wFont: 19 },
 };
 
+// Standardized VFL brand colors — always red/white/blue, never team-themed
+const VFL_RED  = "#C8102E";
+const VFL_BLUE = "#003087";
+const VFL_NAVY = "#07182E";
+
 export function VFLLogo({ size = "md", showWordmark = false }: VFLLogoProps) {
   const d = SIZES[size];
   return (
@@ -33,7 +38,7 @@ export function VFLLogo({ size = "md", showWordmark = false }: VFLLogoProps) {
           <Text style={[styles.vText, { fontSize: d.font * 0.55, lineHeight: d.font * 0.55 }]}>◆</Text>
           <Text style={[styles.vflText, { fontSize: d.font, lineHeight: d.font }]}>VFL</Text>
         </View>
-        <View style={[styles.bottomStripe, { height: d.accent * 0.6 }]} />
+        <View style={[styles.bottomStripe, { height: d.accent * 0.7 }]} />
       </View>
       {showWordmark && (
         <View style={styles.wordmarkText}>
@@ -47,16 +52,16 @@ export function VFLLogo({ size = "md", showWordmark = false }: VFLLogoProps) {
 
 const styles = StyleSheet.create({
   badge: {
-    backgroundColor: "#0F0D2A",
+    backgroundColor: VFL_NAVY,
     borderWidth: 1.5,
-    borderColor: "#4F46E5",
+    borderColor: VFL_BLUE,
     alignItems: "center",
     justifyContent: "space-between",
     overflow: "hidden",
   },
   topStripe: {
     width: "100%",
-    backgroundColor: "#D97706",
+    backgroundColor: VFL_RED,
   },
   innerContent: {
     flex: 1,
@@ -65,18 +70,18 @@ const styles = StyleSheet.create({
     gap: 1,
   },
   vText: {
-    color: "#D97706",
+    color: "#FFFFFF",
     fontFamily: "Inter_700Bold",
-    opacity: 0.9,
+    opacity: 0.85,
   },
   vflText: {
-    color: "#ffffff",
+    color: "#FFFFFF",
     fontFamily: "Inter_700Bold",
     letterSpacing: 1.5,
   },
   bottomStripe: {
     width: "100%",
-    backgroundColor: "#4F46E5",
+    backgroundColor: VFL_BLUE,
   },
   wordmarkRow: {
     flexDirection: "row",

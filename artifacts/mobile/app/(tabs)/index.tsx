@@ -130,30 +130,32 @@ export default function HomeScreen() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
 
       {/* ── Top bar ─────────────────────────────────────────────────────── */}
-      <View style={[st.topBar, { paddingTop: topPad + 8, borderBottomColor: theme.primary + "40" }]}>
+      <View style={[st.topBar, { paddingTop: topPad + 8, borderBottomColor: "#003087" + "50" }]}>
         <View style={st.topRow}>
           <VFLLogo size="sm" />
           <View>
-            <Text style={[st.seasonLbl, { color: colors.mutedForeground }]}>VFL {season?.year} SEASON</Text>
+            <Text style={[st.seasonLbl, { color: colors.mutedForeground }]}>
+              {(season?.year ?? 2025) + 1} VIRTUAL FRANCHISE LEAGUE
+            </Text>
             <Text style={[st.weekLbl, { color: colors.foreground }]}>
               {isOffseason
-                ? <Text style={{ color: theme.secondary }}>{PHASE_LABELS[currentPhase].toUpperCase()}</Text>
-                : <>WK <Text style={{ color: theme.secondary }}>{season?.currentWeek}</Text></>
+                ? <Text style={{ color: "#C8102E" }}>{PHASE_LABELS[currentPhase].toUpperCase()}</Text>
+                : <>SEASON{" "}<Text style={{ color: "#C8102E" }}>{(season?.year ?? 2025) - 2024}</Text></>
               }
             </Text>
           </View>
         </View>
         <View style={st.topRight}>
-          {isSyncing && <ActivityIndicator color={theme.primary} size="small" style={{ transform:[{scale:0.7}] }} />}
+          {isSyncing && <ActivityIndicator color="#003087" size="small" style={{ transform:[{scale:0.7}] }} />}
           {syncError && !isSyncing && <Feather name="wifi-off" size={14} color={colors.danger} />}
           <TouchableOpacity
             onPress={() => Alert.alert("Sign Out", "Leave this session?", [
               { text: "Cancel" },
               { text: "Sign Out", style: "destructive", onPress: signOut },
             ])}
-            style={[st.avatarBtn, { backgroundColor: theme.primary + "22", borderColor: theme.primary + "60" }]}
+            style={[st.avatarBtn, { backgroundColor: "#003087" + "30", borderColor: "#003087" + "80" }]}
           >
-            <Feather name="user" size={14} color={theme.primary} />
+            <Feather name="user" size={14} color="#C8102E" />
           </TouchableOpacity>
         </View>
       </View>
