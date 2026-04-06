@@ -1,5 +1,5 @@
 import React from "react";
-import Svg, { Path, Ellipse } from "react-native-svg";
+import Svg, { Path, Ellipse, Text as SvgText } from "react-native-svg";
 
 /**
  * Front-facing cartoon NFL helmet — matches reference artwork exactly.
@@ -17,6 +17,7 @@ export default function Helmet({
   visorColor    = "#080C14",
   stripeColor   = "#CC2020",
   chinstrapColor = "#ECEEF2",
+  visorText     = "",
 }) {
   const ink = "#1A1E2C";
 
@@ -172,6 +173,22 @@ export default function Helmet({
         opacity="0.16"
         strokeLinecap="round"
       />
+
+      {/* Optional visor text (e.g. "+VFL") */}
+      {!!visorText && (
+        <SvgText
+          x="256"
+          y="370"
+          textAnchor="middle"
+          fontSize="72"
+          fontWeight="bold"
+          fill="#FFFFFF"
+          letterSpacing="3"
+          opacity="0.88"
+        >
+          {visorText}
+        </SvgText>
+      )}
 
       {/* ╔══════════════════════════════════════════╗
           ║  6. CAGE FRAME — bowing rounded-oval     ║
