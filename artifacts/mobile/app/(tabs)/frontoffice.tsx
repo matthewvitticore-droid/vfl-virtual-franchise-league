@@ -167,7 +167,7 @@ export default function FrontOfficeScreen() {
         return Math.round((vRtg + bRtg) / 2);
       }
       case "strength":
-        return Math.round(Math.max(40, Math.min(99, c.benchPress * 1.6 + 22)));
+        return Math.round(Math.max(40, Math.min(99, c.benchPress * 1.8 + 30)));
       default:
         return (c as any)[key] ?? 0;
     }
@@ -967,7 +967,7 @@ function deriveCombineRating(key: "speed"|"acceleration"|"agility"|"strength", c
       return Math.round((vRtg + bRtg) / 2);
     }
     case "strength":
-      return Math.round(Math.max(40, Math.min(99, c.benchPress * 1.6 + 22)));
+      return Math.round(Math.max(40, Math.min(99, c.benchPress * 1.8 + 30)));
   }
 }
 
