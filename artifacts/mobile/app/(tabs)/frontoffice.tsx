@@ -199,9 +199,13 @@ export default function FrontOfficeScreen() {
   }, [season, posFilter, sortKey, sortAsc]);
 
   const userPicks = useMemo(() => {
-    if (!team) return [];
-    return team.draftPicks.filter(pk => pk.ownedByTeamId === team.id);
-  }, [team]);
+    if (!season || !team) return [];
+    // Search ALL teams' arrays — received picks live in the other team's draftPicks
+    return season.teams
+      .flatMap(t => t.draftPicks)
+      .filter(pk => pk.ownedByTeamId === team.id)
+      .sort((a, b) => a.round - b.round);
+  }, [season, team]);
 
   // ── Trades data ────────────────────────────────────────────────────────────
 
@@ -594,6 +598,51 @@ export default function FrontOfficeScreen() {
               </ScrollView>
             </View>
           )}
+
+          {/* ── Transaction Log ───────────────────────────────────── */}
+          {(() => {
+            const txns = (season?.news ?? [])
+              .filter(n => n.category === "trade" || n.category === "signing" || n.category === "contract")
+              .slice(0, 8);
+            if (txns.length === 0) return null;
+            const txIcon: Record<string, string> = { trade: "↔", signing: "✍", contract: "📋" };
+            const txColor: Record<string, string> = { trade: "#3B82F6", signing: "#22C55E", contract: "#D97706" };
+            return (
+              <View style={{ marginHorizontal: 12, marginTop: 10, marginBottom: 6 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: colors.mutedForeground, letterSpacing: 0.8 }}>TRANSACTION LOG</Text>
+                  <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>{txns.length} recent</Text>
+                </View>
+                <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border, overflow: "hidden" }}>
+                  {txns.map((n, i) => {
+                    const cat = n.category as string;
+                    const accent = txColor[cat] ?? "#8B949E";
+                    return (
+                      <View key={n.id} style={{
+                        flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 10,
+                        backgroundColor: i % 2 === 0 ? colors.card : colors.background,
+                        borderTopWidth: i === 0 ? 0 : StyleSheet.hairlineWidth,
+                        borderTopColor: colors.border,
+                      }}>
+                        <View style={{ width: 28, height: 28, borderRadius: 7, backgroundColor: accent + "20",
+                          alignItems: "center", justifyContent: "center", marginTop: 1, flexShrink: 0 }}>
+                          <Text style={{ fontSize: 12 }}>{txIcon[cat] ?? "·"}</Text>
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.foreground }} numberOfLines={2}>
+                            {n.headline}
+                          </Text>
+                          <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 2 }}>
+                            Wk {n.week} · {cat.toUpperCase()}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            );
+          })()}
 
           {/* ── Position filter pills ─────────────────────────────── */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false}

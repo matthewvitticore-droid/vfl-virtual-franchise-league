@@ -71,14 +71,15 @@ export function TradeBuilder({ visible, onClose, teamColor, onPropose }: TradeBu
     ? pickAccentForTeam(targetTeam.primaryColor, targetTeam.secondaryColor)
     : "#8B949E";
 
-  // ── Picks ──────────────────────────────────────────────────────────────────
+  // ── Picks — search ALL teams' arrays (received picks live in other team's draftPicks)
+  const allPicksFlat = useMemo(() => season?.teams.flatMap(t => t.draftPicks) ?? [], [season]);
   const myPicks    = useMemo(() =>
-    (myTeam?.draftPicks ?? []).filter(pk => pk.ownedByTeamId === myTeam?.id).sort((a,b) => a.round - b.round),
-    [myTeam]
+    allPicksFlat.filter(pk => pk.ownedByTeamId === myTeam?.id).sort((a,b) => a.round - b.round),
+    [allPicksFlat, myTeam]
   );
   const theirPicks = useMemo(() =>
-    (targetTeam?.draftPicks ?? []).filter(pk => pk.ownedByTeamId === targetTeam?.id).sort((a,b) => a.round - b.round),
-    [targetTeam]
+    allPicksFlat.filter(pk => pk.ownedByTeamId === targetTeam?.id).sort((a,b) => a.round - b.round),
+    [allPicksFlat, targetTeam]
   );
 
   // ── Rosters ────────────────────────────────────────────────────────────────
@@ -551,29 +552,53 @@ export function TradeBuilder({ visible, onClose, teamColor, onPropose }: TradeBu
 // ─── PlayerPickRow ────────────────────────────────────────────────────────────
 function PlayerPickRow({ p, rank, active, accent, label, colors, onToggle }:
   { p: Player; rank: number; active: boolean; accent: string; label: string; colors: any; onToggle: () => void }) {
+  const posColor = POS_COLOR[p.position] ?? "#8B949E";
+  const ovrColor = p.overall >= 90 ? "#FFD700" : p.overall >= 80 ? "#22C55E" : p.overall >= 70 ? colors.foreground : "#EF4444";
   return (
-    <TouchableOpacity onPress={onToggle} activeOpacity={0.8}
-      style={[tb.playerRow, {
-        backgroundColor: active ? accent + "15" : colors.card,
-        borderBottomColor: colors.border,
-        borderLeftWidth: active ? 3 : 0,
-        borderLeftColor: accent,
-      }]}>
-      <Text style={{ width: 22, fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_500Medium", textAlign: "right" }}>{rank}</Text>
-      <View style={[tb.posBadge, { backgroundColor: POS_COLOR[p.position] + "25" }]}>
-        <Text style={[tb.posBadgeText, { color: POS_COLOR[p.position] }]}>{p.position}</Text>
+    <TouchableOpacity onPress={onToggle} activeOpacity={0.75}
+      style={{
+        flexDirection: "row", alignItems: "center", gap: 10,
+        paddingHorizontal: 14, paddingVertical: 13,
+        borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
+        backgroundColor: active ? accent + "18" : "transparent",
+        borderLeftWidth: 3, borderLeftColor: active ? accent : "transparent",
+      }}>
+      {/* Rank */}
+      <Text style={{ width: 20, fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_400Regular", textAlign: "right" }}>{rank}</Text>
+
+      {/* POS badge */}
+      <View style={{ paddingHorizontal: 6, paddingVertical: 3, borderRadius: 5, backgroundColor: posColor + "28" }}>
+        <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: posColor }}>{p.position}</Text>
       </View>
+
+      {/* Name + meta */}
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={[tb.playerName, { color: active ? accent : colors.foreground }]} numberOfLines={1}>{p.name}</Text>
-        <Text style={[tb.playerMeta, { color: colors.mutedForeground }]}>
-          {p.age}yo · {p.yearsExperience === 0 ? "Rookie" : `${p.yearsExperience}yr`} · ${p.salary.toFixed(1)}M
+        <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: active ? accent : colors.foreground }} numberOfLines={1}>
+          {p.name}
+        </Text>
+        <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 1 }}>
+          Age {p.age} · {p.yearsExperience === 0 ? "Rookie" : `${p.yearsExperience}yr exp`} · ${p.salary.toFixed(1)}M
         </Text>
       </View>
-      <View style={[tb.ovrBadge, { backgroundColor: accent + "20", borderColor: accent + "50" }]}>
-        <Text style={[tb.ovrText, { color: accent }]}>{p.overall}</Text>
+
+      {/* OVR */}
+      <View style={{ width: 42, height: 38, borderRadius: 9, alignItems: "center", justifyContent: "center",
+        backgroundColor: ovrColor + "18", borderWidth: 1.5, borderColor: ovrColor + "60" }}>
+        <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: ovrColor }}>{p.overall}</Text>
       </View>
-      <View style={[tb.toggleBtn, { backgroundColor: active ? accent : colors.secondary, borderColor: active ? accent : colors.border }]}>
-        <Text style={[tb.toggleText, { color: active ? "#fff" : colors.mutedForeground }]}>{label}</Text>
+
+      {/* Toggle */}
+      <View style={{
+        flexDirection: "row", alignItems: "center", gap: 4,
+        paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, borderWidth: 1.5,
+        backgroundColor: active ? accent : "transparent",
+        borderColor: active ? accent : colors.border,
+        minWidth: 60, justifyContent: "center",
+      }}>
+        {active && <Feather name="check" size={11} color="#fff" />}
+        <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: active ? "#fff" : colors.mutedForeground }}>
+          {active ? label.replace(" ✓","") : label.replace(" ✓","")}
+        </Text>
       </View>
     </TouchableOpacity>
   );
