@@ -203,7 +203,7 @@ export default function HomeScreen() {
           <View style={{ paddingHorizontal: 14, gap: 8, marginTop: 6 }}>
             <TouchableOpacity
               onPress={handleSim} disabled={!canPress} activeOpacity={0.82}
-              style={[st.simBtn, { backgroundColor: canPress ? theme.primary : colors.secondary }]}
+              style={[st.simBtn, { backgroundColor: canPress ? "#111118" : colors.secondary, borderWidth: 1.5, borderColor: canPress ? "#ffffff22" : "transparent" }]}
             >
               {busy
                 ? <ActivityIndicator color="#fff" size="small" />
@@ -219,12 +219,12 @@ export default function HomeScreen() {
               <TouchableOpacity
                 onPress={() => { setSimSeason(true); simulateSeason().finally(() => setSimSeason(false)); }}
                 disabled={simSeason || simulating} activeOpacity={0.82}
-                style={[st.simSecBtn, { borderColor: theme.primary + "50" }]}
+                style={[st.simSecBtn, { borderColor: "#ffffff20" }]}
               >
                 {simSeason
-                  ? <ActivityIndicator color={theme.primary} size="small" />
-                  : <Feather name="zap" size={14} color={theme.primary} />}
-                <Text style={[st.simSecTxt, { color: theme.primary }]}>
+                  ? <ActivityIndicator color="#aaa" size="small" />
+                  : <Feather name="zap" size={14} color="#aaa" />}
+                <Text style={[st.simSecTxt, { color: "#aaa" }]}>
                   {simSeason ? "Simulating to VFL Bowl…" : "Sim to VFL Bowl"}
                 </Text>
               </TouchableOpacity>
