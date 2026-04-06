@@ -191,11 +191,27 @@ export default function HomeScreen() {
               <Text style={[st.heroRecord, { color: theme.secondary }]}>
                 {wins}–{losses} · {wPct}
               </Text>
-              <View style={[st.heroPill, { backgroundColor: theme.primary + "20", borderColor: theme.primary + "40" }]}>
-                <Text style={[st.heroPillTxt, { color: theme.primary }]}>
-                  {team?.conference ?? ""} {team?.division ?? ""}
+              <TouchableOpacity
+                onPress={toggleCoGMMode}
+                activeOpacity={0.8}
+                style={[st.heroPill, {
+                  backgroundColor: (season?.coGMMode ? theme.secondary : theme.primary) + "20",
+                  borderColor:     (season?.coGMMode ? theme.secondary : theme.primary) + "50",
+                  flexDirection: "row", alignItems: "center", gap: 5
+                }]}
+              >
+                <Feather
+                  name={season?.coGMMode ? "users" : "user"}
+                  size={11}
+                  color={season?.coGMMode ? theme.secondary : theme.primary}
+                />
+                <Text style={[st.heroPillTxt, { color: season?.coGMMode ? theme.secondary : theme.primary }]}>
+                  {season?.coGMMode ? "Co-GM" : "Solo GM"}
                 </Text>
-              </View>
+                <Text style={{ fontSize: 9, color: colors.mutedForeground, fontFamily: "Inter_400Regular" }}>
+                  · tap to switch
+                </Text>
+              </TouchableOpacity>
               {ovrRating > 0 && (
                 <View style={st.ratingsStack}>
                   {[
@@ -487,46 +503,16 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* ── Home nav panels ──────────────────────────────────────────── */}
-        <View style={{ paddingHorizontal: 14, paddingBottom: 24, flexDirection: "row", gap: 10, alignItems: "stretch" }}>
-
-          {/* Left column: Front Office + Franchise Type stacked thin */}
-          <View style={{ gap: 10, width: 110 }}>
-            {/* Front Office */}
-            <TouchableOpacity
-              onPress={() => goTo("freeAgency")}
-              activeOpacity={0.82}
-              style={[st.slimPanel, { backgroundColor: colors.card, borderColor: theme.primary + "40", flex: 1 }]}
-            >
-              <View style={[st.slimIcon, { backgroundColor: theme.primary + "22" }]}>
-                <Feather name="briefcase" size={18} color={theme.primary} />
-              </View>
-              <Text style={[st.slimTitle, { color: colors.foreground }]}>Front{"\n"}Office</Text>
-              <Text style={[st.slimSub, { color: colors.mutedForeground }]}>Trades{"\n"}FA · Draft</Text>
-            </TouchableOpacity>
-
-            {/* Franchise Type */}
-            <FranchiseTypePanel
-              role={role}
-              coGMMode={season?.coGMMode ?? false}
-              primary={theme.primary}
-              secondary={theme.secondary}
-              colors={colors}
-              onToggleCoGM={toggleCoGMMode}
-            />
-          </View>
-
-          {/* Right column: Draft Class wider */}
-          <View style={{ flex: 1 }}>
-            <DraftClassPanel
-              season={season}
-              team={team}
-              primary={theme.primary}
-              secondary={theme.secondary}
-              colors={colors}
-              onPress={() => goTo("draft")}
-            />
-          </View>
+        {/* ── Draft Class panel — full width ───────────────────────────── */}
+        <View style={{ paddingHorizontal: 14, paddingBottom: 24 }}>
+          <DraftClassPanel
+            season={season}
+            team={team}
+            primary={theme.primary}
+            secondary={theme.secondary}
+            colors={colors}
+            onPress={() => goTo("draft")}
+          />
         </View>
 
       </ScrollView>
