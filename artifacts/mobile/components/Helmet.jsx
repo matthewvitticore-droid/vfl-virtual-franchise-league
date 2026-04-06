@@ -1,271 +1,268 @@
 import React from "react";
-import Svg, { Path, Ellipse, G } from "react-native-svg";
+import Svg, { Path, Ellipse } from "react-native-svg";
 
 /**
- * Front-facing cartoon football helmet.
- * Props:
- *   shellColor    – main dome color
- *   facemaskColor – cage / rail color
- *   visorColor    – dark face-opening color
- *   chinstrapColor– center crown stripe color
+ * Front-facing cartoon NFL-style football helmet.
+ *
+ *   shellColor     – main dome / chin-cup color (white in reference)
+ *   facemaskColor  – cage rails & bars color (light gray in reference)
+ *   visorColor     – dark face-opening fill
+ *   chinstrapColor – crown stripe accent color (red in reference)
  */
 export default function Helmet({
-  size = 220,
+  size          = 220,
   shellColor    = "#ECEEF2",
-  facemaskColor = "#B5BCC8",
-  visorColor    = "#0D1117",
-  chinstrapColor = "#CC2200",
+  facemaskColor = "#B8BEC8",
+  visorColor    = "#0A0E16",
+  chinstrapColor = "#CC2020",
 }) {
-  const ink = "#1C2030"; // universal dark outline
+  const ink = "#1A1E2C"; // universal dark outline
 
   return (
     <Svg width={size} height={size} viewBox="0 0 512 512">
 
-      {/* ════════════════ SHELL ════════════════ */}
+      {/* ══════════════════════════════════════════════
+          1. SHELL — wide, squat dome
+         ══════════════════════════════════════════════ */}
 
-      {/* Main dome — wide, squat, rounded */}
+      {/* Main dome body */}
       <Path
         d="
-          M 256 46
-          C 148 46, 60 118, 60 214
-          C 60 276, 92 316, 152 330
-          L 360 330
-          C 420 316, 452 276, 452 214
-          C 452 118, 364 46, 256 46 Z
+          M 256 44
+          C 145 44, 58 118, 58 218
+          C 58 284, 94 328, 162 340
+          L 350 340
+          C 418 328, 454 284, 454 218
+          C 454 118, 367 44, 256 44 Z
+        "
+        fill={shellColor}
+        stroke={ink}
+        strokeWidth="8"
+        strokeLinejoin="round"
+      />
+
+      {/* Left shadow — large blue-gray shaded zone */}
+      <Path
+        d="
+          M 58 218
+          C 58 284, 94 328, 162 340
+          L 180 340
+          C 118 328, 84 284, 84 218
+          C 84 152, 128 102, 190 72
+          C 136 94, 84 150, 58 218 Z
+        "
+        fill="#00000022"
+      />
+
+      {/* Right gloss highlight */}
+      <Path
+        d="
+          M 454 218
+          C 454 180, 438 145, 408 116
+          C 428 144, 440 182, 440 218 Z
+        "
+        fill="#FFFFFF28"
+      />
+
+      {/* Top-center gloss streak */}
+      <Path
+        d="M 208 64 C 230 54, 282 54, 304 64"
+        stroke="#FFFFFF"
+        strokeWidth="10"
+        fill="none"
+        opacity="0.35"
+        strokeLinecap="round"
+      />
+
+      {/* ══════════════════════════════════════════════
+          2. CROWN STRIPE — vertical accent down center
+         ══════════════════════════════════════════════ */}
+      <Path
+        d="
+          M 240 44
+          C 246 42, 266 42, 272 44
+          L 272 210
+          L 240 210 Z
+        "
+        fill={chinstrapColor}
+        stroke={ink}
+        strokeWidth="4"
+        strokeLinejoin="round"
+      />
+
+      {/* ══════════════════════════════════════════════
+          3. BROW GUARD — pill bar with two rivets
+         ══════════════════════════════════════════════ */}
+      <Path
+        d="
+          M 164 208
+          C 164 200, 170 194, 178 194
+          L 334 194
+          C 342 194, 348 200, 348 208
+          L 348 228
+          C 348 238, 340 244, 330 244
+          L 182 244
+          C 172 244, 164 238, 164 228 Z
         "
         fill={shellColor}
         stroke={ink}
         strokeWidth="7"
-      />
-
-      {/* Left shading strip — blue-gray depth */}
-      <Path
-        d="
-          M 60 214
-          C 60 276, 92 316, 152 330
-          L 166 330
-          C 112 316, 84 276, 84 214
-          C 84 150, 118 102, 174 72
-          C 120 95, 78 148, 60 214 Z
-        "
-        fill="#00000016"
-      />
-
-      {/* Right shading strip */}
-      <Path
-        d="
-          M 452 214
-          C 452 276, 420 316, 360 330
-          L 346 330
-          C 400 316, 428 276, 428 214
-          C 428 150, 394 102, 338 72
-          C 392 95, 434 148, 452 214 Z
-        "
-        fill="#00000016"
-      />
-
-      {/* Top-center gloss highlight */}
-      <Path
-        d="M 210 66 C 232 56, 280 56, 302 66 C 282 60, 256 58, 210 66 Z"
-        fill="#FFFFFF"
-        opacity="0.5"
-      />
-
-      {/* ════════════════ CROWN STRIPE ════════════════ */}
-      {/* Vertical stripe from top of dome down to brow */}
-      <Path
-        d="
-          M 240 46
-          C 244 44, 268 44, 272 46
-          L 272 200
-          L 240 200 Z
-        "
-        fill={chinstrapColor}
-        stroke={ink}
-        strokeWidth="3"
         strokeLinejoin="round"
       />
 
-      {/* ════════════════ BROW GUARD ════════════════ */}
-      {/* White bar bridging top of face opening — rounded pill shape */}
+      {/* Rivet / screw — left */}
+      <Ellipse cx="200" cy="216" rx="11" ry="11" fill="#9CA4B0" stroke={ink} strokeWidth="3.5" />
+      <Ellipse cx="200" cy="216" rx="5"  ry="5"  fill="#505868" />
+
+      {/* Rivet / screw — right */}
+      <Ellipse cx="312" cy="216" rx="11" ry="11" fill="#9CA4B0" stroke={ink} strokeWidth="3.5" />
+      <Ellipse cx="312" cy="216" rx="5"  ry="5"  fill="#505868" />
+
+      {/* ══════════════════════════════════════════════
+          4. CHEEK GUARDS — teal/mint panels behind cage
+         ══════════════════════════════════════════════ */}
+      {/* Left cheek — visible through cage side window */}
       <Path
         d="
-          M 170 192
-          C 170 184, 176 178, 184 178
-          L 328 178
-          C 336 178, 342 184, 342 192
-          L 342 216
-          C 342 224, 336 230, 328 230
-          L 184 230
-          C 176 230, 170 224, 170 216 Z
+          M 154 244
+          L 106 268
+          C 84 300, 80 348, 92 396
+          L 152 396
+          L 152 244 Z
         "
-        fill={shellColor}
-        stroke={ink}
-        strokeWidth="6"
+        fill="#9FD5C8"
+        opacity="0.8"
+      />
+      {/* Right cheek */}
+      <Path
+        d="
+          M 358 244
+          L 406 268
+          C 428 300, 432 348, 420 396
+          L 360 396
+          L 360 244 Z
+        "
+        fill="#9FD5C8"
+        opacity="0.8"
       />
 
-      {/* Brow screw — left */}
-      <Ellipse cx="198" cy="204" rx="10" ry="10" fill="#A0A8B4" stroke={ink} strokeWidth="3" />
-      <Ellipse cx="198" cy="204" rx="5"  ry="5"  fill="#6A7280" />
-
-      {/* Brow screw — right */}
-      <Ellipse cx="314" cy="204" rx="10" ry="10" fill="#A0A8B4" stroke={ink} strokeWidth="3" />
-      <Ellipse cx="314" cy="204" rx="5"  ry="5"  fill="#6A7280" />
-
-      {/* ════════════════ FACE OPENING ════════════════ */}
-      {/* Large dark visor/face-opening window */}
+      {/* ══════════════════════════════════════════════
+          5. FACE OPENING / VISOR — large dark oval
+         ══════════════════════════════════════════════ */}
       <Path
         d="
-          M 256 226
-          C 196 226, 158 252, 158 292
-          L 158 382
-          C 158 406, 176 420, 200 420
-          L 312 420
-          C 336 420, 354 406, 354 382
-          L 354 292
-          C 354 252, 316 226, 256 226 Z
+          M 256 242
+          C 194 242, 154 268, 154 306
+          L 154 390
+          C 154 412, 176 428, 206 428
+          L 306 428
+          C 336 428, 358 412, 358 390
+          L 358 306
+          C 358 268, 318 242, 256 242 Z
         "
         fill={visorColor}
       />
 
-      {/* Subtle visor shine at top */}
+      {/* Visor shine line at top */}
       <Path
-        d="M 192 244 C 218 234, 294 234, 320 244"
+        d="M 192 260 C 220 250, 292 250, 320 260"
         stroke="#FFFFFF"
         strokeWidth="5"
         fill="none"
-        opacity="0.12"
+        opacity="0.14"
         strokeLinecap="round"
       />
 
-      {/* ════════════════ CAGE / FACEMASK ════════════════ */}
-
-      {/* Outer cage frame — single continuous rounded-rectangle loop */}
-      {/* This is drawn as a filled rounded-rect outline (stroke) */}
+      {/* ══════════════════════════════════════════════
+          6. CAGE FRAME — single thick rounded-oval loop
+             Bows outward at mid-face (wider in middle)
+         ══════════════════════════════════════════════ */}
+      {/* Cage fill color layer */}
       <Path
         d="
-          M 256 222
-          C 160 222, 88 258, 88 312
-          L 88 400
-          C 88 444, 116 472, 156 472
-          L 356 472
-          C 396 472, 424 444, 424 400
-          L 424 312
-          C 424 258, 352 222, 256 222 Z
+          M 256 238
+          C 188 238, 130 260, 104 300
+          C 82 336, 80 382, 94 422
+          C 108 458, 138 474, 174 474
+          L 338 474
+          C 374 474, 404 458, 418 422
+          C 432 382, 430 336, 408 300
+          C 382 260, 324 238, 256 238 Z
         "
         fill="none"
         stroke={facemaskColor}
-        strokeWidth="26"
+        strokeWidth="32"
+        strokeLinejoin="round"
       />
-
-      {/* Cage frame dark outline (thinner, sits on top) */}
+      {/* Cage dark outline */}
       <Path
         d="
-          M 256 222
-          C 160 222, 88 258, 88 312
-          L 88 400
-          C 88 444, 116 472, 156 472
-          L 356 472
-          C 396 472, 424 444, 424 400
-          L 424 312
-          C 424 258, 352 222, 256 222 Z
+          M 256 238
+          C 188 238, 130 260, 104 300
+          C 82 336, 80 382, 94 422
+          C 108 458, 138 474, 174 474
+          L 338 474
+          C 374 474, 404 458, 418 422
+          C 432 382, 430 336, 408 300
+          C 382 260, 324 238, 256 238 Z
         "
         fill="none"
         stroke={ink}
-        strokeWidth="6"
+        strokeWidth="7"
+        strokeLinejoin="round"
       />
 
-      {/* Cage horizontal crossbar — upper */}
-      <Path
-        d="M 88 318 C 160 308, 352 308, 424 318"
-        stroke={facemaskColor}
-        strokeWidth="18"
-        fill="none"
-        strokeLinecap="round"
-      />
-      <Path
-        d="M 88 318 C 160 308, 352 308, 424 318"
-        stroke={ink}
-        strokeWidth="4"
-        fill="none"
-        strokeLinecap="round"
-      />
+      {/* ══════════════════════════════════════════════
+          7. CAGE CROSSBARS — 3 horizontal bars
+         ══════════════════════════════════════════════ */}
+      {/* Upper bar */}
+      <Path d="M 98 314 C 162 304, 350 304, 414 314"
+        stroke={facemaskColor} strokeWidth="24" fill="none" strokeLinecap="round" />
+      <Path d="M 98 314 C 162 304, 350 304, 414 314"
+        stroke={ink} strokeWidth="5" fill="none" strokeLinecap="round" />
 
-      {/* Cage horizontal crossbar — middle */}
-      <Path
-        d="M 88 368 C 158 360, 354 360, 424 368"
-        stroke={facemaskColor}
-        strokeWidth="18"
-        fill="none"
-        strokeLinecap="round"
-      />
-      <Path
-        d="M 88 368 C 158 360, 354 360, 424 368"
-        stroke={ink}
-        strokeWidth="4"
-        fill="none"
-        strokeLinecap="round"
-      />
+      {/* Middle bar */}
+      <Path d="M 86 364 C 154 355, 358 355, 426 364"
+        stroke={facemaskColor} strokeWidth="24" fill="none" strokeLinecap="round" />
+      <Path d="M 86 364 C 154 355, 358 355, 426 364"
+        stroke={ink} strokeWidth="5" fill="none" strokeLinecap="round" />
 
-      {/* Cage horizontal crossbar — lower */}
-      <Path
-        d="M 98 416 C 162 410, 350 410, 414 416"
-        stroke={facemaskColor}
-        strokeWidth="18"
-        fill="none"
-        strokeLinecap="round"
-      />
-      <Path
-        d="M 98 416 C 162 410, 350 410, 414 416"
-        stroke={ink}
-        strokeWidth="4"
-        fill="none"
-        strokeLinecap="round"
-      />
+      {/* Lower bar */}
+      <Path d="M 92 412 C 156 404, 356 404, 420 412"
+        stroke={facemaskColor} strokeWidth="24" fill="none" strokeLinecap="round" />
+      <Path d="M 92 412 C 156 404, 356 404, 420 412"
+        stroke={ink} strokeWidth="5" fill="none" strokeLinecap="round" />
 
-      {/* ════════════════ CHIN CUP ════════════════ */}
-      {/* White rounded chin pad at the bottom inside the cage */}
+      {/* ══════════════════════════════════════════════
+          8. CHIN CUP — white pad inside bottom of cage
+         ══════════════════════════════════════════════ */}
       <Path
         d="
-          M 192 424
-          C 178 424, 168 434, 168 448
-          L 168 460
-          C 168 470, 178 476, 192 476
-          L 320 476
-          C 334 476, 344 470, 344 460
-          L 344 448
-          C 344 434, 334 424, 320 424 Z
+          M 192 430
+          C 176 430, 164 440, 164 454
+          L 164 462
+          C 164 474, 176 480, 194 480
+          L 318 480
+          C 336 480, 348 474, 348 462
+          L 348 454
+          C 348 440, 336 430, 320 430 Z
         "
         fill={shellColor}
         stroke={ink}
-        strokeWidth="5"
+        strokeWidth="6"
+        strokeLinejoin="round"
       />
 
       {/* Chin cup crease lines */}
-      <Path
-        d="M 200 442 C 224 436, 288 436, 312 442"
-        stroke={ink}
-        strokeWidth="3"
-        fill="none"
-        strokeLinecap="round"
-        opacity="0.25"
-      />
-      <Path
-        d="M 204 454 C 226 449, 286 449, 308 454"
-        stroke={ink}
-        strokeWidth="3"
-        fill="none"
-        strokeLinecap="round"
-        opacity="0.18"
-      />
+      <Path d="M 200 448 C 222 441, 290 441, 312 448"
+        stroke={ink} strokeWidth="3.5" fill="none" strokeLinecap="round" opacity="0.22" />
+      <Path d="M 204 462 C 224 457, 288 457, 308 462"
+        stroke={ink} strokeWidth="3" fill="none" strokeLinecap="round" opacity="0.15" />
 
-      {/* ════════════════ SHADOW ════════════════ */}
-      <Ellipse
-        cx="256" cy="496"
-        rx="140" ry="12"
-        fill="#000"
-        opacity="0.10"
-      />
+      {/* ══════════════════════════════════════════════
+          9. GROUND SHADOW
+         ══════════════════════════════════════════════ */}
+      <Ellipse cx="256" cy="498" rx="130" ry="10" fill="#000" opacity="0.10" />
 
     </Svg>
   );
