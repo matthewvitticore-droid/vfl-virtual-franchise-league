@@ -6,7 +6,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ColorPickerModal } from "@/components/ColorPickerModal";
-import { HelmetSVGWithLogo } from "@/components/HelmetSVG";
+import Helmet from "@/components/Helmet";
 import { UniformPreview } from "@/components/UniformPreview";
 import { useColors } from "@/hooks/useColors";
 import { useNFL } from "@/context/NFLContext";
@@ -178,15 +178,12 @@ export default function UniformScreen() {
 
         {/* Helmet visual preview */}
         <View style={[st.helmetPreviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <HelmetSVGWithLogo
-            helmetColor={u.helmetColor}
+          <Helmet
+            size={220}
+            shellColor={u.helmetColor}
             facemaskColor={u.helmetFacemaskColor  ?? "#888888"}
             chinstrapColor={u.helmetChinstrapColor ?? "#888888"}
-            logoColor={u.helmetLogoColor      ?? "#FFFFFF"}
-            visorColor={u.helmetVisorColor    ?? "#111827"}
-            abbreviation={abbr}
-            width={240}
-            height={Math.round(240 * 480 / 520)}
+            visorColor={u.helmetVisorColor        ?? "#111827"}
           />
         </View>
 
