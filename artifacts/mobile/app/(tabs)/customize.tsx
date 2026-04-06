@@ -72,11 +72,12 @@ export default function CustomizeTab() {
           <View style={st.kitRow}>
             {KITS.map(k => {
               const isActive = k.key === activeKit;
-              // Active: team primary (solid). Inactive: team secondary tint — always readable
-              const bgColor  = isActive ? theme.primary      : theme.secondary + "25";
-              const bdColor  = isActive ? theme.primary      : theme.secondary + "60";
-              const txtColor = isActive ? "#fff"             : theme.secondary;
-              const dotColor = isActive ? "#fff"             : theme.secondary;
+              // Active: solid team primary fill, white text.
+              // Inactive: app brand blue — always legible regardless of team colorway.
+              const bgColor  = isActive ? theme.primary : "#4F46E510";
+              const bdColor  = isActive ? theme.primary : "#4F46E555";
+              const txtColor = isActive ? "#fff"        : "#4F46E5";
+              const dotColor = isActive ? "#fff"        : "#4F46E5";
               return (
                 <TouchableOpacity
                   key={k.key}
