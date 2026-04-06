@@ -1385,11 +1385,67 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
 
   // ── Trades ─────────────────────────────────────────────────────────────────
 
-  const proposeTrade = useCallback(async (offer: Omit<TradeOffer,"id"|"status"|"aiValue"|"expiresWeek">) => {
-    if (!season) return;
-    const aiValue = evaluateTradeValue(offer, season);
-    const newOffer: TradeOffer = { ...offer, id: uid(), status: "pending", aiValue, expiresWeek: season.currentWeek + 2 };
-    await save({ ...season, tradeOffers: [...season.tradeOffers, newOffer] });
+  const proposeTrade = useCallback(async (offer: Omit<TradeOffer,"id"|"status"|"aiValue"|"expiresWeek">): Promise<{ aiDecision: "accepted"|"rejected"|"considering"; aiValue: number }> => {
+    if (!season) return { aiDecision: "rejected", aiValue: 0 };
+
+    const aiValue   = evaluateTradeValue(offer, season);
+    const offerId   = uid();
+
+    // AI decision — aiValue is from USER perspective:
+    //   positive = good for user = bad for AI → AI more likely to reject
+    //   negative = bad for user = good for AI → AI more likely to accept
+    const aiPov = -aiValue; // positive means AI benefits
+    const r = Math.random();
+    let aiDecision: "accepted" | "rejected" | "considering";
+    if      (aiPov > 50)  aiDecision = r < 0.92 ? "accepted"    : "considering";
+    else if (aiPov > 20)  aiDecision = r < 0.72 ? "accepted"    : (r < 0.88 ? "considering" : "rejected");
+    else if (aiPov > -5)  aiDecision = r < 0.38 ? "accepted"    : (r < 0.65 ? "considering" : "rejected");
+    else if (aiPov > -25) aiDecision = r < 0.15 ? "considering" : "rejected";
+    else                  aiDecision = r < 0.04 ? "considering" : "rejected";
+
+    const newOffer: TradeOffer = {
+      ...offer, id: offerId,
+      status:      aiDecision === "considering" ? "pending"  : aiDecision,
+      aiValue,
+      expiresWeek: season.currentWeek + 2,
+    };
+
+    if (aiDecision === "accepted") {
+      // Execute trade immediately
+      let newTeams = [...season.teams];
+      const fromIdx = newTeams.findIndex(t => t.id === offer.fromTeamId);
+      const toIdx   = newTeams.findIndex(t => t.id === offer.toTeamId);
+      if (fromIdx !== -1 && toIdx !== -1) {
+        const fromPlayers = newTeams[fromIdx].roster.filter(p => offer.offeringPlayerIds.includes(p.id));
+        const toPlayers   = newTeams[toIdx].roster.filter(p => offer.receivingPlayerIds.includes(p.id));
+        newTeams[fromIdx] = { ...newTeams[fromIdx], roster: [...newTeams[fromIdx].roster.filter(p => !offer.offeringPlayerIds.includes(p.id)), ...toPlayers] };
+        newTeams[toIdx]   = { ...newTeams[toIdx],   roster: [...newTeams[toIdx].roster.filter(p => !offer.receivingPlayerIds.includes(p.id)), ...fromPlayers] };
+        if (offer.offeringPickIds.length > 0 || offer.receivingPickIds.length > 0) {
+          newTeams = newTeams.map(t => ({
+            ...t,
+            draftPicks: t.draftPicks.map(pk => {
+              if (offer.offeringPickIds.includes(pk.id))   return { ...pk, ownedByTeamId: offer.toTeamId };
+              if (offer.receivingPickIds.includes(pk.id))  return { ...pk, ownedByTeamId: offer.fromTeamId };
+              return pk;
+            }),
+          }));
+        }
+        const fromAbb = newTeams[fromIdx].abbreviation;
+        const toAbb   = newTeams[toIdx].abbreviation;
+        const newsItem: Omit<NewsItem,"id"|"timestamp"> = {
+          headline: `TRADE: ${fromAbb} and ${toAbb} complete a deal`,
+          body: `${fromAbb} sends ${fromPlayers.map(p=>p.name).join(", ")||"picks"} to ${toAbb} for ${toPlayers.map(p=>p.name).join(", ")||"picks"}.`,
+          category: "trade", teamId: season.playerTeamId, week: season.currentWeek,
+        };
+        await save({ ...season, teams: newTeams, tradeOffers: [...season.tradeOffers, newOffer], news: [addNewsItem(newsItem), ...season.news].slice(0, 50) });
+      } else {
+        await save({ ...season, tradeOffers: [...season.tradeOffers, newOffer] });
+      }
+    } else {
+      await save({ ...season, tradeOffers: [...season.tradeOffers, newOffer] });
+    }
+
+    return { aiDecision, aiValue };
   }, [season, save]);
 
   const respondToTrade = useCallback(async (offerId: string, accept: boolean) => {

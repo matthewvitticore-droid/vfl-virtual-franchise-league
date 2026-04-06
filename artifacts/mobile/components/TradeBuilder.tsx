@@ -1,15 +1,15 @@
 import { Feather } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
 import {
-  Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { NFLPosition, Player, useNFL } from "@/context/NFLContext";
-import { DraftPick, NFLTeam, TradeOffer } from "@/context/types";
+import { DraftPick, TradeOffer } from "@/context/types";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const ALL_POS: NFLPosition[] = ["QB","RB","WR","TE","OL","DE","DT","LB","CB","S","K","P"];
+const ALL_POS: NFLPosition[] = ["QB","RB","WR","TE","OL","DE","DT","LB","CB","S"];
 const POS_COLOR: Record<NFLPosition, string> = {
   QB:"#E31837", RB:"#FB4F14", WR:"#FFC20E", TE:"#00B5E2", OL:"#8B949E",
   DE:"#3FB950", DT:"#26A69A", LB:"#1F6FEB", CB:"#6E40C9", S:"#9C27B0",
@@ -32,12 +32,20 @@ export function pickAccentForTeam(primary: string, secondary: string): string {
 
 type BuildTab = "myRoster" | "theirRoster" | "picks";
 
+// ─── AI result types ─────────────────────────────────────────────────────────
+type AIDecision = "accepted" | "rejected" | "considering";
+interface TradeResult {
+  decision: AIDecision;
+  partnerName: string;
+  aiValue: number;
+}
+
 // ─── Props ───────────────────────────────────────────────────────────────────
 interface TradeBuilderProps {
   visible: boolean;
   onClose: () => void;
   teamColor: string;
-  onPropose: (offer: Omit<TradeOffer, "id" | "status" | "aiValue" | "expiresWeek">) => void;
+  onPropose: (offer: Omit<TradeOffer, "id" | "status" | "aiValue" | "expiresWeek">) => Promise<{ aiDecision: AIDecision; aiValue: number }>;
 }
 
 // ─── TradeBuilder ─────────────────────────────────────────────────────────────
@@ -55,6 +63,8 @@ export function TradeBuilder({ visible, onClose, teamColor, onPropose }: TradeBu
   const [offeringPickIds,   setOfferingPickIds]   = useState<string[]>([]);
   const [receivingPickIds,  setReceivingPickIds]  = useState<string[]>([]);
   const [teamPickerOpen,    setTeamPickerOpen]    = useState(false);
+  const [sending,           setSending]           = useState(false);
+  const [tradeResult,       setTradeResult]       = useState<TradeResult | null>(null);
 
   const targetTeam   = season?.teams.find(t => t.id === targetTeamId) ?? null;
   const targetAccent = targetTeam
@@ -123,11 +133,12 @@ export function TradeBuilder({ visible, onClose, teamColor, onPropose }: TradeBu
     setOfferingPlayerIds([]); setReceivingPlayerIds([]);
     setOfferingPickIds([]);   setReceivingPickIds([]);
     setTargetTeamId(""); setBuildTab("myRoster"); setPosFilter("ALL");
+    setSending(false); setTradeResult(null);
   }
 
   function handleClose() { clearAll(); onClose(); }
 
-  function handleSend() {
+  async function handleSend() {
     if (!targetTeam || !myTeam || !season) {
       Alert.alert("Pick a partner", "Select a trade partner team first."); return;
     }
@@ -137,14 +148,23 @@ export function TradeBuilder({ visible, onClose, teamColor, onPropose }: TradeBu
     if (recvPlayers.length === 0 && recvPicks.length === 0) {
       Alert.alert("Nothing requested", "Select at least one player or pick from the other team."); return;
     }
-    onPropose({
-      fromTeamId: season.playerTeamId,
-      toTeamId: targetTeam.id,
-      offeringPlayerIds,  offeringPickIds,
-      receivingPlayerIds, receivingPickIds,
-    });
-    clearAll(); onClose();
-    Alert.alert("Trade Sent! 🤝", `Your offer has been sent to the ${targetTeam.city} ${targetTeam.name}.`);
+
+    setSending(true);
+    const partnerName = `${targetTeam.city} ${targetTeam.name}`;
+
+    try {
+      const result = await onPropose({
+        fromTeamId: season.playerTeamId,
+        toTeamId: targetTeam.id,
+        offeringPlayerIds, offeringPickIds,
+        receivingPlayerIds, receivingPickIds,
+      });
+      setTradeResult({ decision: result.aiDecision, partnerName, aiValue: result.aiValue });
+    } catch {
+      setTradeResult({ decision: "rejected", partnerName, aiValue: 0 });
+    } finally {
+      setSending(false);
+    }
   }
 
   function toggleOffer(id: string) {
@@ -381,12 +401,89 @@ export function TradeBuilder({ visible, onClose, teamColor, onPropose }: TradeBu
             <Feather name="x" size={16} color={colors.mutedForeground} />
             <Text style={[tb.footerBtnText, { color: colors.mutedForeground }]}>Clear</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleSend}
-            style={[tb.footerSend, { backgroundColor: teamColor }]}>
-            <Feather name="send" size={16} color="#fff" />
-            <Text style={[tb.footerBtnText, { color: "#fff" }]}>Send Offer</Text>
+          <TouchableOpacity onPress={handleSend} disabled={sending}
+            style={[tb.footerSend, { backgroundColor: teamColor, opacity: sending ? 0.7 : 1 }]}>
+            {sending
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Feather name="send" size={16} color="#fff" />}
+            <Text style={[tb.footerBtnText, { color: "#fff" }]}>{sending ? "Sending..." : "Send Offer"}</Text>
           </TouchableOpacity>
         </View>
+
+        {/* ── AI RESPONSE OVERLAY ── */}
+        {tradeResult && (
+          <View style={[StyleSheet.absoluteFillObject, tb.resultOverlay, { backgroundColor: "rgba(0,0,0,0.88)" }]}>
+            <View style={[tb.resultCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {/* Icon */}
+              <View style={[tb.resultIcon, {
+                backgroundColor: tradeResult.decision === "accepted" ? "#22C55E20"
+                               : tradeResult.decision === "rejected"  ? "#EF444420"
+                               : "#D9770620",
+              }]}>
+                <Feather
+                  name={tradeResult.decision === "accepted" ? "check-circle"
+                       : tradeResult.decision === "rejected" ? "x-circle" : "clock"}
+                  size={40}
+                  color={tradeResult.decision === "accepted" ? "#22C55E"
+                        : tradeResult.decision === "rejected"  ? "#EF4444" : "#D97706"}
+                />
+              </View>
+
+              {/* Title */}
+              <Text style={[tb.resultTitle, {
+                color: tradeResult.decision === "accepted" ? "#22C55E"
+                     : tradeResult.decision === "rejected"  ? "#EF4444" : "#D97706",
+              }]}>
+                {tradeResult.decision === "accepted" ? "Trade Accepted!"
+                 : tradeResult.decision === "rejected" ? "Trade Rejected"
+                 : "Considering..."}
+              </Text>
+
+              {/* Partner name */}
+              <Text style={[tb.resultPartner, { color: colors.foreground }]}>{tradeResult.partnerName}</Text>
+
+              {/* Flavor text */}
+              <Text style={[tb.resultFlavor, { color: colors.mutedForeground }]}>
+                {tradeResult.decision === "accepted"
+                  ? "✅ The deal is done. Players and picks have been transferred."
+                  : tradeResult.decision === "rejected"
+                  ? "❌ Their front office passed on your offer. Try sweetening the deal."
+                  : "⏳ They want time to evaluate the offer. Check Incoming Offers later."}
+              </Text>
+
+              {/* Value badge */}
+              {tradeResult.aiValue !== 0 && (
+                <View style={[tb.resultValueBadge, {
+                  backgroundColor: tradeResult.aiValue > 0 ? "#22C55E15" : "#EF444415",
+                  borderColor: tradeResult.aiValue > 0 ? "#22C55E40" : "#EF444440",
+                }]}>
+                  <Text style={[tb.resultValueText, { color: tradeResult.aiValue > 0 ? "#22C55E" : "#EF4444" }]}>
+                    Value differential: {tradeResult.aiValue > 0 ? "+" : ""}{tradeResult.aiValue} pts
+                  </Text>
+                </View>
+              )}
+
+              {/* Close button */}
+              <TouchableOpacity
+                onPress={tradeResult.decision === "accepted" ? handleClose : () => { setTradeResult(null); clearAll(); }}
+                style={[tb.resultCloseBtn, { backgroundColor: teamColor }]}>
+                <Text style={tb.resultCloseBtnText}>
+                  {tradeResult.decision === "accepted" ? "Done" : "Got It"}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Build another (on reject/considering) */}
+              {tradeResult.decision !== "accepted" && (
+                <TouchableOpacity onPress={() => { setTradeResult(null); }}
+                  style={[tb.resultAltBtn, { borderColor: colors.border }]}>
+                  <Text style={[tb.resultAltBtnText, { color: colors.mutedForeground }]}>
+                    Adjust Offer
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        )}
 
         {/* ── TEAM PICKER ── */}
         <Modal visible={teamPickerOpen} animationType="slide" transparent onRequestClose={() => setTeamPickerOpen(false)}>
@@ -563,6 +660,20 @@ const tb = StyleSheet.create({
   footerClear:  { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 14, borderWidth: 1, flex: 0.4 },
   footerSend:   { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 14, flex: 1 },
   footerBtnText:{ fontSize: 15, fontFamily: "Inter_700Bold" },
+
+  // AI result overlay
+  resultOverlay:    { alignItems: "center", justifyContent: "center", padding: 24 },
+  resultCard:       { width: "100%", maxWidth: 360, borderRadius: 20, borderWidth: 1, padding: 28, alignItems: "center", gap: 12 },
+  resultIcon:       { width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center", marginBottom: 4 },
+  resultTitle:      { fontSize: 24, fontFamily: "Inter_700Bold", textAlign: "center" },
+  resultPartner:    { fontSize: 15, fontFamily: "Inter_600SemiBold", textAlign: "center" },
+  resultFlavor:     { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20, marginTop: 4 },
+  resultValueBadge: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 6, marginTop: 4 },
+  resultValueText:  { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  resultCloseBtn:   { width: "100%", paddingVertical: 14, borderRadius: 14, alignItems: "center", marginTop: 8 },
+  resultCloseBtnText:{ fontSize: 16, fontFamily: "Inter_700Bold", color: "#fff" },
+  resultAltBtn:     { width: "100%", paddingVertical: 12, borderRadius: 14, alignItems: "center", borderWidth: 1 },
+  resultAltBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
 
   pickerSheet:  { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, maxHeight: "88%" },
   pickerHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#ffffff25", alignSelf: "center", marginBottom: 8 },

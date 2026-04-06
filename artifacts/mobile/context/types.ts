@@ -522,7 +522,7 @@ export interface NFLContextValue {
   simPicksUntilUserTurn: () => Promise<void>;
   unlockScouting: (prospectId: string) => Promise<void>;
   // Trades
-  proposeTrade: (offer: Omit<TradeOffer, "id" | "status" | "aiValue" | "expiresWeek">) => Promise<void>;
+  proposeTrade: (offer: Omit<TradeOffer, "id" | "status" | "aiValue" | "expiresWeek">) => Promise<{ aiDecision: "accepted" | "rejected" | "considering"; aiValue: number }>;
   respondToTrade: (offerId: string, accept: boolean) => Promise<void>;
   // Offseason
   advancePhase: () => Promise<void>;

@@ -23,6 +23,7 @@ type FASortKey = "overall" | "age" | "speed" | "acceleration" | "agility" | "faI
 type TradeSortKey = "overall" | "age" | "speed" | "acceleration" | "agility" | "yearsExperience" | "salary";
 
 const ALL_POS: NFLPosition[] = ["QB","RB","WR","TE","OL","DE","DT","LB","CB","S","K","P"];
+const TRADE_POS: NFLPosition[] = ["QB","RB","WR","TE","OL","DE","DT","LB","CB","S"];
 const POS_COLOR: Record<NFLPosition, string> = {
   QB:"#E31837", RB:"#FB4F14", WR:"#FFC20E", TE:"#00B5E2", OL:"#8B949E",
   DE:"#3FB950", DT:"#26A69A", LB:"#1F6FEB", CB:"#6E40C9", S:"#9C27B0",
@@ -211,7 +212,9 @@ export default function FrontOfficeScreen() {
     const TRADE_LOW_BETTER: TradeSortKey[] = ["age", "salary", "yearsExperience"];
     const all: Array<Player & { teamId: string; teamAbbr: string; teamColor: string }> =
       season.teams.flatMap(t =>
-        t.roster.map(p => ({ ...p, teamId: t.id, teamAbbr: t.abbreviation, teamColor: t.primaryColor }))
+        t.roster
+          .filter(p => p.position !== "K" && p.position !== "P")
+          .map(p => ({ ...p, teamId: t.id, teamAbbr: t.abbreviation, teamColor: t.primaryColor }))
       );
     const filtered = tradePosFilter === "ALL" ? all : all.filter(p => p.position === tradePosFilter);
     return filtered.sort((a, b) => {
@@ -534,7 +537,7 @@ export default function FrontOfficeScreen() {
         visible={tradeBuilderOpen}
         onClose={() => setTradeBuilderOpen(false)}
         teamColor={teamColor}
-        onPropose={(offer) => proposeTrade(offer)}
+        onPropose={proposeTrade}
       />
 
       {/* ── TRADES ─────────────────────────────────────────────────────────── */}
@@ -558,7 +561,7 @@ export default function FrontOfficeScreen() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false}
             style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}
             contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 10, gap: 6 }}>
-            {(["ALL", ...ALL_POS] as (NFLPosition | "ALL")[]).map(pos => (
+            {(["ALL", ...TRADE_POS] as (NFLPosition | "ALL")[]).map(pos => (
               <TouchableOpacity key={pos} onPress={() => setTradePosFilter(pos)}
                 style={[st.posPill, {
                   backgroundColor: tradePosFilter === pos
