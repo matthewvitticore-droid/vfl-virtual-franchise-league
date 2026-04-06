@@ -45,7 +45,7 @@ export default function HomeScreen() {
     season, isLoading, isSyncing, syncError,
     teamCustomization,
     getPlayerTeam, getWeekGames,
-    simulateWeek, simulateSeason, advancePhase,
+    simulateWeek, simulateSeason, advancePhase, toggleCoGMMode,
   } = useNFL();
 
   const [simulating, setSimulating] = useState(false);
@@ -487,19 +487,42 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* ── Context nav tiles ─────────────────────────────────────────── */}
-        <View style={[st.tilesSection, { paddingHorizontal: 14 }]}>
-          <ContextTiles
-            phase={currentPhase}
+        {/* ── Home nav panels ──────────────────────────────────────────── */}
+        <View style={{ paddingHorizontal: 14, gap: 10, paddingBottom: 24 }}>
+          {/* 1. Front Office */}
+          <TouchableOpacity
+            onPress={() => goTo("freeAgency")}
+            activeOpacity={0.82}
+            style={[st.homePanel, { backgroundColor: colors.card, borderColor: theme.primary + "40" }]}
+          >
+            <View style={[st.homePanelIcon, { backgroundColor: theme.primary + "22" }]}>
+              <Feather name="briefcase" size={20} color={theme.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[st.homePanelTitle, { color: colors.foreground }]}>Front Office</Text>
+              <Text style={[st.homePanelSub, { color: colors.mutedForeground }]}>Trades · Free Agency · Draft</Text>
+            </View>
+            <Feather name="chevron-right" size={18} color={theme.primary} />
+          </TouchableOpacity>
+
+          {/* 2. Current Draft Class */}
+          <DraftClassPanel
+            season={season}
+            team={team}
             primary={theme.primary}
             secondary={theme.secondary}
             colors={colors}
-            onPress={(dest) => {
-              if (dest === "roster")    router.push("/(tabs)/roster" as any);
-              else if (dest === "schedule") router.push("/(tabs)/schedule" as any);
-              else if (dest === "standings") router.push("/(tabs)/standings" as any);
-              else goTo(dest as any);
-            }}
+            onPress={() => goTo("draft")}
+          />
+
+          {/* 3. Franchise Type */}
+          <FranchiseTypePanel
+            role={role}
+            coGMMode={season?.coGMMode ?? false}
+            primary={theme.primary}
+            secondary={theme.secondary}
+            colors={colors}
+            onToggleCoGM={toggleCoGMMode}
           />
         </View>
 
@@ -538,40 +561,125 @@ function PhaseStrip({ phase, colors, primary, secondary }:
   );
 }
 
-// ─── Context-aware nav tiles ──────────────────────────────────────────────────
-function ContextTiles({ phase, primary, secondary, colors, onPress }:
-  { phase: Phase; primary: string; secondary: string; colors: any; onPress: (dest: string) => void }) {
+// ─── Draft Class Panel ────────────────────────────────────────────────────────
+const DC_POS_COL: Record<string, string> = {
+  QB:"#E31837", RB:"#FB4F14", WR:"#FFC20E", TE:"#00B5E2", OL:"#8B949E",
+  DE:"#3FB950", DT:"#26A69A", LB:"#1F6FEB", CB:"#6E40C9",  S:"#9C27B0",
+  K:"#FF7043",  P:"#795548",
+};
+function fmtHt(inches: number) {
+  return `${Math.floor(inches / 12)}'${inches % 12}"`;
+}
 
-  type TileDef = { icon: string; label: string; dest: string; highlight?: boolean };
+function DraftClassPanel({ season, team, primary, secondary, colors, onPress }:
+  { season: any; team: any; primary: string; secondary: string; colors: any; onPress: () => void }) {
 
-  const allTiles: TileDef[] = [
-    { icon: "users",       label: "Depth Chart",  dest: "roster",      highlight: false },
-    { icon: "user-plus",   label: "Free Agency",  dest: "freeAgency",  highlight: phase === "freeAgency" },
-    { icon: "award",       label: "Draft Room",   dest: "draft",       highlight: phase === "draft" },
-    { icon: "git-merge",   label: "Trades",       dest: "trades",      highlight: false },
-    { icon: "calendar",    label: "Schedule",     dest: "schedule",    highlight: false },
-    { icon: "bar-chart-2", label: "Standings",    dest: "standings",   highlight: false },
-  ];
+  const rookies: any[] = (team?.roster ?? [])
+    .filter((p: any) => p.draftRound !== undefined)
+    .sort((a: any, b: any) => (a.draftPick ?? 999) - (b.draftPick ?? 999));
+
+  const prospects: any[] = season?.draftProspects ?? [];
 
   return (
-    <View style={st.tileGrid}>
-      {allTiles.map(t => {
-        const hl = t.highlight;
+    <View style={[st.homePanel, { backgroundColor: colors.card, borderColor: secondary + "40",
+      flexDirection: "column", padding: 0, overflow: "hidden" }]}>
+      {/* Header row */}
+      <TouchableOpacity onPress={onPress} activeOpacity={0.82}
+        style={{ flexDirection: "row", alignItems: "center", padding: 14, gap: 10 }}>
+        <View style={[st.homePanelIcon, { backgroundColor: secondary + "22" }]}>
+          <Feather name="users" size={20} color={secondary} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[st.homePanelTitle, { color: colors.foreground }]}>Draft Class</Text>
+          <Text style={[st.homePanelSub, { color: colors.mutedForeground }]}>
+            {rookies.length > 0 ? `${rookies.length} rookies · ${season?.year ? season.year + 1 : ""} Draft` : "No picks yet — draft starts soon"}
+          </Text>
+        </View>
+        <Feather name="chevron-right" size={18} color={secondary} />
+      </TouchableOpacity>
+
+      {/* Rookie rows */}
+      {rookies.map((p: any, i: number) => {
+        const ovrColor = p.overall >= 80 ? "#FFD700" : p.overall >= 70 ? "#3FB950" : p.overall >= 60 ? "#fff" : "#8B949E";
+        const pc = DC_POS_COL[p.position] ?? primary;
+        const prospect = prospects.find((pr: any) => pr.name === p.name);
+        const htIn  = prospect?.combine?.height;
+        const wt    = prospect?.combine?.weight;
+        const htStr = htIn ? fmtHt(htIn) : "—";
+        const wtStr = wt   ? `${wt} lbs` : "—";
         return (
-          <TouchableOpacity key={t.label} onPress={() => onPress(t.dest)} activeOpacity={0.8}
-            style={[st.tile,
-              hl
-                ? { backgroundColor: secondary + "20", borderColor: secondary + "70" }
-                : { backgroundColor: primary + "10", borderColor: primary + "35" }
-            ]}>
-            <View style={[st.tileIcon, { backgroundColor: hl ? secondary + "25" : primary + "20" }]}>
-              <Feather name={t.icon as any} size={17} color={hl ? secondary : primary} />
+          <View key={p.id} style={[st.dcRow, { borderTopColor: colors.border,
+            backgroundColor: i % 2 === 0 ? "transparent" : colors.background + "80" }]}>
+            {/* Rd badge */}
+            <View style={[st.dcRdBadge, { backgroundColor: secondary + "18", borderColor: secondary + "45" }]}>
+              <Text style={{ fontSize: 9,  fontFamily: "Inter_700Bold", color: secondary, lineHeight: 11 }}>R{p.draftRound}</Text>
+              <Text style={{ fontSize: 7.5, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground, lineHeight: 10 }}>#{p.draftPick}</Text>
             </View>
-            <Text style={[st.tileLbl, { color: colors.foreground }]} numberOfLines={1}>{t.label}</Text>
-            {hl && <View style={[st.tilePulse, { backgroundColor: secondary }]} />}
-          </TouchableOpacity>
+            {/* Pos pill */}
+            <View style={[st.dcPosPill, { backgroundColor: pc + "20", borderColor: pc + "50" }]}>
+              <Text style={{ fontSize: 9, fontFamily: "Inter_700Bold", color: pc }}>{p.position}</Text>
+            </View>
+            {/* Name */}
+            <Text style={{ flex: 1, fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.foreground }} numberOfLines={1}>{p.name}</Text>
+            {/* HT / WT */}
+            <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginRight: 8 }}>
+              {htStr} · {wtStr}
+            </Text>
+            {/* OVR */}
+            <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5,
+              borderWidth: 1, borderColor: ovrColor + "50", backgroundColor: ovrColor + "18" }}>
+              <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: ovrColor }}>{p.overall}</Text>
+            </View>
+          </View>
         );
       })}
+    </View>
+  );
+}
+
+// ─── Franchise Type Panel ─────────────────────────────────────────────────────
+function FranchiseTypePanel({ role, coGMMode, primary, secondary, colors, onToggleCoGM }:
+  { role: string; coGMMode: boolean; primary: string; secondary: string; colors: any; onToggleCoGM: () => void }) {
+
+  const modeLabel = coGMMode ? "Co-GM" : "Solo GM";
+  const modeColor = coGMMode ? secondary : primary;
+  const modeIcon  = coGMMode ? "users"  : "user";
+  const roleColor = role === "GM" ? "#FFD700" : role === "Coach" ? "#3FB950" : "#8B949E";
+
+  return (
+    <View style={[st.homePanel, { backgroundColor: colors.card, borderColor: primary + "40",
+      flexDirection: "column", padding: 0, overflow: "hidden" }]}>
+      {/* Header */}
+      <View style={{ flexDirection: "row", alignItems: "center", padding: 14, gap: 10 }}>
+        <View style={[st.homePanelIcon, { backgroundColor: primary + "22" }]}>
+          <Feather name={modeIcon as any} size={20} color={primary} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[st.homePanelTitle, { color: colors.foreground }]}>Franchise Type</Text>
+          <Text style={[st.homePanelSub, { color: colors.mutedForeground }]}>
+            {modeLabel} · <Text style={{ color: roleColor }}>{role}</Text>
+          </Text>
+        </View>
+        {/* Mode badge */}
+        <View style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
+          backgroundColor: modeColor + "20", borderWidth: 1, borderColor: modeColor + "50" }}>
+          <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: modeColor }}>{modeLabel}</Text>
+        </View>
+      </View>
+      {/* Divider + toggle row */}
+      <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border,
+        flexDirection: "row", gap: 8, padding: 12 }}>
+        <TouchableOpacity onPress={onToggleCoGM} activeOpacity={0.82}
+          style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+            paddingVertical: 9, borderRadius: 9, borderWidth: 1,
+            backgroundColor: coGMMode ? secondary + "20" : primary + "15",
+            borderColor: coGMMode ? secondary + "60" : primary + "40" }}>
+          <Feather name={coGMMode ? "user" : "users"} size={13} color={coGMMode ? secondary : primary} />
+          <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: coGMMode ? secondary : primary }}>
+            {coGMMode ? "Switch to Solo" : "Enable Co-GM"}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -749,12 +857,18 @@ const st = StyleSheet.create({
   rookieOvrBadge:    { borderRadius:6, borderWidth:1, paddingHorizontal:7, paddingVertical:3 },
   rookieOvr:         { fontSize:12, fontFamily:"Inter_700Bold" },
 
-  // Nav tiles
-  tilesSection: { gap: 8, marginTop: 4 },
-  tileGrid:  { flexDirection:"row", flexWrap:"wrap", gap:8 },
-  tile:      { width:"31%", borderRadius:12, borderWidth:1, padding:10, gap:6,
-               alignItems:"flex-start", position:"relative", overflow:"hidden" },
-  tileIcon:  { width:34, height:34, borderRadius:8, alignItems:"center", justifyContent:"center" },
-  tileLbl:   { fontSize:11, fontFamily:"Inter_700Bold" },
-  tilePulse: { position:"absolute", top:8, right:8, width:6, height:6, borderRadius:3 },
+  // Home nav panels
+  homePanel:      { flexDirection:"row", alignItems:"center", gap:12,
+                    padding:14, borderRadius:14, borderWidth:1.5 },
+  homePanelIcon:  { width:44, height:44, borderRadius:12,
+                    alignItems:"center", justifyContent:"center" },
+  homePanelTitle: { fontSize:15, fontFamily:"Inter_700Bold" },
+  homePanelSub:   { fontSize:12, fontFamily:"Inter_400Regular", marginTop:2 },
+
+  // Draft class rows
+  dcRow:      { flexDirection:"row", alignItems:"center", gap:8,
+                paddingHorizontal:12, paddingVertical:8, borderTopWidth:StyleSheet.hairlineWidth },
+  dcRdBadge:  { borderRadius:6, borderWidth:1, paddingHorizontal:6, paddingVertical:3,
+                alignItems:"center", minWidth:32 },
+  dcPosPill:  { borderRadius:5, borderWidth:1, paddingHorizontal:6, paddingVertical:3 },
 });
