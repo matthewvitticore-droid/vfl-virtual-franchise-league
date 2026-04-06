@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
-import Helmet from "@/components/Helmet";
+import { HelmetSVGWithLogo } from "@/components/HelmetSVG";
 
 export function VFLSplash() {
   const fade  = useRef(new Animated.Value(0)).current;
@@ -24,16 +24,16 @@ export function VFLSplash() {
       {/* Radial glow behind helmet */}
       <View style={st.glow} />
 
-      {/* Helmet with +VFL on visor */}
+      {/* Helmet */}
       <Animated.View style={{ opacity: fade, transform: [{ scale }] }}>
-        <Helmet
-          size={300}
+        <HelmetSVGWithLogo
+          width={300}
           shellColor="#ECEEF2"
           facemaskColor="#C0C6D0"
           visorColor="#080C14"
-          stripeColor="#4F46E5"
           chinstrapColor="#ECEEF2"
-          visorText="+VFL"
+          abbreviation="VFL"
+          logoColor="#4F46E5"
         />
       </Animated.View>
 

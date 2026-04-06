@@ -98,14 +98,6 @@ const FM_TOP =
   "C 400 82 378 64 350 58 " +
   "C 305 50 262 54 255 66 Z";
 
-// Horizontal bar 1 (across the mid-face area, below the visor)
-const FM_BAR1 =
-  "M 244 256 L 410 256 L 410 268 L 244 268 Z";
-
-// Centre vertical bar (from top to bottom chin guard)
-const FM_CENTER =
-  "M 322 56 L 330 56 L 332 390 L 324 390 Z";
-
 // Bottom chin guard — the flat horizontal tab at the bottom of the cage
 const FM_CHIN =
   "M 244 382 " +
@@ -175,11 +167,6 @@ export function HelmetSVGWithLogo({
             strokeLinecap="round"
           />
 
-          {/* Ear hole (left side of dome) */}
-          <Ellipse cx="76" cy="302" rx="18" ry="22"
-            fill={sh} stroke="#111" strokeWidth="4" />
-          <Ellipse cx="76" cy="302" rx="10" ry="13" fill="#0d0d18" />
-
           {/* Back vent dot */}
           <Circle cx="52" cy="210" r="7"
             fill={sh} stroke="#111" strokeWidth="3" />
@@ -238,12 +225,6 @@ export function HelmetSVGWithLogo({
 
           {/* Right outer frame */}
           <Path d={FM_RAIL_R} />
-
-          {/* Horizontal bar */}
-          <Path d={FM_BAR1} />
-
-          {/* Centre vertical bar */}
-          <Path d={FM_CENTER} />
 
           {/* Bottom chin guard */}
           <Path d={FM_CHIN} />
