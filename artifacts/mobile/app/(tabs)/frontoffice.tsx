@@ -398,32 +398,36 @@ export default function FrontOfficeScreen() {
           {/* Draft status banner */}
           {ds && (
             <View style={[st.draftBanner, { backgroundColor: ds.isUserTurn ? teamColor + "25" : colors.card, borderBottomColor: colors.border }]}>
-              <View style={{ flex: 1 }}>
-                <Text style={[st.draftBannerTitle, { color: ds.isUserTurn ? teamColor : colors.foreground }]}>
-                  {ds.isComplete ? "Draft Complete" : ds.isUserTurn ? "YOUR PICK — ON THE CLOCK" : `Round ${ds.currentRound}, Pick ${ds.currentPickInRound}`}
-                </Text>
-                <Text style={[st.draftBannerSub, { color: colors.mutedForeground }]}>
-                  {ds.isComplete ? `${ds.completedPicks.length} picks made` : ds.isUserTurn ? `Overall pick #${ds.overallPick}` : `${season?.teams.find(t=>t.id===ds.currentTeamId)?.city ?? "Team"} on the clock`}
-                </Text>
+              {/* Row 1: title + subtitle */}
+              <View style={{ flexDirection:"row", alignItems:"center" }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[st.draftBannerTitle, { color: ds.isUserTurn ? teamColor : colors.foreground }]}>
+                    {ds.isComplete ? "Draft Complete" : ds.isUserTurn ? "YOUR PICK — ON THE CLOCK" : `Round ${ds.currentRound}, Pick ${ds.currentPickInRound}`}
+                  </Text>
+                  <Text style={[st.draftBannerSub, { color: colors.mutedForeground }]}>
+                    {ds.isComplete ? `${ds.completedPicks.length} picks made` : ds.isUserTurn ? `Overall pick #${ds.overallPick}` : `${season?.teams.find(t=>t.id===ds.currentTeamId)?.city ?? "Team"} on the clock`}
+                  </Text>
+                </View>
               </View>
+              {/* Row 2: sim buttons — only when draft is active */}
               {!ds.isComplete && (
-                <View style={{ flexDirection:"row", gap:6, flexWrap:"wrap", justifyContent:"flex-end" }}>
+                <View style={{ flexDirection:"row", gap:8, marginTop:8 }}>
                   {!ds.isUserTurn && (
                     <TouchableOpacity onPress={handleSimulateAllAI}
-                      style={[st.simPickBtn, { backgroundColor: colors.secondary, borderWidth:1, borderColor: colors.border }]}>
+                      style={[st.simPickBtn, { flex:1, backgroundColor: colors.secondary, borderWidth:1, borderColor: colors.border }]}>
                       <Feather name="chevron-right" size={13} color={colors.foreground} />
                       <Text style={[st.simPickBtnText, { color: colors.foreground }]}>1 Pick</Text>
                     </TouchableOpacity>
                   )}
                   {!ds.isUserTurn && (
                     <TouchableOpacity onPress={handleSimToMyPick} disabled={isSimming}
-                      style={[st.simPickBtn, { backgroundColor: isSimming ? colors.secondary : teamColor, opacity: isSimming ? 0.6 : 1 }]}>
+                      style={[st.simPickBtn, { flex:1, backgroundColor: isSimming ? colors.secondary : teamColor, opacity: isSimming ? 0.6 : 1 }]}>
                       <Feather name="chevrons-right" size={13} color="#fff" />
                       <Text style={[st.simPickBtnText, { color:"#fff" }]}>{isSimming ? "Simming…" : "My Pick"}</Text>
                     </TouchableOpacity>
                   )}
                   <TouchableOpacity onPress={handleSimRemainder} disabled={isSimRemainder}
-                    style={[st.simPickBtn, { backgroundColor: "#8B0000", opacity: isSimRemainder ? 0.6 : 1, borderWidth:1, borderColor:"#FF000060" }]}>
+                    style={[st.simPickBtn, { flex:1, backgroundColor: "#7A0000", opacity: isSimRemainder ? 0.6 : 1, borderWidth:1, borderColor:"#CC000060" }]}>
                     {isSimRemainder
                       ? <Feather name="loader" size={13} color="#fff" />
                       : <Feather name="zap" size={13} color="#fff" />}
@@ -1675,7 +1679,7 @@ const st = StyleSheet.create({
   draftBtn:         { flexDirection:"row", alignItems:"center", justifyContent:"center", gap:6, paddingVertical:10, borderRadius:10 },
   draftBtnText:     { fontSize:14, fontFamily:"Inter_700Bold", color:"#fff" },
   // Draft banner
-  draftBanner:      { flexDirection:"row", alignItems:"center", padding:12, borderBottomWidth:1, gap:10 },
+  draftBanner:      { flexDirection:"column", padding:12, borderBottomWidth:1 },
   draftBannerTitle: { fontSize:14, fontFamily:"Inter_700Bold" },
   draftBannerSub:   { fontSize:12, fontFamily:"Inter_400Regular", marginTop:2 },
   simPickBtn:       { flexDirection:"row", alignItems:"center", gap:5, paddingHorizontal:12, paddingVertical:7, borderRadius:8 },
