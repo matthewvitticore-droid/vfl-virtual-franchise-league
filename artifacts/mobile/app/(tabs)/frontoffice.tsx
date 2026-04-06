@@ -383,9 +383,6 @@ export default function FrontOfficeScreen() {
                 )}
               </View>
 
-              {/* Positions of Need grid */}
-              {team && <RosterNeedGrid team={team} colors={colors} teamColor={teamColor} />}
-
               {/* Tip bar */}
               <View style={[st.boardTip, { backgroundColor: teamColor + "12", borderColor: teamColor + "30" }]}>
                 <Feather name="info" size={11} color={teamColor} />
