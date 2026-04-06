@@ -44,7 +44,7 @@ export default function HomeScreen() {
   const {
     season, isLoading, isSyncing, syncError,
     teamCustomization,
-    getPlayerTeam, getWeekGames, getStandings,
+    getPlayerTeam, getWeekGames,
     simulateWeek, simulateSeason, advancePhase,
   } = useNFL();
 
@@ -67,8 +67,17 @@ export default function HomeScreen() {
   const wPct    = (wins / Math.max(1, wins + losses)).toFixed(3).replace("0.", ".");
   const roster  = team?.roster ?? [];
 
-  const standings = getStandings(team?.conference);
-  const myRank    = standings.findIndex(t => t.id === season?.playerTeamId) + 1;
+  // Team ratings derived from roster
+  const offPos    = ["QB","RB","WR","TE","OL"];
+  const defPos    = ["DE","DT","LB","CB","S"];
+  const ovrRating = roster.length > 0
+    ? Math.round(roster.reduce((s, p) => s + p.overall, 0) / roster.length) : 0;
+  const offRoster = roster.filter(p => offPos.includes(p.position));
+  const defRoster = roster.filter(p => defPos.includes(p.position));
+  const offRating = offRoster.length > 0
+    ? Math.round(offRoster.reduce((s, p) => s + p.overall, 0) / offRoster.length) : 0;
+  const defRating = defRoster.length > 0
+    ? Math.round(defRoster.reduce((s, p) => s + p.overall, 0) / defRoster.length) : 0;
 
   // Sim state
   const currentPhase     = season?.phase ?? "regular";
@@ -172,12 +181,18 @@ export default function HomeScreen() {
                   {team?.conference ?? ""} {team?.division ?? ""}
                 </Text>
               </View>
-              {myRank > 0 && (
-                <View style={st.heroRank}>
-                  <Text style={[st.heroRankLbl, { color: colors.mutedForeground }]}>CONF RANK</Text>
-                  <Text style={[st.heroRankNum, {
-                    color: myRank <= 3 ? colors.nflGold : myRank <= 7 ? colors.success : colors.foreground,
-                  }]}>#{myRank}</Text>
+              {ovrRating > 0 && (
+                <View style={st.ratingsStack}>
+                  {[
+                    { lbl: "OVR", val: ovrRating },
+                    { lbl: "OFF", val: offRating },
+                    { lbl: "DEF", val: defRating },
+                  ].map(r => (
+                    <View key={r.lbl} style={st.ratingRow}>
+                      <Text style={[st.ratingLbl, { color: colors.mutedForeground }]}>{r.lbl}</Text>
+                      <Text style={[st.ratingVal, { color: theme.secondary }]}>{r.val}</Text>
+                    </View>
+                  ))}
                 </View>
               )}
             </View>
@@ -329,9 +344,10 @@ const st = StyleSheet.create({
   heroPill:  { alignSelf:"flex-start", paddingHorizontal:8, paddingVertical:3,
                borderRadius:6, borderWidth:1, marginTop:2 },
   heroPillTxt:{ fontSize:10, fontFamily:"Inter_600SemiBold" },
-  heroRank:  { marginTop:6 },
-  heroRankLbl:{ fontSize:9, fontFamily:"Inter_500Medium", letterSpacing:1 },
-  heroRankNum:{ fontSize:32, fontFamily:"Inter_700Bold", lineHeight:36 },
+  ratingsStack: { marginTop: 8, gap: 2 },
+  ratingRow:    { flexDirection: "row", alignItems: "baseline", gap: 6 },
+  ratingLbl:    { fontSize: 9, fontFamily: "Inter_700Bold", letterSpacing: 1.2, width: 28 },
+  ratingVal:    { fontSize: 20, fontFamily: "Inter_700Bold", letterSpacing: -0.5, lineHeight: 24 },
 
   // Kit toggle
   kitRow:    { flexDirection:"row", alignItems:"center", borderTopWidth:1, borderBottomWidth:1,
