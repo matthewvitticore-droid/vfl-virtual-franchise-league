@@ -207,14 +207,17 @@ function genPosRatingsFromProspect(
   spd: number, str: number, agi: number, acc: number,
 ): PosRatings {
   const base = genPosRatings(pos, overall, false, false);
-  // Weight: combine-derived rating gets 55% weight vs technique (grade-based) 45%
+  // Skill blend: combine gets 55% weight (technique matters too)
   const ab = (combine: number, technique: number, w = 0.55) =>
     Math.round(clamp(combine * w + technique * (1 - w), 45, 99));
+  // Athletic blend: combine is ground truth for pure measurables — 85% weight
+  const ath = (combine: number, technique: number) =>
+    Math.round(clamp(combine * 0.85 + technique * 0.15, 45, 99));
   return {
     ...base,
-    // Universal athletic overrides
-    agility:      ab(agi, base.agility),
-    acceleration: ab(acc, base.acceleration),
+    // Universal athletic overrides — combine dominates for measurables
+    agility:      ath(agi, base.agility),
+    acceleration: ath(acc, base.acceleration),
     // Position-specific athletic blends
     mobility: ["QB","WR","RB","CB","S"].includes(pos) ? ab(spd, base.mobility, 0.4) : base.mobility,
     manCoverage:  pos === "CB" ? ab(spd, base.manCoverage, 0.5) : base.manCoverage,
