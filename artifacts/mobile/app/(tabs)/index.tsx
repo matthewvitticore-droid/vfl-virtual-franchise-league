@@ -4,7 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator, Alert, Animated, Platform, ScrollView,
+  ActivityIndicator, Alert, Animated, Image, Platform, ScrollView,
   StyleSheet, Text, TouchableOpacity, View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -117,104 +117,101 @@ export default function HomeScreen() {
   const losses = team?.losses ?? 0;
   const wPct = (wins / Math.max(1, wins + losses)).toFixed(3).replace("0.", ".");
 
+  const tickerVisible = !!(season?.news && season.news.length > 0);
+  const helmetColor = uniformHelmetColor ?? teamColor;
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Team color full-page ambient wash */}
-      <LinearGradient
-        colors={[teamColor + "38", teamColor + "18", teamColor + "06", "transparent"]}
-        locations={[0, 0.3, 0.6, 1]}
-        style={{ position: "absolute", top: 0, left: 0, right: 0, height: 520, zIndex: 0 }}
-        pointerEvents="none"
-      />
-      {/* Uniform accent overlay (if customized) */}
-      {featuredUniform && uniformBgColor !== teamColor && (
-        <LinearGradient
-          colors={[uniformBgColor + "18", "transparent"]}
-          locations={[0, 1]}
-          style={{ position: "absolute", top: 0, left: 0, right: 0, height: 260, zIndex: 0 }}
-          pointerEvents="none"
-        />
-      )}
-      {/* Right-edge color glow */}
-      <LinearGradient
-        colors={["transparent", teamColor + "14", "transparent"]}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-        style={{ position: "absolute", top: 80, right: 0, width: 120, height: 400, zIndex: 0 }}
-        pointerEvents="none"
-      />
-      {/* News Ticker */}
-      {season?.news && season.news.length > 0 && (
-        <View style={[st.ticker, { backgroundColor: teamColor, top: topPad }]}>
+      {/* News Ticker — fixed above everything */}
+      {tickerVisible && (
+        <View style={[st.ticker, { backgroundColor: teamColor, top: topPad, zIndex: 30 }]}>
           <Feather name="radio" size={10} color="#fff" style={{ marginRight: 6, marginLeft: 10 }} />
           <View style={{ flex: 1, overflow: "hidden" }}>
             <Animated.Text style={[st.tickerText, { transform: [{ translateX: tickerX }] }]} numberOfLines={1}>
-              {newsTicker(season.news)}
+              {newsTicker(season!.news)}
             </Animated.Text>
           </View>
-          <View style={[st.liveTag, { backgroundColor: "#fff22" }]}>
+          <View style={[st.liveTag, { backgroundColor: "#ffffff22" }]}>
             <Text style={{ fontSize: 9, fontFamily: "Inter_700Bold", color: teamColor, letterSpacing: 1 }}>LIVE</Text>
           </View>
         </View>
       )}
 
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={[st.content, { paddingTop: topPad + 42, paddingBottom: Platform.OS === "web" ? 100 : 90 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View style={st.headerRow}>
-          <View style={st.headerLeft}>
-            <VFLLogo size="sm" />
-            <View>
-              <Text style={[st.seasonLabel, { color: teamColor + "cc" }]}>VFL {season?.year} SEASON</Text>
-              <Text style={[st.weekLabel, { color: colors.foreground }]}>WEEK <Text style={{ color: teamColor }}>{season?.currentWeek}</Text></Text>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? 100 : 90 }} showsVerticalScrollIndicator={false}>
+
+        {/* ── Helmet Hero ────────────────────────────────────────────────── */}
+        <View style={st.helmetHero}>
+          {/* Deep team-color gradient background */}
+          <LinearGradient
+            colors={[teamColor + "80", teamColor + "50", teamColor + "18", "transparent"]}
+            locations={[0, 0.35, 0.7, 1]}
+            style={StyleSheet.absoluteFill}
+          />
+          {/* Helmet image — tinted to team helmet color */}
+          <Image
+            source={require("@/assets/helmet_base.png")}
+            style={st.helmetImg}
+            tintColor={helmetColor}
+            resizeMode="contain"
+          />
+          {/* Bottom fade so team info blends into content */}
+          <LinearGradient
+            colors={["transparent", colors.background + "cc", colors.background]}
+            locations={[0.55, 0.82, 1]}
+            style={[StyleSheet.absoluteFill]}
+            pointerEvents="none"
+          />
+
+          {/* Top bar — VFL logo, week label, user icon */}
+          <View style={[st.helmetTopBar, { paddingTop: topPad + (tickerVisible ? 34 : 10) }]}>
+            <View style={st.headerLeft}>
+              <VFLLogo size="sm" />
+              <View>
+                <Text style={[st.seasonLabel, { color: "#ffffffaa" }]}>VFL {season?.year} SEASON</Text>
+                <Text style={[st.weekLabel, { color: "#fff" }]}>
+                  WK <Text style={{ color: colors.nflGold }}>{season?.currentWeek}</Text>
+                </Text>
+              </View>
+            </View>
+            <View style={st.headerRight}>
+              {isSyncing && <SyncBadge type="syncing" colors={colors} />}
+              {syncError && !isSyncing && <SyncBadge type="offline" colors={colors} />}
+              {!isSyncing && !syncError && membership && <SyncBadge type="live" colors={colors} />}
+              <TouchableOpacity
+                onPress={() => Alert.alert("Sign Out", "Leave this session?", [{ text: "Cancel" }, { text: "Sign Out", style: "destructive", onPress: signOut }])}
+                style={[st.avatarBtn, { backgroundColor: teamColor + "30", borderColor: teamColor + "80" }]}
+              >
+                <Feather name="user" size={14} color={teamColor} />
+              </TouchableOpacity>
             </View>
           </View>
-          <View style={st.headerRight}>
-            {isSyncing && <SyncBadge type="syncing" colors={colors} />}
-            {syncError && !isSyncing && <SyncBadge type="offline" colors={colors} />}
-            {!isSyncing && !syncError && membership && <SyncBadge type="live" colors={colors} />}
-            <TouchableOpacity
-              onPress={() => Alert.alert("Sign Out", "Leave this session?", [{ text: "Cancel" }, { text: "Sign Out", style: "destructive", onPress: signOut }])}
-              style={[st.avatarBtn, { backgroundColor: teamColor + "25", borderColor: teamColor }]}
-            >
-              <Feather name="user" size={14} color={teamColor} />
-            </TouchableOpacity>
-          </View>
-        </View>
 
-        {/* Team Hero Card */}
-        {team && (
-          <View style={[st.heroCard, { backgroundColor: teamColor + "30", borderColor: teamColor + "99" }]}>
-            <LinearGradient
-              colors={[teamColor + "55", teamColor + "18", "transparent"]}
-              locations={[0, 0.5, 1]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, borderRadius: 18 }}
-              pointerEvents="none"
-            />
-            <View style={[st.heroAccent, { backgroundColor: teamColor, height: 4 }]} />
-            <View style={st.heroContent}>
-              <NFLTeamBadge abbreviation={team.abbreviation} primaryColor={team.primaryColor} size="lg" />
-              <View style={{ flex: 1, marginLeft: 16 }}>
-                <Text style={[st.heroCity, { color: colors.mutedForeground }]}>{team.city.toUpperCase()}</Text>
-                <Text style={[st.heroName, { color: colors.foreground }]}>{team.name}</Text>
-                <View style={st.heroRecordRow}>
-                  <Text style={[st.heroRecord, { color: teamColor }]}>{wins}-{losses} · {wPct}</Text>
-                  <View style={[st.confBadge, { backgroundColor: colors.secondary }]}>
-                    <Text style={[st.confText, { color: colors.mutedForeground }]}>{team.conference} {team.division}</Text>
+          {/* Team info — pinned to bottom of helmet section */}
+          {team && (
+            <View style={st.helmetTeamInfo}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+                <NFLTeamBadge abbreviation={team.abbreviation} primaryColor={team.primaryColor} size="lg" />
+                <View style={{ flex: 1 }}>
+                  <Text style={[st.heroCity, { color: teamColor }]}>{team.city.toUpperCase()}</Text>
+                  <Text style={[st.heroName, { color: "#fff" }]}>{team.name}</Text>
+                  <View style={st.heroRecordRow}>
+                    <Text style={[st.heroRecord, { color: teamColor }]}>{wins}-{losses} · {wPct}</Text>
+                    <View style={[st.confBadge, { backgroundColor: "#ffffff12" }]}>
+                      <Text style={[st.confText, { color: "#ffffff80" }]}>{team.conference} {team.division}</Text>
+                    </View>
                   </View>
                 </View>
-              </View>
-              <View style={{ alignItems: "flex-end" }}>
-                <Text style={[st.rankLabel, { color: colors.mutedForeground }]}>CONF RANK</Text>
-                <Text style={[st.rankNum, { color: myRank <= 3 ? colors.nflGold : myRank <= 7 ? colors.success : colors.foreground }]}>#{myRank}</Text>
+                <View style={{ alignItems: "flex-end" }}>
+                  <Text style={[st.rankLabel, { color: "#ffffff60" }]}>CONF RANK</Text>
+                  <Text style={[st.rankNum, { color: myRank <= 3 ? colors.nflGold : myRank <= 7 ? colors.success : "#fff" }]}>#{myRank}</Text>
+                </View>
               </View>
             </View>
+          )}
+        </View>
 
-          </View>
-        )}
+        {/* ── All content below helmet ────────────────────────────────────── */}
+        <View style={st.content}>
 
         {/* Compact stats strip */}
         {team && (
@@ -490,6 +487,8 @@ export default function HomeScreen() {
             ))}
           </View>
         </View>
+        {/* close st.content wrapper */}
+        </View>
       </ScrollView>
     </View>
   );
@@ -584,10 +583,15 @@ const st = StyleSheet.create({
   center:         { flex:1, alignItems:"center", justifyContent:"center", gap:12 },
   loadingText:    { fontSize:14, fontFamily:"Inter_400Regular" },
   content:        { paddingHorizontal:16 },
-  ticker:         { position:"absolute", left:0, right:0, zIndex:20, flexDirection:"row", alignItems:"center", height:28, overflow:"hidden" },
+  ticker:         { position:"absolute", left:0, right:0, flexDirection:"row", alignItems:"center", height:28, overflow:"hidden" },
   tickerText:     { fontSize:11, fontFamily:"Inter_600SemiBold", color:"#fff", letterSpacing:0.3, width:3000 },
   liveTag:        { paddingHorizontal:6, paddingVertical:2, borderRadius:4, marginRight:8 },
-  headerRow:      { flexDirection:"row", alignItems:"center", justifyContent:"space-between", marginBottom:14 },
+  // Helmet hero
+  helmetHero:     { height:360, overflow:"hidden", position:"relative" },
+  helmetImg:      { position:"absolute", right:-30, top:10, width:340, height:320 },
+  helmetTopBar:   { flexDirection:"row", alignItems:"center", justifyContent:"space-between", paddingHorizontal:16, paddingBottom:8 },
+  helmetTeamInfo: { position:"absolute", bottom:16, left:16, right:16 },
+  // Header pieces still used
   headerLeft:     { flexDirection:"row", alignItems:"center", gap:10 },
   headerRight:    { flexDirection:"row", alignItems:"center", gap:8 },
   seasonLabel:    { fontSize:10, fontFamily:"Inter_600SemiBold", letterSpacing:1.5 },
