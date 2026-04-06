@@ -1299,7 +1299,7 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
 
     const newTeams = teams.map(t => t.id === season.playerTeamId ? { ...t, roster: [...t.roster, newPlayer] } : t);
     const newProspects = draftProspects.map(p => p.id === prospectId ? { ...p, isPickedUp: true, pickedByTeamId: season.playerTeamId, pickedAtRound: draftState.currentRound, pickedAtPick: draftState.overallPick } : p);
-    const newDraftState = advanceDraftState(draftState, completedPick, teams);
+    const newDraftState = advanceDraftState(draftState, completedPick, season.playerTeamId);
 
     await save({ ...season, teams: newTeams, draftProspects: newProspects, draftState: newDraftState, news: [addNewsItem(newsItem), ...season.news].slice(0, 50) });
   }, [season, save, getPlayerTeam]);
@@ -1367,7 +1367,7 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
     const newProspects = draftProspects.map(p => p.id === prospect.id
       ? { ...p, isPickedUp: true, pickedByTeamId: draftState.currentTeamId, pickedAtRound: draftState.currentRound, pickedAtPick: draftState.overallPick }
       : p);
-    const newDraftState = advanceDraftState(draftState, completedPick, newTeams);
+    const newDraftState = advanceDraftState(draftState, completedPick, season.playerTeamId);
     await save({ ...season, teams: newTeams, draftProspects: newProspects, draftState: newDraftState });
   }, [season, save]);
 
@@ -1400,7 +1400,7 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
           ? { ...p, isPickedUp: true, pickedByTeamId: state.currentTeamId, pickedAtRound: state.currentRound, pickedAtPick: state.overallPick }
           : p
       );
-      state = advanceDraftState(state, completedPick, teams);
+      state = advanceDraftState(state, completedPick, season.playerTeamId);
     }
 
     await save({ ...season, teams, draftProspects: prospects, draftState: state });
@@ -1408,10 +1408,38 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
 
   const simRemainderOfDraft = useCallback(async () => {
     if (!season) return;
+    const playerTeamId = season.playerTeamId;
+
+    // If already complete but the user's team has no rookies, rebuild from completedPicks
+    if (season.draftState.isComplete) {
+      const userPicks = season.draftState.completedPicks.filter(cp => cp.teamId === playerTeamId);
+      const alreadyHasRookies = season.teams
+        .find(t => t.id === playerTeamId)
+        ?.roster.some(p => p.draftRound !== undefined);
+      if (alreadyHasRookies || userPicks.length === 0) return;
+
+      // Re-populate rookies from completedPicks
+      let teams = season.teams.map(t => {
+        const teamPicks = season.draftState.completedPicks.filter(cp => cp.teamId === t.id);
+        if (teamPicks.length === 0) return t;
+        const alreadyDrafted = t.roster.some(p => p.draftRound !== undefined);
+        if (alreadyDrafted) return t;
+        const newPlayers = teamPicks.map(cp => {
+          const prospect = season.draftProspects.find(p => p.id === cp.prospectId);
+          if (!prospect) return null;
+          return draftProspectToPlayer(prospect, cp.round, cp.overallPick, t.id, season.year);
+        }).filter((p): p is Player => p !== null);
+        return { ...t, roster: [...t.roster, ...newPlayers] };
+      });
+      const finalSeason = { ...season, teams };
+      setSeason(finalSeason);
+      try { await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(finalSeason)); } catch {}
+      return;
+    }
+
     let teams = season.teams;
     let state = season.draftState;
     let prospects = season.draftProspects;
-    if (state.isComplete) return;
 
     let iterations = 0;
     while (!state.isComplete && iterations < 500) {
@@ -1420,7 +1448,6 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       if (!available.length) break;
 
       const pickingTeamId = state.currentTeamId;
-      // User turn → auto-pick best available; AI turn → positional sim pick
       const prospect = state.isUserTurn
         ? available[0]
         : simulateAIPick(pickingTeamId, available, state.currentRound);
@@ -1443,13 +1470,15 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
           ? { ...p, isPickedUp: true, pickedByTeamId: pickingTeamId, pickedAtRound: state.currentRound, pickedAtPick: state.overallPick }
           : p
       );
-      state = advanceDraftState(state, completedPick, teams);
+      state = advanceDraftState(state, completedPick, playerTeamId);
     }
 
-    await save({ ...season, teams, draftProspects: prospects, draftState: state });
-  }, [season, save]);
+    const finalSeason = { ...season, teams, draftProspects: prospects, draftState: state };
+    setSeason(finalSeason);
+    try { await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(finalSeason)); } catch {}
+  }, [season, setSeason]);
 
-  function advanceDraftState(state: DraftState, completedPick: CompletedDraftPick, teams: NFLTeam[]): DraftState {
+  function advanceDraftState(state: DraftState, completedPick: CompletedDraftPick, playerTeamId: string): DraftState {
     const nextOverall = state.overallPick + 1;
     const nextPickInRound = state.currentPickInRound + 1;
     const totalRounds = 7;
@@ -1472,7 +1501,7 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       currentPickInRound: nextPickInRoundFinal,
       overallPick: nextOverall,
       currentTeamId: nextTeamId,
-      isUserTurn: !isComplete && nextTeamId === teams.find(t => t.id === season?.playerTeamId)?.id,
+      isUserTurn: !isComplete && nextTeamId === playerTeamId,
       isComplete,
       completedPicks: [...state.completedPicks, completedPick],
     };

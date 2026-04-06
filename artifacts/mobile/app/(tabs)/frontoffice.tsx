@@ -292,28 +292,13 @@ export default function FrontOfficeScreen() {
   }
 
   async function handleSimRemainder() {
-    if (!ds || ds.isComplete || isSimRemainder) return;
-    Alert.alert(
-      "Sim Remainder of Draft?",
-      "The AI will auto-pick for all teams including yours. Your war room targets won't be guaranteed.",
-      [
-        { text: "Cancel" },
-        {
-          text: "Sim All",
-          style: "destructive",
-          onPress: async () => {
-            setIsSimRemainder(true);
-            await simRemainderOfDraft();
-            setIsSimRemainder(false);
-            Alert.alert(
-              "Draft Complete",
-              "All picks have been made. Check your Home Screen to see your rookie class.",
-              [{ text: "Done" }]
-            );
-          },
-        },
-      ]
-    );
+    if (!ds || isSimRemainder) return;
+    setIsSimRemainder(true);
+    try {
+      await simRemainderOfDraft();
+    } finally {
+      setIsSimRemainder(false);
+    }
   }
 
   function evaluateTradeValue() {
@@ -422,7 +407,7 @@ export default function FrontOfficeScreen() {
                   </Text>
                 </View>
               </View>
-              {/* Row 2: sim buttons — only when draft is active */}
+              {/* Row 2: sim buttons */}
               {!ds.isComplete && (
                 <View style={{ flexDirection:"row", gap:8, marginTop:8 }}>
                   {!ds.isUserTurn && (
@@ -447,6 +432,16 @@ export default function FrontOfficeScreen() {
                     <Text style={[st.simPickBtnText, { color:"#fff" }]}>{isSimRemainder ? "Simming…" : "Sim All"}</Text>
                   </TouchableOpacity>
                 </View>
+              )}
+              {/* Recovery button — draft marked complete but team has no rookies */}
+              {ds.isComplete && team && !team.roster.some(p => p.draftRound !== undefined) && ds.completedPicks.some(cp => cp.teamId === team.id) && (
+                <TouchableOpacity onPress={handleSimRemainder} disabled={isSimRemainder}
+                  style={[st.simPickBtn, { marginTop: 8, backgroundColor: teamColor, opacity: isSimRemainder ? 0.6 : 1 }]}>
+                  {isSimRemainder
+                    ? <Feather name="loader" size={13} color="#fff" />
+                    : <Feather name="refresh-cw" size={13} color="#fff" />}
+                  <Text style={[st.simPickBtnText, { color:"#fff" }]}>{isSimRemainder ? "Fixing…" : "Fix Draft Class"}</Text>
+                </TouchableOpacity>
               )}
             </View>
           )}
@@ -568,20 +563,61 @@ export default function FrontOfficeScreen() {
                 })
               )}
 
+              {/* MY PICKS — user's draft class after picks are made */}
+              {(() => {
+                const myPicks = (ds?.completedPicks ?? []).filter(cp => cp.teamId === season?.playerTeamId);
+                if (myPicks.length === 0) return null;
+                return (
+                  <View style={{ marginTop: 16 }}>
+                    <View style={[st.warRoomHeader, { backgroundColor: teamColor + "18", borderBottomColor: teamColor + "40" }]}>
+                      <Feather name="star" size={13} color={teamColor} />
+                      <Text style={[st.warRoomTitle, { color: teamColor }]}>
+                        My Draft Class — {myPicks.length} pick{myPicks.length !== 1 ? "s" : ""}
+                      </Text>
+                      {ds?.isComplete && (
+                        <View style={{ marginLeft: "auto", backgroundColor: teamColor, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 2 }}>
+                          <Text style={{ color: "#fff", fontSize: 10, fontFamily: "Inter_700Bold" }}>COMPLETE</Text>
+                        </View>
+                      )}
+                    </View>
+                    {myPicks.map(pick => {
+                      const posColor = POS_COLOR[pick.prospectPosition] ?? teamColor;
+                      return (
+                        <View key={`mypick-${pick.round}-${pick.pickInRound}`} style={[st.pickRow, { backgroundColor: teamColor + "10", borderBottomColor: teamColor + "20" }]}>
+                          <View style={[st.pickNum, { backgroundColor: teamColor }]}>
+                            <Text style={[st.pickNumText, { color: "#fff" }]}>R{pick.round}.{pick.pickInRound}</Text>
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection:"row", alignItems:"center", gap:6 }}>
+                              <Text style={[st.pickName, { color: colors.foreground }]}>{pick.prospectName}</Text>
+                              <View style={[st.posPill, { backgroundColor: posColor + "25" }]}>
+                                <Text style={[st.posPillText, { color: posColor }]}>{pick.prospectPosition}</Text>
+                              </View>
+                            </View>
+                            <Text style={[st.pickMeta, { color: colors.mutedForeground }]}>{pick.prospectCollege} · Grade {pick.prospectGrade} · Pick #{pick.overallPick}</Text>
+                          </View>
+                          <Feather name="check-circle" size={14} color={teamColor} />
+                        </View>
+                      );
+                    })}
+                  </View>
+                );
+              })()}
+
               {/* Recent picks sub-section */}
               {(ds?.completedPicks.length ?? 0) > 0 && (
                 <View>
                   <View style={[st.warRoomHeader, { backgroundColor: colors.card, borderBottomColor: colors.border, marginTop: 16 }]}>
                     <Feather name="clock" size={13} color={colors.mutedForeground} />
                     <Text style={[st.warRoomTitle, { color: colors.mutedForeground, fontSize: 12 }]}>
-                      Recent Picks — {ds?.completedPicks.length ?? 0} made
+                      All Picks — {ds?.completedPicks.length ?? 0} made
                     </Text>
                   </View>
-                  {(ds?.completedPicks ?? []).slice(-10).reverse().map(pick => {
+                  {(ds?.completedPicks ?? []).slice(-15).reverse().map(pick => {
                     const pickTeam = season?.teams.find(t => t.id === pick.teamId);
                     const isUser = pick.teamId === season?.playerTeamId;
                     return (
-                      <View key={`${pick.round}-${pick.pickInRound}`} style={[st.pickRow, { backgroundColor: isUser ? teamColor + "15" : colors.card, borderBottomColor: colors.border }]}>
+                      <View key={`allpick-${pick.round}-${pick.pickInRound}`} style={[st.pickRow, { backgroundColor: isUser ? teamColor + "12" : colors.card, borderBottomColor: colors.border }]}>
                         <View style={[st.pickNum, { backgroundColor: isUser ? teamColor : colors.secondary }]}>
                           <Text style={[st.pickNumText, { color: isUser ? "#fff" : colors.mutedForeground }]}>R{pick.round}.{pick.pickInRound}</Text>
                         </View>
