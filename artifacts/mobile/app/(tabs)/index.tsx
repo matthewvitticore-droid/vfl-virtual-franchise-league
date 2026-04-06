@@ -603,35 +603,59 @@ function DraftClassPanel({ season, team, primary, secondary, colors, onPress }:
 
       {/* Rookie rows */}
       {rookies.map((p: any, i: number) => {
-        const ovrColor = p.overall >= 80 ? "#FFD700" : p.overall >= 70 ? "#3FB950" : p.overall >= 60 ? "#fff" : "#8B949E";
+        const ovrColor = p.overall >= 80 ? "#FFD700" : p.overall >= 70 ? "#3FB950" : p.overall >= 60 ? "#aaa" : "#8B949E";
         const pc = DC_POS_COL[p.position] ?? primary;
         const prospect = prospects.find((pr: any) => pr.name === p.name);
-        const htIn  = prospect?.combine?.height;
-        const wt    = prospect?.combine?.weight;
+        const htIn = prospect?.combine?.height;
+        const wt   = prospect?.combine?.weight;
         const htStr = htIn ? fmtHt(htIn) : "—";
-        const wtStr = wt   ? `${wt} lbs` : "—";
+        const wtStr = wt   ? `${wt}` : "—";
         return (
-          <View key={p.id} style={[st.dcRow, { borderTopColor: colors.border,
-            backgroundColor: i % 2 === 0 ? "transparent" : colors.background + "80" }]}>
-            {/* Rd badge */}
-            <View style={[st.dcRdBadge, { backgroundColor: secondary + "18", borderColor: secondary + "45" }]}>
-              <Text style={{ fontSize: 9,  fontFamily: "Inter_700Bold", color: secondary, lineHeight: 11 }}>R{p.draftRound}</Text>
-              <Text style={{ fontSize: 7.5, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground, lineHeight: 10 }}>#{p.draftPick}</Text>
+          <View key={p.id} style={{
+            flexDirection: "row", alignItems: "center",
+            paddingHorizontal: 10, paddingVertical: 7,
+            borderTopWidth: 1, borderTopColor: colors.border,
+            backgroundColor: i % 2 === 0 ? "transparent" : primary + "08",
+            gap: 8,
+          }}>
+            {/* Pos pill — colored by position */}
+            <View style={{
+              width: 32, alignItems: "center", justifyContent: "center",
+              paddingVertical: 2, borderRadius: 4,
+              backgroundColor: pc + "22", borderWidth: 1, borderColor: pc + "55",
+            }}>
+              <Text style={{ fontSize: 9, fontFamily: "Inter_700Bold", color: pc, letterSpacing: 0.3 }}>{p.position}</Text>
             </View>
-            {/* Pos pill */}
-            <View style={[st.dcPosPill, { backgroundColor: pc + "20", borderColor: pc + "50" }]}>
-              <Text style={{ fontSize: 9, fontFamily: "Inter_700Bold", color: pc }}>{p.position}</Text>
+
+            {/* Name + stats line */}
+            <View style={{ flex: 1, gap: 1 }}>
+              {/* Name in team primary */}
+              <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: primary }} numberOfLines={1}>
+                {p.name}
+              </Text>
+              {/* Stats row: Rd · OVR · HT WT */}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                <Text style={{ fontSize: 9, fontFamily: "Inter_700Bold", color: secondary }}>
+                  R{p.draftRound}
+                </Text>
+                <Text style={{ fontSize: 8, color: colors.border, fontFamily: "Inter_400Regular" }}>·</Text>
+                <Text style={{ fontSize: 9, fontFamily: "Inter_700Bold", color: ovrColor }}>
+                  {p.overall} OVR
+                </Text>
+                <Text style={{ fontSize: 8, color: colors.border, fontFamily: "Inter_400Regular" }}>·</Text>
+                <Text style={{ fontSize: 9, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>
+                  {htStr} / {wtStr}
+                </Text>
+              </View>
             </View>
-            {/* Name */}
-            <Text style={{ flex: 1, fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.foreground }} numberOfLines={1}>{p.name}</Text>
-            {/* HT / WT */}
-            <Text style={{ fontSize: 9, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginRight: 4 }}>
-              {htStr}{"\n"}{wtStr}
-            </Text>
-            {/* OVR */}
-            <View style={{ paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5,
-              borderWidth: 1, borderColor: ovrColor + "50", backgroundColor: ovrColor + "18" }}>
-              <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: ovrColor }}>{p.overall}</Text>
+
+            {/* Pick number badge */}
+            <View style={{
+              backgroundColor: secondary + "15", borderRadius: 4,
+              paddingHorizontal: 5, paddingVertical: 2,
+              borderWidth: 1, borderColor: secondary + "35",
+            }}>
+              <Text style={{ fontSize: 8, fontFamily: "Inter_600SemiBold", color: secondary }}>#{p.draftPick}</Text>
             </View>
           </View>
         );
