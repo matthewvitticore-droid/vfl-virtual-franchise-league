@@ -404,6 +404,7 @@ export default function RosterScreen() {
         visible={!!statsPlayer}
         onClose={() => setStatsPlayer(null)}
         teamPrimaryColor={teamColor}
+        teamSecondaryColor={teamSecondary}
         gamesPlayedThisSeason={gamesPlayed}
       />
     </View>

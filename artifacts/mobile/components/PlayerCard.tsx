@@ -22,15 +22,6 @@ const DEV_ICON: Record<string, any> = {
   Normal: "user", "Late Bloomer": "trending-up",
 };
 
-// ─── OVR color ────────────────────────────────────────────────────────────────
-
-function ovrColor(ovr: number): string {
-  if (ovr >= 90) return "#FFD700";
-  if (ovr >= 80) return "#3FB950";
-  if (ovr >= 70) return "#FFC107";
-  return "#E31837";
-}
-
 // ─── Role label (computed from ratings, no combine needed) ────────────────────
 
 function computeRole(pos: NFLPosition, r: PosRatings, overall: number): string | null {
@@ -58,9 +49,9 @@ function computeRole(pos: NFLPosition, r: PosRatings, overall: number): string |
 
 // ─── Rating bar ───────────────────────────────────────────────────────────────
 
-function RatingBar({ label, value, fill }: { label: string; value: number; fill: string }) {
+function RatingBar({ label, value, fill, accent }: { label: string; value: number; fill: string; accent: string }) {
   const pct = `${Math.min(100, Math.max(0, value))}%` as any;
-  const valColor = value >= 85 ? ovrColor(value) : "#CBD5E1";
+  const valColor = value >= 85 ? accent : "#CBD5E1";
   return (
     <View style={rb.row}>
       <Text style={rb.label}>{label}</Text>
@@ -111,7 +102,6 @@ export function PlayerCard({
 
   const devColor = DEV_COLOR[player.developmentTrait] ?? "#8B949E";
   const devIcon  = DEV_ICON[player.developmentTrait]  ?? "user";
-  const ovrC     = ovrColor(player.overall);
   const role     = computeRole(player.position, player.posRatings, player.overall);
 
   return (
@@ -152,8 +142,8 @@ export function PlayerCard({
           <View style={[card.posStripe, { backgroundColor: secondary }]} />
           {/* OVR number */}
           <View style={card.ovrBlock}>
-            <Text style={[card.ovrNum, { color: ovrC }]}>{player.overall}</Text>
-            <Text style={[card.ovrLbl, { color: ovrC + "AA" }]}>OVR</Text>
+            <Text style={[card.ovrNum, { color: secondary }]}>{player.overall}</Text>
+            <Text style={[card.ovrLbl, { color: secondary + "AA" }]}>OVR</Text>
           </View>
           {/* Position badge */}
           <View style={[card.posBadge, { backgroundColor: secondary + "30", borderColor: secondary + "80" }]}>
@@ -229,7 +219,7 @@ export function PlayerCard({
               const isLast = i === (POS_RATING_KEYS[player.position].length - 1);
               return (
                 <RatingBar key={key} label={POS_RATING_LABELS[key]} value={val}
-                  fill={isLast ? ovrC : primary} />
+                  fill={primary} accent={secondary} />
               );
             })}
           </View>

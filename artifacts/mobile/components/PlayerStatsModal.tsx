@@ -18,14 +18,6 @@ const POS_COLOR: Record<NFLPosition, string> = {
   CB:"#6E40C9", S:"#9C27B0",  K:"#FF7043", P:"#795548",
 };
 
-// ─── Rating color ──────────────────────────────────────────────────────────────
-function ratingColor(v: number) {
-  if (v >= 90) return "#FFD700";
-  if (v >= 80) return "#3FB950";
-  if (v >= 70) return "#F0F0F0";
-  return "#E31837";
-}
-
 // ─── Compact stat card (Topps-style) ──────────────────────────────────────────
 function StatCard({
   label, value, accent,
@@ -299,7 +291,7 @@ const cr = StyleSheet.create({
 });
 
 // ─── Ratings tab ───────────────────────────────────────────────────────────────
-function RatingsTab({ player, accent }: { player: Player; accent: string }) {
+function RatingsTab({ player, accent, secondary }: { player: Player; accent: string; secondary: string }) {
   const colors = useColors();
   const keys   = POS_RATING_KEYS[player.position];
 
@@ -345,16 +337,16 @@ function RatingsTab({ player, accent }: { player: Player; accent: string }) {
         {keys.map(key => {
           const val   = player.posRatings[key] ?? 0;
           const label = POS_RATING_LABELS[key];
-          const valClr = ratingColor(val); // keep tier color for the number only
+          const valClr = val >= 85 ? secondary : "#CBD5E1";
           return (
             <View key={key} style={rt.ratingRow}>
               {/* Label */}
               <Text style={[rt.rLabel, { color: colors.mutedForeground }]}>{label}</Text>
-              {/* Bar — team color fill */}
+              {/* Bar — team primary fill */}
               <View style={[rt.track, { backgroundColor: colors.border }]}>
                 <View style={[rt.fill, { width: `${val}%` as any, backgroundColor: accent }]} />
               </View>
-              {/* Value — tier color so 93 = gold, 75 = white, etc. */}
+              {/* Value — secondary for elite (≥85), white otherwise */}
               <Text style={[rt.rVal, { color: valClr }]}>{val}</Text>
             </View>
           );
@@ -390,18 +382,19 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   teamPrimaryColor?: string;
+  teamSecondaryColor?: string;
   gamesPlayedThisSeason?: number;
 }
 
-export function PlayerStatsModal({ player, visible, onClose, teamPrimaryColor, gamesPlayedThisSeason }: Props) {
+export function PlayerStatsModal({ player, visible, onClose, teamPrimaryColor, teamSecondaryColor, gamesPlayedThisSeason }: Props) {
   const colors  = useColors();
   const insets  = useSafeAreaInsets();
   const [tab, setTab] = useState<ModalTab>("season");
 
   if (!player) return null;
 
-  const accent   = teamPrimaryColor ?? POS_COLOR[player.position];
-  const posColor = POS_COLOR[player.position];
+  const accent    = teamPrimaryColor   ?? POS_COLOR[player.position];
+  const secondary = teamSecondaryColor ?? accent;
   const career   = player.careerStats ?? [];
 
   const TABS: { key: ModalTab; label: string; icon: any }[] = [
@@ -476,7 +469,7 @@ export function PlayerStatsModal({ player, visible, onClose, teamPrimaryColor, g
               <CareerSection career={career} pos={player.position} accent={accent} />
             )}
             {tab === "ratings" && (
-              <RatingsTab player={player} accent={accent} />
+              <RatingsTab player={player} accent={accent} secondary={secondary} />
             )}
           </ScrollView>
         </View>
