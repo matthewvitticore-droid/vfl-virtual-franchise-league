@@ -362,11 +362,15 @@ function generateRoster(teamOverall: number): Player[] {
       overall,
       potential: Math.min(99, overall + irng(0, age < 26 ? 12 : 5)),
       speed: (() => {
-        if (["WR","CB"].includes(pos))           return gaussian(teamOverall + 5, 5, 80, 99);
-        if (["RB","S"].includes(pos))            return gaussian(teamOverall + 2, 5, 74, 96);
-        if (["DE","LB","QB","TE"].includes(pos)) return gaussian(teamOverall - 3, 5, 65, 88);
-        if (["OL"].includes(pos))                return gaussian(58, 7, 45, 71);
-        if (["DT"].includes(pos))                return gaussian(60, 6, 48, 72);
+        // Speed is position-specific. Mean stays realistic; high std + high cap
+        // lets elite players reach the ceiling organically.
+        if (["WR","CB"].includes(pos))  return gaussian(teamOverall + 5,  6, 80, 99); // elite speed
+        if (["RB","S"].includes(pos))   return gaussian(teamOverall + 2,  6, 74, 99); // elite speed + rare 99
+        if (pos === "TE")               return gaussian(teamOverall - 5,  9, 62, 93); // elite TEs can fly
+        if (pos === "QB")               return gaussian(teamOverall - 6, 10, 58, 95); // elite scramblers hit 90+
+        if (["DE","LB"].includes(pos))  return gaussian(teamOverall - 4,  7, 62, 90); // athletic edge/LB
+        if (pos === "DT")               return gaussian(60,              10, 46, 92); // Aaron Donald tier tops
+        if (pos === "OL")               return gaussian(56,               7, 43, 70); // linemen stay slow
         return gaussian(teamOverall - 5, 5, 58, 80);
       })(),
       strength: genRating(teamOverall + (["OL","DE","DT"].includes(pos) ? 3 : -2), isStarter, false),
