@@ -72,28 +72,21 @@ export default function CustomizeTab() {
           <View style={st.kitRow}>
             {KITS.map(k => {
               const isActive = k.key === activeKit;
-              const kitUniform = teamCustomization?.uniforms?.[k.key];
-              const kitColor   = kitUniform?.jerseyColor ?? theme.primary;
+              // Active: team primary (solid). Inactive: team secondary tint — always readable
+              const bgColor  = isActive ? theme.primary      : theme.secondary + "25";
+              const bdColor  = isActive ? theme.primary      : theme.secondary + "60";
+              const txtColor = isActive ? "#fff"             : theme.secondary;
+              const dotColor = isActive ? "#fff"             : theme.secondary;
               return (
                 <TouchableOpacity
                   key={k.key}
                   onPress={() => setKit(k.key)}
-                  style={[
-                    st.kitPill,
-                    {
-                      backgroundColor: isActive ? kitColor + "30" : colors.card,
-                      borderColor: isActive ? kitColor : colors.border,
-                    },
-                  ]}
+                  style={[st.kitPill, { backgroundColor: bgColor, borderColor: bdColor }]}
                   activeOpacity={0.75}
                 >
-                  <View style={[st.kitDot, { backgroundColor: kitColor }]} />
-                  <Text style={[st.kitLabel, { color: isActive ? kitColor : colors.mutedForeground }]}>
-                    {k.label}
-                  </Text>
-                  {isActive && (
-                    <Feather name="check" size={12} color={kitColor} />
-                  )}
+                  <View style={[st.kitDot, { backgroundColor: dotColor }]} />
+                  <Text style={[st.kitLabel, { color: txtColor }]}>{k.label}</Text>
+                  {isActive && <Feather name="check" size={12} color="#fff" />}
                 </TouchableOpacity>
               );
             })}

@@ -262,26 +262,21 @@ function KitToggle() {
       <Text style={[st.kitRowLabel, { color: colors.mutedForeground }]}>THEME KIT</Text>
       <View style={st.kitPills}>
         {KITS.map(k => {
-          const isActive   = k.key === activeKit;
-          const kitUniform = teamCustomization?.uniforms?.[k.key];
-          const kitColor   = kitUniform?.jerseyColor ?? theme.primary;
+          const isActive = k.key === activeKit;
+          // Active: team primary (solid). Inactive: team secondary tint — always readable
+          const bgColor   = isActive ? theme.primary         : theme.secondary + "25";
+          const bdColor   = isActive ? theme.primary         : theme.secondary + "60";
+          const txtColor  = isActive ? "#fff"                : theme.secondary;
+          const dotColor  = isActive ? "#fff"                : theme.secondary;
           return (
             <TouchableOpacity
               key={k.key}
               onPress={() => setKit(k.key)}
               activeOpacity={0.75}
-              style={[
-                st.kitPill,
-                {
-                  backgroundColor: isActive ? kitColor : kitColor + "12",
-                  borderColor: kitColor + (isActive ? "FF" : "50"),
-                },
-              ]}
+              style={[st.kitPill, { backgroundColor: bgColor, borderColor: bdColor }]}
             >
-              <View style={[st.kitDot, { backgroundColor: isActive ? "#fff" : kitColor }]} />
-              <Text style={[st.kitPillTxt, { color: isActive ? "#fff" : kitColor }]}>
-                {k.label}
-              </Text>
+              <View style={[st.kitDot, { backgroundColor: dotColor }]} />
+              <Text style={[st.kitPillTxt, { color: txtColor }]}>{k.label}</Text>
             </TouchableOpacity>
           );
         })}
