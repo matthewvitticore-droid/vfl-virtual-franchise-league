@@ -167,7 +167,7 @@ export default function UniformScreen() {
               color={featuredSet === activeTab ? "#D97706" : colors.mutedForeground}
             />
             <Text style={[st.bgToggleText, { color: featuredSet === activeTab ? "#D97706" : colors.mutedForeground }]}>
-              {featuredSet === activeTab ? "Used as Page Background" : "Set as Page Background"}
+              {featuredSet === activeTab ? "Active Theme Kit" : "Set as Theme"}
             </Text>
           </TouchableOpacity>
         </View>
