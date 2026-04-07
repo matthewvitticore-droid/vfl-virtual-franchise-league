@@ -2,10 +2,10 @@ import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react"; // useRef kept for ScrollView ref
 import {
   Alert, Platform, ScrollView, StyleSheet,
-  Text, TextInput, TouchableOpacity, View,
+  Text, TouchableOpacity, View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { NFLTeamBadge } from "@/components/NFLTeamBadge";
@@ -69,8 +69,6 @@ export default function LoadSaveScreen() {
   const { season, teamCustomization } = useNFL();
 
   const [saves,       setSaves]       = useState<SaveSlot[]>([]);
-  const [showModal,   setShowModal]   = useState(false);
-  const [saveName,    setSaveName]    = useState("");
   const [saving,      setSaving]      = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [gmMode,      setGmMode]      = useState<string>("solo");
@@ -91,44 +89,29 @@ export default function LoadSaveScreen() {
     }
   }
 
-  function openSaveModal() {
-    const myTeam = season?.teams.find(t => t.id === season.playerTeamId);
-    const week   = season?.isPlayoffs
-      ? (season.playoffRound ?? "Playoffs")
-      : `Wk ${season?.currentWeek ?? 1}`;
-    const suggested = myTeam
-      ? `${myTeam.name} · ${week} · ${season?.year ?? 2026}`
-      : `My Franchise · ${season?.year ?? 2026}`;
-    setSaveName(suggested);
-    setShowModal(true);
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120);
-  }
-
-  function closeModal() {
-    setShowModal(false);
-    setSaveName("");
-  }
-
-  async function commitSave() {
-    if (!saveName.trim()) return;
+  async function handleInstantSave() {
     if (!season) {
-      Alert.alert("No Active Franchise", "Load or start a franchise before saving.");
+      Alert.alert("No Active Franchise", "Load or start a franchise first.");
       return;
     }
+    if (saving) return;
     setSaving(true);
     try {
-      const myTeam = season.teams.find(t => t.id === season.playerTeamId);
+      const myTeam    = season.teams.find(t => t.id === season.playerTeamId);
       const gmModeVal = await AsyncStorage.getItem(GM_MODE_KEY) ?? "solo";
-      const record = myTeam
+      const record    = myTeam
         ? `${myTeam.wins}-${myTeam.losses}${myTeam.ties ? `-${myTeam.ties}` : ""}`
         : "—";
       const weekLabel = season.isPlayoffs
         ? (season.playoffRound ?? "Playoffs")
         : `Week ${season.currentWeek ?? 1}`;
+      const autoName  = myTeam
+        ? `${myTeam.name} · ${weekLabel} · ${season.year ?? 2026}`
+        : `Franchise · ${season.year ?? 2026}`;
 
       const slot: SaveSlot = {
         id:                Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
-        name:              saveName.trim(),
+        name:              autoName,
         savedAt:           Date.now(),
         teamAbbr:          myTeam?.abbreviation ?? "???",
         teamName:          myTeam ? `${myTeam.city} ${myTeam.name}` : "Unknown Team",
@@ -147,19 +130,15 @@ export default function LoadSaveScreen() {
       const existing = await AsyncStorage.getItem(SAVES_KEY);
       let slots: SaveSlot[] = [];
       if (existing) { try { slots = JSON.parse(existing); } catch {} }
-
       slots.unshift(slot);
       if (slots.length > MAX_SAVES) slots = slots.slice(0, MAX_SAVES);
 
       await AsyncStorage.setItem(SAVES_KEY, JSON.stringify(slots));
       setSaves(slots);
-      // close first, then show success so it's visible on the main screen
-      setShowModal(false);
-      setSaveName("");
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2500);
+      setTimeout(() => setSaveSuccess(false), 3000);
     } catch (e) {
-      Alert.alert("Save Failed", "Could not save your franchise. Please try again.");
+      Alert.alert("Save Failed", "Could not save. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -297,55 +276,14 @@ export default function LoadSaveScreen() {
 
               <View style={[styles.cardDivider, { backgroundColor: colors.border }]} />
 
-              {showModal ? (
-                // ── Inline name entry ──────────────────────────────────────
-                <View style={styles.inlineNaming}>
-                  <View style={[styles.inputWrap, { backgroundColor: colors.background, borderColor: primary + "80" }]}>
-                    <Feather name="edit-2" size={14} color={colors.mutedForeground} style={{ marginLeft: 12 }} />
-                    <TextInput
-                      value={saveName}
-                      onChangeText={setSaveName}
-                      style={[styles.nameInput, { color: colors.foreground }]}
-                      placeholderTextColor={colors.mutedForeground}
-                      placeholder="e.g. Sharks · Week 12 · 2025"
-                      maxLength={48}
-                      autoFocus
-                      selectTextOnFocus
-                      returnKeyType="done"
-                      onSubmitEditing={commitSave}
-                    />
-                    {saveName.length > 0 && (
-                      <TouchableOpacity onPress={() => setSaveName("")} style={{ padding: 10 }}>
-                        <Feather name="x-circle" size={14} color={colors.mutedForeground} />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                  <View style={styles.modalBtns}>
-                    <TouchableOpacity
-                      onPress={closeModal}
-                      style={[styles.cancelBtn, { borderColor: colors.border }]}
-                    >
-                      <Text style={[styles.cancelBtnText, { color: colors.mutedForeground }]}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={commitSave}
-                      disabled={saving || !saveName.trim()}
-                      style={[styles.confirmBtn, { backgroundColor: primary, opacity: (!saveName.trim() || saving) ? 0.5 : 1 }]}
-                    >
-                      <Feather name="save" size={14} color="#fff" />
-                      <Text style={styles.confirmBtnText}>{saving ? "Saving…" : "Save"}</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  onPress={openSaveModal}
-                  style={[styles.actionBtn, { backgroundColor: primary }]}
-                >
-                  <Feather name="save" size={16} color="#fff" />
-                  <Text style={styles.actionBtnText}>Save Franchise Now</Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                onPress={handleInstantSave}
+                disabled={saving}
+                style={[styles.actionBtn, { backgroundColor: primary, opacity: saving ? 0.6 : 1 }]}
+              >
+                <Feather name="save" size={16} color="#fff" />
+                <Text style={styles.actionBtnText}>{saving ? "Saving…" : "Save Franchise Now"}</Text>
+              </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={handleReturnToLaunch}
