@@ -88,10 +88,10 @@ export default function RosterScreen() {
     [season, viewTeamId, team]
   );
   const isViewingOwnTeam = !viewTeamId || viewTeamId === team?.id;
-  // For own team: use the active kit's jersey color (responds to Home/Away/Alt toggle)
-  // For scouted teams: pick whichever of primary/secondary is actually visible
+  // Always use brand primary (never kit jersey color) so the modal tabs get the
+  // correct team color regardless of which uniform kit is active on the home screen.
   const viewColor = isViewingOwnTeam
-    ? pickAccent(theme.kitJerseyColor, theme.secondary)
+    ? theme.primary
     : pickAccent(viewTeam?.primaryColor ?? teamColor, viewTeam?.secondaryColor ?? teamSecondary);
   const viewSecondary = isViewingOwnTeam
     ? theme.secondary

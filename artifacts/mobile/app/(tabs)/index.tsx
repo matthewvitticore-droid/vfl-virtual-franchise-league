@@ -730,18 +730,22 @@ function KitToggle() {
       <View style={st.kitPills}>
         {KITS.map(k => {
           const isActive = k.key === activeKit;
-          // Each kit highlights in its signature color when active
+          // Use the actual jersey color of each kit so the pill always shows
+          // the real kit color (home=red, away=white, alt=navy) regardless of
+          // what theme.primary resolves to.
+          const homeJersey = teamCustomization?.uniforms?.home?.jerseyColor      ?? theme.primary;
+          const altJersey  = teamCustomization?.uniforms?.alternate?.jerseyColor ?? theme.secondary;
           const activeBg: Record<typeof k.key, string> = {
-            home:      theme.primary,
+            home:      homeJersey,
             away:      "#FFFFFF",
-            alternate: theme.secondary,
+            alternate: altJersey,
           };
-          const bg     = isActive ? activeBg[k.key]                       : theme.primary + "22";
+          const bg     = isActive ? activeBg[k.key]  : theme.primary + "22";
           const bgColor = bg;
-          const bdColor = isActive ? activeBg[k.key]                      : theme.primary + "55";
+          const bdColor = isActive ? activeBg[k.key] : theme.primary + "55";
           const onBg    = k.key === "away" ? "#111111" : "#fff";
-          const txtColor = isActive ? onBg                                : theme.primary;
-          const dotColor = isActive ? onBg                                : theme.primary;
+          const txtColor = isActive ? onBg            : theme.primary;
+          const dotColor = isActive ? onBg            : theme.primary;
           return (
             <TouchableOpacity
               key={k.key}
