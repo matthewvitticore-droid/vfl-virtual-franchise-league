@@ -29,23 +29,27 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (isLoading) return <VFLSplash />;
 
-  const inAuthGroup     = segments[0] === "auth";
+  const inAuthGroup      = segments[0] === "auth";
   const inFranchiseGroup = segments[0] === "franchise";
-  const inTabsGroup     = segments[0] === "(tabs)";
+  const inTabsGroup      = segments[0] === "(tabs)";
+  // Root index.tsx is the launch screen — never redirect away from it
+  const inLaunchScreen   = segments.length === 0;
 
-  // If Supabase isn't configured, skip auth and allow direct access to tabs
+  // If Supabase isn't configured, skip auth and allow direct access
   if (!SUPABASE_ENABLED) {
     if (inAuthGroup || inFranchiseGroup) return <Redirect href="/(tabs)" />;
     return <>{children}</>;
   }
+
+  // Launch screen is always accessible — no auth required
+  if (inLaunchScreen) return <>{children}</>;
 
   // Not logged in → force to login
   if (!session && !inAuthGroup) {
     return <Redirect href="/auth/login" />;
   }
 
-  // Logged in but no franchise → force to franchise lobby (unless skipping offline)
-  // We allow the user to skip to tabs from the lobby screen itself
+  // Logged in but no franchise → force to franchise lobby
   if (session && !membership && !inFranchiseGroup && !inTabsGroup && !inAuthGroup) {
     return <Redirect href="/franchise" />;
   }
@@ -58,6 +62,7 @@ function RootLayoutNav() {
     <NFLProvider>
       <AuthGate>
         <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" options={{ animation: "none" }} />
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="auth/login" />
           <Stack.Screen name="auth/register" />
