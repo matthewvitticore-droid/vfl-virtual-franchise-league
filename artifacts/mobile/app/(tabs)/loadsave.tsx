@@ -13,6 +13,7 @@ import { VFLLogo } from "@/components/VFLLogo";
 import { useColors } from "@/hooks/useColors";
 import { useTeamTheme } from "@/hooks/useTeamTheme";
 import { useNFL } from "@/context/NFLContext";
+import { bigSet, bigGet, bigDelete } from "@/utils/bigStorage";
 
 const SEASON_KEY  = "vfl_season_v1";
 const CUSTOM_KEY  = "vfl_customization_v1";
@@ -153,8 +154,8 @@ export default function LoadSaveScreen() {
       // Strip bulky play-by-play data before storing (each game has 150+ events — too large)
       const leanSeason = stripSeasonForSave(season);
 
-      // Store season data in its own key to avoid localStorage 5 MB single-key limit
-      await AsyncStorage.setItem(
+      // Store season data in IndexedDB (web) / AsyncStorage (native) — no 5 MB quota limit
+      await bigSet(
         saveDataKey(slotId),
         JSON.stringify({
           seasonData:        JSON.stringify(leanSeason),
@@ -188,7 +189,7 @@ export default function LoadSaveScreen() {
         // Clean up data keys for evicted slots
         const evicted = slots.slice(MAX_SAVES);
         for (const ev of evicted) {
-          await AsyncStorage.removeItem(saveDataKey(ev.id));
+          await bigDelete(saveDataKey(ev.id));
         }
         slots = slots.slice(0, MAX_SAVES);
       }
@@ -217,7 +218,7 @@ export default function LoadSaveScreen() {
         {
           text: "Delete", style: "destructive",
           onPress: async () => {
-            await AsyncStorage.removeItem(saveDataKey(id));
+            await bigDelete(saveDataKey(id));
             const updated = saves.filter(s => s.id !== id);
             await AsyncStorage.setItem(SAVES_KEY, JSON.stringify(updated));
             setSaves(updated);

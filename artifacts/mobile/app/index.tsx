@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { VFLLogo } from "@/components/VFLLogo";
+import { bigGet } from "@/utils/bigStorage";
 
 // ─── Brand ─────────────────────────────────────────────────────────────────────
 const VFL_RED  = "#C8102E";
@@ -160,7 +161,7 @@ export default function LaunchScreen() {
       let seasonData     = slot.seasonData;
       let customData     = slot.customizationData;
 
-      const dataRaw = await AsyncStorage.getItem(saveDataKey(slot.id));
+      const dataRaw = await bigGet(saveDataKey(slot.id));
       if (dataRaw) {
         try {
           const parsed = JSON.parse(dataRaw);
