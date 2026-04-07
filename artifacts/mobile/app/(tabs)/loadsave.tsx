@@ -4,7 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert, Animated, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet,
+  Alert, Animated, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -364,19 +364,13 @@ export default function LoadSaveScreen() {
         onRequestClose={closeModal}
         statusBarTranslucent
       >
-        <View style={{ flex: 1 }}>
-          {/* Dim backdrop — rendered first (behind everything) */}
-          <Pressable
-            style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.65)" }]}
-            onPress={closeModal}
-          />
+        {/* Outer dim layer: flex column, dark background */}
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.65)", justifyContent: "flex-end" }}>
+          {/* Flex-1 spacer above sheet — tapping it dismisses the modal */}
+          <TouchableOpacity style={{ flex: 1 }} onPress={closeModal} activeOpacity={1} />
 
-          {/* Keyboard-aware wrapper — box-none so it never steals button taps */}
-          <KeyboardAvoidingView
-            style={{ flex: 1, justifyContent: "flex-end" }}
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            pointerEvents="box-none"
-          >
+          {/* Keyboard-aware sheet at the bottom */}
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"}>
           <View
             style={[
               styles.modalSheet,
@@ -433,6 +427,7 @@ export default function LoadSaveScreen() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
+
     </View>
   );
 }
