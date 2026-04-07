@@ -254,7 +254,7 @@ export default function RosterScreen() {
                     const isStarter = idx === 0;
                     const salaryStr = typeof p.salary === "number" ? p.salary.toFixed(1) : String(p.salary);
                     return (
-                      <TouchableOpacity key={p.id} onPress={() => setSelectedPlayer(p)} activeOpacity={0.75}
+                      <View key={p.id}
                         style={[st.depthRow, {
                           backgroundColor: isStarter ? teamColor + "12" : colors.card,
                           borderBottomColor: colors.border,
@@ -299,7 +299,7 @@ export default function RosterScreen() {
                             <Feather name="chevron-down" size={15} color={colors.mutedForeground} />
                           </TouchableOpacity>
                         </View>
-                      </TouchableOpacity>
+                      </View>
                     );
                   })}
                 </View>
