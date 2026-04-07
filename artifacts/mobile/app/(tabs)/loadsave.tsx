@@ -4,7 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert, Animated, Platform, ScrollView, StyleSheet,
+  Alert, Animated, KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -351,7 +351,11 @@ export default function LoadSaveScreen() {
 
       {/* ── Save Name Modal ──────────────────────────────────────────────── */}
       {showModal && (
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={0}
+        >
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={closeModal} activeOpacity={1} />
           <Animated.View
             style={[
@@ -402,7 +406,7 @@ export default function LoadSaveScreen() {
               </TouchableOpacity>
             </View>
           </Animated.View>
-        </View>
+        </KeyboardAvoidingView>
       )}
     </View>
   );
