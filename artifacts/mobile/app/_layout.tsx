@@ -42,7 +42,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const inAuthGroup      = segments[0] === "auth";
   const inFranchiseGroup = segments[0] === "franchise";
   const inTabsGroup      = segments[0] === "(tabs)";
-  const inLaunchScreen   = segments.length === 0;
+  // "/" = app/index.tsx (segments=[]), "/launch" = app/launch.tsx (segments=["launch"])
+  const inLaunchScreen   = segments.length === 0 || segments[0] === "launch";
 
   // Solo GM or Supabase not configured → skip auth entirely
   const skipAuth = !SUPABASE_ENABLED || gmMode === "solo";
@@ -73,7 +74,8 @@ function RootLayoutNav() {
     <NFLProvider>
       <AuthGate>
         <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" options={{ animation: "none" }} />
+          <Stack.Screen name="index"  options={{ animation: "none" }} />
+          <Stack.Screen name="launch" options={{ animation: "none" }} />
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="auth/login" />
           <Stack.Screen name="auth/register" />
