@@ -4,8 +4,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert, Animated, KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
-  Text, TextInput, TouchableOpacity, View,
+  Alert, Animated, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet,
+  Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { NFLTeamBadge } from "@/components/NFLTeamBadge";
@@ -350,17 +350,25 @@ export default function LoadSaveScreen() {
       </ScrollView>
 
       {/* ── Save Name Modal ──────────────────────────────────────────────── */}
-      {showModal && (
+      <Modal
+        visible={showModal}
+        transparent
+        animationType="slide"
+        onRequestClose={closeModal}
+        statusBarTranslucent
+      >
         <KeyboardAvoidingView
           style={styles.modalOverlay}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
-          keyboardVerticalOffset={0}
         >
-          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={closeModal} activeOpacity={1} />
-          <Animated.View
+          <TouchableWithoutFeedback onPress={closeModal}>
+            <View style={StyleSheet.absoluteFill} />
+          </TouchableWithoutFeedback>
+
+          <View
             style={[
               styles.modalSheet,
-              { backgroundColor: colors.card, borderColor: primary + "60", transform: [{ translateY: slideAnim }] },
+              { backgroundColor: colors.card, borderColor: primary + "60", paddingBottom: insets.bottom + 16 },
             ]}
           >
             <View style={styles.modalHandle} />
@@ -409,9 +417,9 @@ export default function LoadSaveScreen() {
                 <Text style={styles.confirmBtnText}>{saving ? "Saving…" : "Save"}</Text>
               </TouchableOpacity>
             </View>
-          </Animated.View>
+          </View>
         </KeyboardAvoidingView>
-      )}
+      </Modal>
     </View>
   );
 }
