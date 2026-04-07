@@ -105,7 +105,8 @@ export default function LoadSaveScreen() {
   }
 
   function closeModal() {
-    Animated.timing(slideAnim, { toValue: 80, duration: 180, useNativeDriver: true }).start(() => setShowModal(false));
+    setShowModal(false);
+    setSaveName("");
   }
 
   async function commitSave() {
@@ -148,10 +149,12 @@ export default function LoadSaveScreen() {
 
       await AsyncStorage.setItem(SAVES_KEY, JSON.stringify(slots));
       setSaves(slots);
+      // close first, then show success so it's visible on the main screen
+      setShowModal(false);
+      setSaveName("");
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
-      closeModal();
-    } catch {
+    } catch (e) {
       Alert.alert("Save Failed", "Could not save your franchise. Please try again.");
     } finally {
       setSaving(false);
