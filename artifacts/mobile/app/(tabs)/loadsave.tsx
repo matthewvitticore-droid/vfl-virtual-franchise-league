@@ -365,10 +365,12 @@ export default function LoadSaveScreen() {
           >
             <View style={styles.modalHandle} />
 
-            <Text style={[styles.modalTitle, { color: colors.foreground }]}>Name This Save</Text>
-            <Text style={[styles.modalSub, { color: colors.mutedForeground }]}>
-              You'll see this name on the launch screen when choosing which franchise to load.
-            </Text>
+            <View style={styles.modalHeaderRow}>
+              <Text style={[styles.modalTitle, { color: colors.foreground }]}>Name This Save</Text>
+              <TouchableOpacity onPress={closeModal} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Feather name="x" size={20} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            </View>
 
             <View style={[styles.inputWrap, { backgroundColor: colors.background, borderColor: primary + "60" }]}>
               <Feather name="edit-2" size={15} color={colors.mutedForeground} style={{ marginLeft: 12 }} />
@@ -381,9 +383,11 @@ export default function LoadSaveScreen() {
                 maxLength={48}
                 autoFocus
                 selectTextOnFocus
+                returnKeyType="done"
+                onSubmitEditing={commitSave}
               />
               {saveName.length > 0 && (
-                <TouchableOpacity onPress={() => setSaveName("")} style={{ padding: 12 }}>
+                <TouchableOpacity onPress={() => setSaveName("")} style={{ padding: 10 }}>
                   <Feather name="x-circle" size={15} color={colors.mutedForeground} />
                 </TouchableOpacity>
               )}
@@ -532,15 +536,15 @@ const styles = StyleSheet.create({
 
   // Modal
   modalOverlay:       { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.65)", justifyContent: "flex-end" },
-  modalSheet:         { borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1, borderBottomWidth: 0, padding: 24, paddingBottom: 40, gap: 14 },
-  modalHandle:        { width: 36, height: 4, borderRadius: 2, backgroundColor: "#ffffff30", alignSelf: "center", marginBottom: 4 },
-  modalTitle:         { fontSize: 22, fontFamily: "Inter_700Bold" },
-  modalSub:           { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19, marginTop: -4 },
+  modalSheet:         { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderBottomWidth: 0, padding: 18, paddingBottom: 28, gap: 12 },
+  modalHandle:        { width: 36, height: 4, borderRadius: 2, backgroundColor: "#ffffff30", alignSelf: "center", marginBottom: 2 },
+  modalHeaderRow:     { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  modalTitle:         { fontSize: 19, fontFamily: "Inter_700Bold" },
   inputWrap:          { flexDirection: "row", alignItems: "center", borderRadius: 12, borderWidth: 1.5, overflow: "hidden" },
-  nameInput:          { flex: 1, fontSize: 15, fontFamily: "Inter_500Medium", paddingHorizontal: 10, paddingVertical: 14 },
+  nameInput:          { flex: 1, fontSize: 15, fontFamily: "Inter_500Medium", paddingHorizontal: 10, paddingVertical: 12 },
   modalBtns:          { flexDirection: "row", gap: 10 },
-  cancelBtn:          { flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1, alignItems: "center" },
-  cancelBtnText:      { fontSize: 15, fontFamily: "Inter_600SemiBold" },
-  confirmBtn:         { flex: 2, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 12 },
-  confirmBtnText:     { fontSize: 15, fontFamily: "Inter_700Bold", color: "#fff" },
+  cancelBtn:          { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, alignItems: "center" },
+  cancelBtnText:      { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  confirmBtn:         { flex: 2, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 12, borderRadius: 12 },
+  confirmBtnText:     { fontSize: 14, fontFamily: "Inter_700Bold", color: "#fff" },
 });
