@@ -1720,6 +1720,47 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       const { games: newGames, byeWeeks: newBye } = generateSchedule(newTeams);
       const newDraftProspects = generateDraftClass(season.year + 1, 252);
       const newDraftState = initDraftState(newTeams.map(t => t.id), season.playerTeamId);
+      // ── Capture championship history before rolling year over ──────────────
+      const prevHistory = season.history ?? { vflBowls: [], hofEntries: [] };
+      let newHistory = { ...prevHistory, vflBowls: [...prevHistory.vflBowls], hofEntries: [...prevHistory.hofEntries] };
+      if (season.vflBowlWinnerId) {
+        const winnerTeam = season.teams.find(t => t.id === season.vflBowlWinnerId);
+        const vflBowlGame = season.games.find(g => g.playoffRound === "vflBowl" && g.status === "final");
+        if (winnerTeam && vflBowlGame) {
+          const isHomeWin   = vflBowlGame.homeTeamId === season.vflBowlWinnerId;
+          const loserTeamId = isHomeWin ? vflBowlGame.awayTeamId : vflBowlGame.homeTeamId;
+          const loserTeam   = season.teams.find(t => t.id === loserTeamId);
+          // Auto-select MVP: top impact score from winning team
+          let mvpName = "Team MVP"; let mvpPos: any = "QB";
+          if (vflBowlGame.playerStats) {
+            let best = 0;
+            for (const [pid, st] of Object.entries(vflBowlGame.playerStats)) {
+              const p = winnerTeam.roster.find(r => r.id === pid);
+              if (!p) continue;
+              const sc = (st.passingYards ?? 0) * 0.04 + (st.passingTDs ?? 0) * 10
+                + (st.rushingYards ?? 0) * 0.06 + (st.rushingTDs ?? 0) * 10
+                + (st.receivingYards ?? 0) * 0.06 + (st.receivingTDs ?? 0) * 10
+                + (st.tackles ?? 0) * 1.5 + (st.sacks ?? 0) * 8 + (st.defensiveINTs ?? 0) * 12;
+              if (sc > best) { best = sc; mvpName = p.name; mvpPos = p.position; }
+            }
+          }
+          newHistory.vflBowls = [...prevHistory.vflBowls, {
+            year: season.year,
+            winnerTeamId: winnerTeam.id,
+            winnerTeamName: winnerTeam.name,
+            winnerTeamCity: winnerTeam.city,
+            winnerTeamColor: winnerTeam.primaryColor,
+            loserTeamId,
+            loserTeamName: loserTeam?.name ?? "Opponent",
+            loserTeamCity: loserTeam?.city ?? "",
+            winnerScore: isHomeWin ? vflBowlGame.homeScore : vflBowlGame.awayScore,
+            loserScore:  isHomeWin ? vflBowlGame.awayScore : vflBowlGame.homeScore,
+            mvpPlayerName: mvpName,
+            mvpPosition: mvpPos,
+          }];
+        }
+      }
+
       const nextYearSeason: Season = {
         ...season,
         year: season.year + 1,
@@ -1736,6 +1777,7 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
         draftProspects: newDraftProspects,
         draftState: newDraftState,
         freeAgents: generateFreeAgents(60),
+        history: newHistory,
         news: [{
           id: uid(), timestamp: Date.now(),
           headline: `VFL ${season.year + 1} Season Kicks Off!`,

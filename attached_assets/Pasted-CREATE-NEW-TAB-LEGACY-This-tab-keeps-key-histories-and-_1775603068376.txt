@@ -1,0 +1,33 @@
+CREATE NEW TAB:
+
+LEGACY:
+
+This tab keeps key histories and stories saved for posterity …so users can feel the home sweet home feeling of their team
+Colorways and user control and co-op capability….but also to relieve legends of the past:
+
+Add a living history board for each franchise that grows richer every season. This is the emotional heart of the franchise app.
+
+LEGACY BOARD DESIGN: 
+Heavy on the team’s active colorway theme flowing through it. Feels like walking into a team’s trophy room. 
+
+Sections are scrollable and expand as history is made.
+
+CHAMPIONSHIP BANNERS: Every VFL Bowl championship displayed as a banner with the season year, final score, opponent, and MVP. 
+
+Banners hang at the top of the legacy board like retired numbers in an arena.
+
+VFL BOWL MVPS: Every championship MVP gets a special gold card on the legacy board showing their name, position, stats from that game, and the season they won it.
+
+HALL OF FAME GALLERY: Inducted legends displayed as premium HOF cards in gold with their career stats, seasons played, accolades, dev trait journey from rookie to HOF, and their retired jersey number displayed prominently.
+
+***NUMBERS CAN ONLY BE RETIRED IF ALL CO-GMs Approve (we’ll build that later)
+
+CORNERSTONE PLAYERS: A special section for franchise defining players — not just HOF but players who defined an era. Tracked automatically based on seasons played, pro bowl selections, and franchise records held.
+
+DRAFT TO LEGEND TIMELINE: For every HOF or cornerstone player show their full journey — what round they were drafted, their rookie ratings, their peak ratings, career stats year by year, awards won, and how they finished.
+
+FRANCHISE RECORDS: All time single season and career records for every major stat category — only populated by real in-game performance. Each record shows the player, the season, and the stat line.
+
+The Legacy Tab should feel like the most special place in the app — somewhere users come back to just to feel proud of what they built together! 
+
+Perhaps replicate the football player (helmet jersey pants hero) used in custom uniform build with historic player #’s here ??? Could be really cool….!!!!

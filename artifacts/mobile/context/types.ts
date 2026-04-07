@@ -407,6 +407,43 @@ export interface NFLTeam {
   depthChart: Partial<Record<NFLPosition, string[]>>;
 }
 
+// ─── Franchise History ────────────────────────────────────────────────────────
+
+export interface VFLBowlRecord {
+  year: number;
+  winnerTeamId: string;
+  winnerTeamName: string;
+  winnerTeamCity: string;
+  winnerTeamColor: string;
+  loserTeamId: string;
+  loserTeamName: string;
+  loserTeamCity: string;
+  winnerScore: number;
+  loserScore: number;
+  mvpPlayerName: string;
+  mvpPosition: NFLPosition;
+}
+
+export interface HOFEntry {
+  playerId: string;
+  playerName: string;
+  position: NFLPosition;
+  inductionYear: number;
+  retiredNumber?: number;
+  seasons: number;
+  peakOverall: number;
+  developmentTrait: DevelopmentTrait;
+  draftRound?: number;
+  draftYear?: number;
+  careerTotals: PlayerSeasonStats;
+  accolades: string[];
+}
+
+export interface FranchiseHistory {
+  vflBowls: VFLBowlRecord[];
+  hofEntries: HOFEntry[];
+}
+
 // ─── Season ───────────────────────────────────────────────────────────────────
 
 export interface Season {
@@ -428,6 +465,7 @@ export interface Season {
   playoffSeeds?: PlayoffSeed[];
   playoffRound?: PlayoffRound;
   vflBowlWinnerId?: string;
+  history?: FranchiseHistory;
 }
 
 // ─── Uniform & Customization ──────────────────────────────────────────────────
