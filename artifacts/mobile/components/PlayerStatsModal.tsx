@@ -24,6 +24,20 @@ function onColor(hex: string): "#111111" | "#ffffff" {
   return hexLum(hex.slice(0, 7)) > 0.35 ? "#111111" : "#ffffff";
 }
 
+// Returns a version of `hex` that is legible on a dark modal background.
+// White/near-white → muted grey. Very dark (navy, black) → boosted by +110.
+function readableOnDark(hex: string): string {
+  const lum = hexLum(hex.slice(0, 7));
+  if (lum > 0.6) return "#9090A8";                        // white/light → grey
+  if (lum > 0.04) return hex.slice(0, 7) + "BB";         // normal → 73% opacity
+  const h = hex.replace("#", "").slice(0, 6).padEnd(6, "0");
+  const [r, g, b] = [0, 2, 4].map(i =>
+    Math.min(255, parseInt(h.slice(i, i + 2), 16) + 110)
+  );
+  const t = (n: number) => n.toString(16).padStart(2, "0");
+  return `#${t(r)}${t(g)}${t(b)}BB`;                     // very dark → brightened
+}
+
 // ─── Position colors ───────────────────────────────────────────────────────────
 const POS_COLOR: Record<NFLPosition, string> = {
   QB:"#E31837", RB:"#FB4F14", WR:"#FFC20E", TE:"#00B5E2",
@@ -372,9 +386,29 @@ export function PlayerStatsModal({ player, visible, onClose, teamPrimaryColor, t
   if (!player) return null;
 
   const pc        = POS_COLOR[player.position];
+  // accent / secondary are kept for hero gradient and other accents
   const accent    = teamPrimaryColor   ?? pc;
   const secondary = teamSecondaryColor ?? accent;
   const career    = player.careerStats ?? [];
+
+  // ── Kit-mapped tab colors (fixed per tab, mirrors HOME/AWAY/ALT) ────────────
+  const homeBg = teamPrimaryColor  ?? pc;    // Season  = HOME kit → primary
+  const awayBg = "#FFFFFF";                  // Career  = AWAY kit → white
+  const altBg  = teamSecondaryColor ?? pc;   // Ratings = ALT  kit → secondary
+
+  // Per-tab active text (contrast-adaptive, same as KitToggle)
+  const homeOn = onColor(homeBg);
+  const awayOn = "#111111";   // always dark on white
+  const altOn  = onColor(altBg);
+
+  // Per-tab inactive text (readable against dark #14142A modal bg)
+  const homeOff = readableOnDark(homeBg);
+  const awayOff = "#9090A8";              // white→grey on dark bg
+  const altOff  = readableOnDark(altBg);
+
+  const TAB_BG:  Record<ModalTab, string> = { season: homeBg, career: awayBg, ratings: altBg };
+  const TAB_ON:  Record<ModalTab, string> = { season: homeOn, career: awayOn, ratings: altOn  };
+  const TAB_OFF: Record<ModalTab, string> = { season: homeOff,career: awayOff,ratings: altOff };
 
   const devColor  = DEV_COLORS[player.developmentTrait] ?? "#8B949E";
   const devIcon   = (DEV_ICONS[player.developmentTrait]  ?? "user") as any;
@@ -465,35 +499,26 @@ export function PlayerStatsModal({ player, visible, onClose, teamPrimaryColor, t
               )}
             </View>
 
-            {/* ── Tab bar ── */}
-            {(() => {
-              const activeOn   = onColor(accent);          // "#111111" or "#fff"
-              const isAccentLight = hexLum(accent.slice(0, 7)) > 0.35;
-              // Inactive text: if accent is light, use dark-ish; if dark, use accent tinted
-              const inactiveTxt = isAccentLight ? "#111111" + "88" : accent + "CC";
-              return (
-                <View style={[modal.tabBar, { backgroundColor: colors.secondary, borderColor: accent + "40" }]}>
-                  {TABS.map(t => {
-                    const isActive = tab === t.key;
-                    return (
-                      <TouchableOpacity key={t.key} onPress={() => setTab(t.key)}
-                        style={[modal.tabBtn, {
-                          backgroundColor: isActive ? accent : accent + "18",
-                        }]}>
-                        <Feather name={t.icon} size={10}
-                          color={isActive ? activeOn : inactiveTxt} />
-                        <Text style={[modal.tabLabel, {
-                          color: isActive ? activeOn : inactiveTxt,
-                          fontFamily: isActive ? "Inter_700Bold" : "Inter_500Medium",
-                        }]}>
-                          {t.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              );
-            })()}
+            {/* ── Tab bar — HOME/AWAY/ALT kit colors mapped to Season/Career/Ratings ── */}
+            <View style={[modal.tabBar, { backgroundColor: colors.secondary, borderColor: accent + "30" }]}>
+              {TABS.map(t => {
+                const isActive = tab === t.key;
+                const bg  = isActive ? TAB_BG[t.key]  : TAB_BG[t.key] + "22";
+                const txt = isActive ? TAB_ON[t.key]  : TAB_OFF[t.key];
+                return (
+                  <TouchableOpacity key={t.key} onPress={() => setTab(t.key)}
+                    style={[modal.tabBtn, { backgroundColor: bg }]}>
+                    <Feather name={t.icon} size={10} color={txt} />
+                    <Text style={[modal.tabLabel, {
+                      color: txt,
+                      fontFamily: isActive ? "Inter_700Bold" : "Inter_500Medium",
+                    }]}>
+                      {t.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
 
             {/* ── Tab content ── */}
             <View style={{ padding:14, paddingTop:6 }}>
