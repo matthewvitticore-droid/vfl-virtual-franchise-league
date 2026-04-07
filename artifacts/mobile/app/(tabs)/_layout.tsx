@@ -47,12 +47,17 @@ export default function TabLayout() {
         options={{ title: "Front Office", tabBarIcon: ({ color, size }) => <Feather name="briefcase" size={size} color={color} /> }}
       />
       <Tabs.Screen
-        name="schedule"
-        options={{ title: "Schedule", tabBarIcon: ({ color, size }) => <Feather name="calendar" size={size} color={color} /> }}
-      />
-      <Tabs.Screen
         name="standings"
         options={{ title: "Standings", tabBarIcon: ({ color, size }) => <Feather name="bar-chart-2" size={size} color={color} /> }}
+      />
+      <Tabs.Screen
+        name="loadsave"
+        options={{ title: "Franchise", tabBarIcon: ({ color, size }) => <Feather name="shield" size={size} color={color} /> }}
+      />
+      {/* Schedule is now embedded in Standings — hidden from tab bar */}
+      <Tabs.Screen
+        name="schedule"
+        options={{ href: null }}
       />
       <Tabs.Screen
         name="customize"
