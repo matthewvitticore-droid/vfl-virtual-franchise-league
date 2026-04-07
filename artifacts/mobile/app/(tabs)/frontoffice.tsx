@@ -1357,7 +1357,7 @@ function FARow({ p, rank, colors, teamColor, isGM, onSign }: {
       <ColCell value={`${agi}`}       color={ratingColor(agi)} />
       <ColCell value={`${p.faInterestLevel}/5`} color={interestColor(p.faInterestLevel)} />
       <ColCell value={`${p.yearsExperience}yr`} color={colors.foreground} />
-      <ColCell value={`$${p.salary}M`} color={p.salary >= 15 ? colors.danger : p.salary >= 8 ? colors.nflGold : colors.success} />
+      <ColCell value={`$${parseFloat(p.salary.toFixed(1))}M`} color={p.salary >= 15 ? colors.danger : p.salary >= 8 ? colors.nflGold : colors.success} />
       {isGM && (
         <TouchableOpacity onPress={(e) => {
           e.stopPropagation?.();
@@ -1430,7 +1430,7 @@ function TradePlayerRow({ p, rank, colors, teamColor, isMyTeam, isOffering, isRe
       <ColCell value={`${acc}`}       color={ratingColor(acc)} />
       <ColCell value={`${agi}`}       color={ratingColor(agi)} />
       <ColCell value={`${p.yearsExperience}yr`} color={colors.foreground} />
-      <ColCell value={`$${p.salary}M`} color={p.salary >= 15 ? colors.danger : p.salary >= 8 ? colors.nflGold : colors.success} />
+      <ColCell value={`$${parseFloat(p.salary.toFixed(1))}M`} color={p.salary >= 15 ? colors.danger : p.salary >= 8 ? colors.nflGold : colors.success} />
 
       {/* Action button */}
       <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); onToggle(); }}

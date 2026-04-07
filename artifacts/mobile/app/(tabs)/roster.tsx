@@ -36,7 +36,7 @@ function pickAccent(primary: string, secondary: string): string {
 }
 
 type MainTab = "depth" | "roster" | "gamePlan";
-type RosterSortKey = "overall" | "age" | "speed" | "acceleration" | "agility" | "yearsExperience" | "salary";
+type RosterSortKey = "overall" | "age" | "speed" | "strength" | "awareness" | "acceleration" | "agility" | "yearsExperience" | "salary";
 
 const GAME_PLANS: { value: GamePlan; label: string; desc: string }[] = [
   { value:"aggressive",   label:"Aggressive",   desc:"More deep shots, aggressive blitzes. Higher variance." },
@@ -111,6 +111,8 @@ export default function RosterScreen() {
           case "overall":        return p.overall;
           case "age":            return p.age;
           case "speed":          return p.speed;
+          case "strength":       return p.strength ?? 50;
+          case "awareness":      return p.awareness ?? 50;
           case "acceleration":   return (p.positionRatings as any)?.acceleration ?? 50;
           case "agility":        return (p.positionRatings as any)?.agility ?? 50;
           case "yearsExperience":return p.yearsExperience;
@@ -361,12 +363,14 @@ export default function RosterScreen() {
 
             {/* Sortable table */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={{ minWidth: 640 }}>
+              <View style={{ minWidth: 760 }}>
                 {/* Header row */}
                 <View style={[st.tableHeader, { backgroundColor: viewColor + "28", borderBottomColor: viewColor + "50" }]}>
                   <Text style={[st.colFixHdr, { color: viewColor }]}># POS PLAYER</Text>
                   <RSortHeader label="OVR"  sortKey="overall"          current={rosterSortKey} asc={rosterSortAsc} onSort={handleRosterSort} colors={colors} accent={viewColor} />
                   <RSortHeader label="SPD"  sortKey="speed"            current={rosterSortKey} asc={rosterSortAsc} onSort={handleRosterSort} colors={colors} accent={viewColor} />
+                  <RSortHeader label="STR"  sortKey="strength"         current={rosterSortKey} asc={rosterSortAsc} onSort={handleRosterSort} colors={colors} accent={viewColor} />
+                  <RSortHeader label="AWR"  sortKey="awareness"        current={rosterSortKey} asc={rosterSortAsc} onSort={handleRosterSort} colors={colors} accent={viewColor} />
                   <RSortHeader label="ACC"  sortKey="acceleration"     current={rosterSortKey} asc={rosterSortAsc} onSort={handleRosterSort} colors={colors} accent={viewColor} />
                   <RSortHeader label="AGI"  sortKey="agility"          current={rosterSortKey} asc={rosterSortAsc} onSort={handleRosterSort} colors={colors} accent={viewColor} />
                   <RSortHeader label="EXP"  sortKey="yearsExperience"  current={rosterSortKey} asc={rosterSortAsc} onSort={handleRosterSort} colors={colors} accent={viewColor} />
@@ -631,13 +635,15 @@ function RosterPlayerRow({ p, rank, colors, accent, onPress, isOwnTeam, onManage
         </Text>
       </View>
 
-      {/* Stat cells */}
-      <ColCell value={`${p.overall}`}           color={ratingColor(p.overall)} />
-      <ColCell value={`${p.speed}`}             color={ratingColor(p.speed)} />
-      <ColCell value={`${acc}`}                 color={ratingColor(acc)} />
-      <ColCell value={`${agi}`}                 color={ratingColor(agi)} />
-      <ColCell value={`${p.yearsExperience}yr`} color={accent + "99"} />
-      <ColCell value={`$${p.salary.toFixed(1)}M`} color={salaryColor(p.salary)} />
+      {/* Stat cells — matches Ratings tab: OVR SPD STR AWR ACC AGI EXP SAL */}
+      <ColCell value={`${p.overall}`}            color={ratingColor(p.overall)} />
+      <ColCell value={`${p.speed}`}              color={ratingColor(p.speed)} />
+      <ColCell value={`${p.strength ?? 50}`}     color={ratingColor(p.strength ?? 50)} />
+      <ColCell value={`${p.awareness ?? 50}`}    color={ratingColor(p.awareness ?? 50)} />
+      <ColCell value={`${acc}`}                  color={ratingColor(acc)} />
+      <ColCell value={`${agi}`}                  color={ratingColor(agi)} />
+      <ColCell value={`${p.yearsExperience}yr`}  color={accent + "99"} />
+      <ColCell value={`$${parseFloat(p.salary.toFixed(1))}M`} color={salaryColor(p.salary)} />
 
       {/* Manage button (own team only) */}
       {onManage && (

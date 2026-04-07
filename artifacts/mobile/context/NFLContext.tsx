@@ -402,6 +402,10 @@ function generateRoster(teamOverall: number): Player[] {
 }
 
 function rng2(min: number, max: number) { return min + Math.random() * (max - min); }
+function rng2r(min: number, max: number, decimals = 1) {
+  const factor = Math.pow(10, decimals);
+  return Math.round(rng2(min, max) * factor) / factor;
+}
 
 function generateFreeAgents(count = 60): Player[] {
   const positions: NFLPosition[] = ["QB","RB","WR","TE","OL","DE","DT","LB","CB","S","K","P"];
@@ -1308,9 +1312,9 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       faceVariant: irng(0, 3) as 0|1|2|3,
       yearsExperience: 0,
       contractYears: 4,
-      salary: draftState.currentRound === 1 ? rng2(2.5, 8) : rng2(0.9, 3),
-      signingBonus: draftState.currentRound === 1 ? rng2(1.5, 5) : rng2(0.3, 1.5),
-      guaranteedMoney: draftState.currentRound === 1 ? rng2(3, 10) : rng2(0.5, 2.5),
+      salary: draftState.currentRound === 1 ? rng2r(2.5, 8) : rng2r(0.9, 3),
+      signingBonus: draftState.currentRound === 1 ? rng2r(1.5, 5) : rng2r(0.3, 1.5),
+      guaranteedMoney: draftState.currentRound === 1 ? rng2r(3, 10) : rng2r(0.5, 2.5),
       deadCap: 0,
       status: "Backup",
       depthOrder: 3,
@@ -1362,9 +1366,9 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       faceVariant: irng(0, 3) as 0|1|2|3,
       yearsExperience: 0,
       contractYears: 4,
-      salary: round === 1 ? rng2(2.5, 8) : rng2(0.9, 3),
-      signingBonus: round === 1 ? rng2(1.5, 5) : rng2(0.3, 1.5),
-      guaranteedMoney: round === 1 ? rng2(3, 10) : rng2(0.5, 2.5),
+      salary: round === 1 ? rng2r(2.5, 8) : rng2r(0.9, 3),
+      signingBonus: round === 1 ? rng2r(1.5, 5) : rng2r(0.3, 1.5),
+      guaranteedMoney: round === 1 ? rng2r(3, 10) : rng2r(0.5, 2.5),
       deadCap: 0,
       status: "Backup",
       depthOrder: 3,

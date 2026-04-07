@@ -440,10 +440,11 @@ export function PlayerStatsModal({ player, visible, onClose, teamPrimaryColor, t
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom:60 }}>
 
-            {/* ── HERO HEADER (ProspectModal-style) ── */}
-            <View style={[modal.hero, { backgroundColor: pc + "14" }]}>
+            {/* ── HERO HEADER — team-color themed ── */}
+            <View style={[modal.hero, { backgroundColor: accent + "20" }]}>
               <LinearGradient
-                colors={[pc+"30", "transparent"]}
+                colors={[accent+"50", accent+"18", "transparent"]}
+                locations={[0, 0.5, 1]}
                 style={StyleSheet.absoluteFill}
                 pointerEvents="none"
               />
