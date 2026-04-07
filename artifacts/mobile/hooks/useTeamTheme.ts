@@ -25,8 +25,8 @@ export interface TeamTheme {
   kitJerseyColor: string;   // active kit jersey color (for kit-toggle pill only)
 }
 
-const FALLBACK_PRIMARY   = "#4F46E5";
-const FALLBACK_SECONDARY = "#0D9488";
+const FALLBACK_PRIMARY   = "#003087";   // VFL Navy — neutral until team loads
+const FALLBACK_SECONDARY = "#07182E";
 
 export function useTeamTheme(): TeamTheme {
   const { teamCustomization, season } = useNFL();

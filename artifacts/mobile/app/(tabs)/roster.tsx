@@ -218,16 +218,20 @@ export default function RosterScreen() {
         {/* Tab bar */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.tabScroll}
           contentContainerStyle={{ gap: 6, paddingHorizontal: 16, paddingBottom: 10 }}>
-          {TABS.filter(t => t.allowed).map(t => (
-            <TouchableOpacity key={t.key} onPress={() => setTab(t.key)}
-              style={[st.tabBtn, {
-                backgroundColor: tab === t.key ? teamColor : colors.secondary,
-                borderColor: tab === t.key ? teamColor : colors.border,
-              }]}>
-              <Feather name={t.icon} size={12} color={tab === t.key ? "#fff" : colors.mutedForeground} />
-              <Text style={[st.tabLabel, { color: tab === t.key ? "#fff" : colors.mutedForeground }]}>{t.label}</Text>
-            </TouchableOpacity>
-          ))}
+          {TABS.filter(t => t.allowed).map(t => {
+            const active = tab === t.key;
+            return (
+              <TouchableOpacity key={t.key} onPress={() => setTab(t.key)}
+                style={[st.tabBtn, {
+                  backgroundColor: active ? teamColor : teamColor + "18",
+                  borderColor:     active ? teamColor : teamColor + "35",
+                }]}>
+                {active && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#fff" }} />}
+                <Feather name={t.icon} size={12} color={active ? "#fff" : "rgba(255,255,255,0.45)"} />
+                <Text style={[st.tabLabel, { color: active ? "#fff" : "rgba(255,255,255,0.45)" }]}>{t.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
       </View>
 
@@ -335,20 +339,21 @@ export default function RosterScreen() {
               <Feather name="chevron-down" size={16} color={viewColor} />
             </TouchableOpacity>
 
-            {/* Position filter pills */}
+            {/* Position filter pills — kit-tab style */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false}
-              style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}
+              style={{ borderBottomWidth: 1, borderBottomColor: viewColor + "40" }}
               contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 10, gap: 6 }}>
               {(["ALL", ...ALL_POS] as (NFLPosition | "ALL")[]).map(pos => {
                 const active = posFilter === pos;
-                const pillColor = pos === "ALL" ? viewColor : POS_COLOR[pos as NFLPosition];
                 return (
                   <TouchableOpacity key={pos} onPress={() => setPosFilter(pos)}
                     style={[st.posPill, {
-                      backgroundColor: active ? pillColor : colors.secondary,
-                      borderColor: active ? pillColor : colors.border,
+                      backgroundColor: active ? viewColor : viewColor + "18",
+                      borderColor: active ? viewColor : viewColor + "35",
+                      flexDirection: "row", alignItems: "center", gap: 4,
                     }]}>
-                    <Text style={[st.posPillText, { color: active ? "#fff" : colors.mutedForeground }]}>{pos}</Text>
+                    {active && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#fff" }} />}
+                    <Text style={[st.posPillText, { color: active ? "#fff" : "rgba(255,255,255,0.50)" }]}>{pos}</Text>
                   </TouchableOpacity>
                 );
               })}
