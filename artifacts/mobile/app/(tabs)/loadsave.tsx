@@ -4,7 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert, Animated, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet,
+  Alert, Animated, KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -357,24 +357,26 @@ export default function LoadSaveScreen() {
       </ScrollView>
 
       {/* ── Save Name Modal ──────────────────────────────────────────────── */}
-      <Modal
-        visible={showModal}
-        transparent
-        animationType="slide"
-        onRequestClose={closeModal}
-        statusBarTranslucent
-      >
-        {/* Outer dim layer: flex column, dark background */}
-        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.65)", justifyContent: "flex-end" }}>
-          {/* Flex-1 spacer above sheet — tapping it dismisses the modal */}
-          <TouchableOpacity style={{ flex: 1 }} onPress={closeModal} activeOpacity={1} />
+      {showModal && (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={[
+            StyleSheet.absoluteFillObject,
+            { zIndex: 9999, justifyContent: "flex-end" },
+          ]}
+        >
+          {/* Flex-1 dimmed spacer — tapping it closes modal */}
+          <TouchableOpacity
+            style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.65)" }}
+            onPress={closeModal}
+            activeOpacity={1}
+          />
 
-          {/* Keyboard-aware sheet at the bottom */}
-          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"}>
+          {/* Sheet */}
           <View
             style={[
               styles.modalSheet,
-              { backgroundColor: colors.card, borderColor: primary + "60", paddingBottom: insets.bottom + 16 },
+              { backgroundColor: colors.card, borderColor: primary + "60", paddingBottom: insets.bottom + 16, zIndex: 9999 },
             ]}
           >
             <View style={styles.modalHandle} />
@@ -424,9 +426,8 @@ export default function LoadSaveScreen() {
               </TouchableOpacity>
             </View>
           </View>
-          </KeyboardAvoidingView>
-        </View>
-      </Modal>
+        </KeyboardAvoidingView>
+      )}
 
     </View>
   );
