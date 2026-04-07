@@ -168,21 +168,24 @@ export default function RosterScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
 
-      {/* Team-color ambient wash — follows viewColor when on Players tab */}
+      {/* Team-color ambient wash */}
       <LinearGradient
-        colors={[pageColor + "40", pageColor + "18", pageColor + "06", "transparent"]}
-        locations={[0, 0.25, 0.55, 1]}
-        style={{ position: "absolute", top: 0, left: 0, right: 0, height: 420, zIndex: 0 }}
+        colors={[pageColor + "70", pageColor + "30", pageColor + "10", "transparent"]}
+        locations={[0, 0.28, 0.58, 1]}
+        style={{ position: "absolute", top: 0, left: 0, right: 0, height: 520, zIndex: 0 }}
         pointerEvents="none"
       />
+      {/* Jersey stripe — left rail */}
+      <View style={{ position: "absolute", top: 0, left: 0, width: 4, bottom: 0, backgroundColor: pageColor + "90", zIndex: 0 }} pointerEvents="none" />
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <View style={[st.header, { paddingTop: topPad + 8, backgroundColor: "transparent", borderBottomColor: pageColor + "40" }]}>
         <View style={st.headerTop}>
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Text style={[st.headerTitle, { color: colors.foreground }]}>
-                {headerTeam?.city} {headerTeam?.name}
+              <Text style={[st.headerTitle, { color: "#FFFFFF" }]}>
+                {headerTeam?.city}{" "}
+                <Text style={{ color: pageColor }}>{headerTeam?.name}</Text>
               </Text>
               {tab === "roster" && !isViewingOwnTeam && (
                 <View style={[st.scoutingBadge, { backgroundColor: viewColor + "25", borderColor: viewColor + "60" }]}>
@@ -191,10 +194,10 @@ export default function RosterScreen() {
               )}
             </View>
             {isViewingOwnTeam || tab !== "roster"
-              ? <Text style={[st.headerSub, { color: colors.mutedForeground }]}>
+              ? <Text style={st.headerSub}>
                   Cap: ${capUsed}M used · ${capLeft}M avail · ${deadCap}M dead
                 </Text>
-              : <Text style={[st.headerSub, { color: colors.mutedForeground }]}>
+              : <Text style={st.headerSub}>
                   {viewTeam?.roster.length ?? 0} players · {viewTeam?.conference} · {viewTeam?.division}
                 </Text>
             }
@@ -246,9 +249,9 @@ export default function RosterScreen() {
               };
               return (
                 <View key={pos} style={{ marginBottom: 1 }}>
-                  <View style={[st.posHeader, { backgroundColor: teamColor + "18", borderLeftColor: teamColor }]}>
-                    <Text style={[st.posLabel, { color: teamColor }]}>{pos}</Text>
-                    <Text style={[st.posCount, { color: colors.mutedForeground }]}>{byPos.length} deep</Text>
+                  <View style={[st.posHeader, { backgroundColor: teamColor + "35", borderLeftColor: teamColor }]}>
+                    <Text style={[st.posLabel, { color: "#FFFFFF" }]}>{pos}</Text>
+                    <Text style={[st.posCount, { color: "rgba(255,255,255,0.55)" }]}>{byPos.length} deep</Text>
                   </View>
                   {byPos.map((p, idx) => {
                     const isStarter = idx === 0;
@@ -256,15 +259,17 @@ export default function RosterScreen() {
                     return (
                       <View key={p.id}
                         style={[st.depthRow, {
-                          backgroundColor: isStarter ? teamColor + "12" : colors.card,
-                          borderBottomColor: colors.border,
+                          backgroundColor: isStarter ? teamColor + "22" : colors.card,
+                          borderBottomColor: isStarter ? teamColor + "40" : colors.border,
+                          borderLeftWidth: isStarter ? 3 : 0,
+                          borderLeftColor: teamColor,
                         }]}>
                         <View style={[st.depthNum, { backgroundColor: isStarter ? teamColor : colors.secondary }]}>
-                          <Text style={[st.depthNumText, { color: isStarter ? "#fff" : colors.mutedForeground }]}>{idx + 1}</Text>
+                          <Text style={[st.depthNumText, { color: "#fff" }]}>{idx + 1}</Text>
                         </View>
                         <View style={{ flex: 1, minWidth: 0 }}>
                           <View style={st.depthNameRow}>
-                            <Text style={[st.depthName, { color: isStarter ? colors.foreground : colors.mutedForeground }]} numberOfLines={1}>{p.name}</Text>
+                            <Text style={[st.depthName, { color: "#FFFFFF", fontFamily: isStarter ? "Inter_700Bold" : "Inter_600SemiBold", opacity: isStarter ? 1 : 0.65 }]} numberOfLines={1}>{p.name}</Text>
                             {p.yearsExperience === 0 && (
                               <View style={st.rookieBadge}><Text style={st.rookieText}>R</Text></View>
                             )}
@@ -279,12 +284,15 @@ export default function RosterScreen() {
                               </View>
                             )}
                           </View>
-                          <Text style={[st.depthMeta, { color: colors.mutedForeground }]} numberOfLines={1}>
+                          <Text style={[st.depthMeta, { color: "rgba(255,255,255,0.45)" }]} numberOfLines={1}>
                             {p.age}yo · ${salaryStr}M · {p.contractYears}yr
                           </Text>
                         </View>
-                        <View style={[st.depthOvr, { backgroundColor: teamColor + "20", borderColor: teamColor + "50" }]}>
-                          <Text style={[st.depthOvrText, { color: teamColor }]}>{p.overall}</Text>
+                        <View style={[st.depthOvr, {
+                          backgroundColor: isStarter ? teamColor : teamColor + "20",
+                          borderColor: isStarter ? teamColor : teamColor + "50",
+                        }]}>
+                          <Text style={[st.depthOvrText, { color: isStarter ? "#FFFFFF" : teamColor }]}>{p.overall}</Text>
                         </View>
                         <View style={st.arrowCol}>
                           <TouchableOpacity onPress={e => { e.stopPropagation?.(); movePlayer(idx, "up"); }}
@@ -350,8 +358,8 @@ export default function RosterScreen() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={{ minWidth: 640 }}>
                 {/* Header row */}
-                <View style={[st.tableHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-                  <Text style={[st.colFixHdr, { color: colors.mutedForeground }]}># POS PLAYER</Text>
+                <View style={[st.tableHeader, { backgroundColor: viewColor + "28", borderBottomColor: viewColor + "50" }]}>
+                  <Text style={[st.colFixHdr, { color: viewColor }]}># POS PLAYER</Text>
                   <RSortHeader label="OVR"  sortKey="overall"          current={rosterSortKey} asc={rosterSortAsc} onSort={handleRosterSort} colors={colors} accent={viewColor} />
                   <RSortHeader label="SPD"  sortKey="speed"            current={rosterSortKey} asc={rosterSortAsc} onSort={handleRosterSort} colors={colors} accent={viewColor} />
                   <RSortHeader label="ACC"  sortKey="acceleration"     current={rosterSortKey} asc={rosterSortAsc} onSort={handleRosterSort} colors={colors} accent={viewColor} />
@@ -564,7 +572,7 @@ function RSortHeader({ label, sortKey: key, current, asc, onSort, colors, accent
   return (
     <TouchableOpacity onPress={() => onSort(key)}
       style={[st.colHeader, { borderBottomColor: active ? accent : "transparent", borderBottomWidth: active ? 2 : 0 }]}>
-      <Text style={[st.colHeaderText, { color: active ? accent : colors.mutedForeground }]}>{label}</Text>
+      <Text style={[st.colHeaderText, { color: active ? "#FFFFFF" : "rgba(255,255,255,0.55)", fontFamily: active ? "Inter_700Bold" : "Inter_600SemiBold" }]}>{label}</Text>
       {active && <Feather name={asc ? "chevron-up" : "chevron-down"} size={9} color={accent} />}
     </TouchableOpacity>
   );
@@ -574,16 +582,16 @@ function RSortHeader({ label, sortKey: key, current, asc, onSort, colors, accent
 function RosterPlayerRow({ p, rank, colors, accent, onPress, isOwnTeam, onManage }:
   { p: Player; rank: number; colors: any; accent: string;
     onPress: () => void; isOwnTeam: boolean; onManage?: () => void }) {
-  // Team-colorway rating tiers: full → bright → mid → muted
+  // Jersey-number rule: elite = pure white, good = near-white, avg = team accent, below avg = muted
   const ratingColor = (v: number) =>
-    v >= 90 ? accent :
-    v >= 80 ? accent + "CC" :
-    v >= 70 ? accent + "88" :
+    v >= 90 ? "#FFFFFF" :
+    v >= 80 ? "#E4E8FF" :
+    v >= 70 ? accent :
     colors.mutedForeground;
-  // Salary: max earners = full accent (flagship player), mid = dimmer, low = muted
+  // Salary: max earners = white (big contract), mid = team accent, low = muted
   const salaryColor = (sal: number) =>
-    sal >= 20 ? accent :
-    sal >= 10 ? accent + "AA" :
+    sal >= 20 ? "#FFFFFF" :
+    sal >= 10 ? accent :
     colors.mutedForeground;
 
   const acc = (p.positionRatings as any)?.acceleration ?? 50;
@@ -591,15 +599,20 @@ function RosterPlayerRow({ p, rank, colors, accent, onPress, isOwnTeam, onManage
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.75}
-      style={[st.rosterRow, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+      style={[st.rosterRow, {
+        backgroundColor: colors.card,
+        borderBottomColor: colors.border,
+        borderLeftWidth: 3,
+        borderLeftColor: accent + "80",
+      }]}>
       {/* Fixed left name cell */}
       <View style={{ width: 185, paddingRight: 6 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
           <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_500Medium", width: 20, textAlign: "right" }}>{rank}</Text>
-          <View style={[st.posBadge, { backgroundColor: accent + "25" }]}>
-            <Text style={[st.posBadgeText, { color: accent }]}>{p.position}</Text>
+          <View style={[st.posBadge, { backgroundColor: accent + "35" }]}>
+            <Text style={[st.posBadgeText, { color: "#FFFFFF" }]}>{p.position}</Text>
           </View>
-          <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground, flexShrink: 1 }} numberOfLines={1}>
+          <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: "#FFFFFF", flexShrink: 1 }} numberOfLines={1}>
             {p.name.split(" ").slice(-1)[0]}
           </Text>
           {p.developmentTrait !== "Normal" && (
@@ -633,7 +646,7 @@ function RosterPlayerRow({ p, rank, colors, accent, onPress, isOwnTeam, onManage
 }
 
 function ColCell({ value, color }: { value: string; color: string }) {
-  return <Text style={[st.colCell, { color }]}>{value}</Text>;
+  return <Text style={[st.colCell, { color, fontSize: 14, fontFamily: "Inter_700Bold" }]}>{value}</Text>;
 }
 
 // ─── PlanSection ─────────────────────────────────────────────────────────────
@@ -678,8 +691,8 @@ function ContractRow({ label, value, color }: { label: string; value: string; co
 const st = StyleSheet.create({
   header:       { borderBottomWidth: 1, zIndex: 10 },
   headerTop:    { flexDirection: "row", alignItems: "flex-start", paddingHorizontal: 16, paddingBottom: 10, gap: 8 },
-  headerTitle:  { fontSize: 20, fontFamily: "Inter_700Bold" },
-  headerSub:    { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
+  headerTitle:  { fontSize: 22, fontFamily: "Inter_700Bold", letterSpacing: -0.3 },
+  headerSub:    { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2, color: "rgba(255,255,255,0.50)" },
   scoutingBadge:{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, borderWidth: 1 },
   scoutingText: { fontSize: 9, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
   exportBtn:    { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
