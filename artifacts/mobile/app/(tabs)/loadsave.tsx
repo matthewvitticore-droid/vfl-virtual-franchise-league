@@ -4,8 +4,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert, Animated, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet,
-  Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View,
+  Alert, Animated, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet,
+  Text, TextInput, TouchableOpacity, View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { NFLTeamBadge } from "@/components/NFLTeamBadge";
@@ -110,7 +110,11 @@ export default function LoadSaveScreen() {
   }
 
   async function commitSave() {
-    if (!season || !saveName.trim()) return;
+    if (!saveName.trim()) return;
+    if (!season) {
+      Alert.alert("No Active Franchise", "Load or start a franchise before saving.");
+      return;
+    }
     setSaving(true);
     try {
       const myTeam = season.teams.find(t => t.id === season.playerTeamId);
@@ -360,14 +364,19 @@ export default function LoadSaveScreen() {
         onRequestClose={closeModal}
         statusBarTranslucent
       >
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-        >
-          <TouchableWithoutFeedback onPress={closeModal}>
-            <View style={StyleSheet.absoluteFill} />
-          </TouchableWithoutFeedback>
+        <View style={{ flex: 1 }}>
+          {/* Dim backdrop — rendered first (behind everything) */}
+          <Pressable
+            style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.65)" }]}
+            onPress={closeModal}
+          />
 
+          {/* Keyboard-aware wrapper — box-none so it never steals button taps */}
+          <KeyboardAvoidingView
+            style={{ flex: 1, justifyContent: "flex-end" }}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            pointerEvents="box-none"
+          >
           <View
             style={[
               styles.modalSheet,
@@ -421,7 +430,8 @@ export default function LoadSaveScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </KeyboardAvoidingView>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
     </View>
   );
