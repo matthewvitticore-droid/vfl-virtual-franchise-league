@@ -41,14 +41,16 @@ ALTER TABLE franchises         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE franchise_members  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE franchise_state    ENABLE ROW LEVEL SECURITY;
 
--- FRANCHISES: anyone authenticated can create; members can read; creator can delete
+-- FRANCHISES: anyone authenticated can create; members can read; anyone authenticated
+-- can look up a franchise by join_code (required for the join flow); creator can delete
 CREATE POLICY "auth_create_franchise" ON franchises
   FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 
-CREATE POLICY "member_read_franchise" ON franchises
-  FOR SELECT USING (
-    id IN (SELECT franchise_id FROM franchise_members WHERE user_id = auth.uid())
-  );
+-- Allow any authenticated user to read franchise rows (needed for join-by-code lookup)
+-- Drop old restrictive policy first if it was previously applied
+DROP POLICY IF EXISTS "member_read_franchise" ON franchises;
+CREATE POLICY "auth_read_franchise" ON franchises
+  FOR SELECT USING (auth.uid() IS NOT NULL);
 
 CREATE POLICY "creator_delete_franchise" ON franchises
   FOR DELETE USING (created_by = auth.uid());

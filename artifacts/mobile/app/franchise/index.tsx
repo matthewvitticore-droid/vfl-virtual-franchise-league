@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -89,6 +90,17 @@ export default function FranchiseLobbyScreen() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Pre-fill join code if coming from the launch screen "Join Franchise" flow
+  useEffect(() => {
+    AsyncStorage.getItem("vfl_pending_join_code").then(code => {
+      if (code) {
+        setJoinCode(code);
+        setScreen("join");
+        AsyncStorage.removeItem("vfl_pending_join_code");
+      }
+    });
+  }, []);
 
   const selectedTeam = VFL_TEAMS.find(t => t.id === selectedTeamId) ?? VFL_TEAMS[13];
 

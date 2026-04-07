@@ -112,7 +112,23 @@ export default function LaunchScreen() {
 
   function handleEnter() {
     if (mode === "join" && joinInput.trim().length < 4) return;
-    router.replace("/(tabs)");
+
+    if (mode === "solo") {
+      AsyncStorage.setItem("vfl_gm_mode", "solo").then(() => {
+        router.replace("/(tabs)");
+      });
+    } else if (mode === "cogm") {
+      AsyncStorage.setItem("vfl_gm_mode", "cogm").then(() => {
+        router.push("/auth/login");
+      });
+    } else {
+      Promise.all([
+        AsyncStorage.setItem("vfl_gm_mode", "join"),
+        AsyncStorage.setItem("vfl_pending_join_code", joinInput.trim().toUpperCase()),
+      ]).then(() => {
+        router.push("/auth/login");
+      });
+    }
   }
 
   function handleModeChange(m: Mode) {
