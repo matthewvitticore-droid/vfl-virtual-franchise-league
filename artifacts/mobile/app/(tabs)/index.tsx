@@ -711,10 +711,27 @@ const KITS = [
   { key: "alternate" as const, label: "ALT"  },
 ];
 
+function hexLum(hex: string): number {
+  const h = hex.replace("#", "").slice(0, 6);
+  const r = parseInt(h.slice(0,2),16)/255, g = parseInt(h.slice(2,4),16)/255, b = parseInt(h.slice(4,6),16)/255;
+  const ch = (c: number) => c <= 0.03928 ? c/12.92 : ((c+0.055)/1.055)**2.4;
+  return 0.2126*ch(r) + 0.7152*ch(g) + 0.0722*ch(b);
+}
+// Pick the darkest readable color between two candidates
+function darkest(a: string | undefined, b: string): string {
+  if (!a) return b;
+  return hexLum(a) <= hexLum(b) ? a : b;
+}
+
 function KitToggle() {
   const colors = useColors();
   const theme  = useTeamTheme();
-  const { teamCustomization, saveCustomization } = useNFL();
+  const { teamCustomization, saveCustomization, season } = useNFL();
+
+  // Brand colors straight from team definition — most reliable source
+  const myTeam      = season?.teams.find(t => t.id === season?.playerTeamId);
+  const brandPrimary   = myTeam?.primaryColor   ?? teamCustomization?.primaryColor   ?? theme.primary;
+  const brandSecondary = myTeam?.secondaryColor  ?? teamCustomization?.secondaryColor ?? theme.secondary;
 
   const activeKit = (teamCustomization?.featuredUniformSet ?? "home") as "home" | "away" | "alternate";
 
@@ -730,11 +747,10 @@ function KitToggle() {
       <View style={st.kitPills}>
         {KITS.map(k => {
           const isActive = k.key === activeKit;
-          // Use the actual jersey color of each kit so the pill always shows
-          // the real kit color (home=red, away=white, alt=navy) regardless of
-          // what theme.primary resolves to.
-          const homeJersey = teamCustomization?.uniforms?.home?.jerseyColor      ?? theme.primary;
-          const altJersey  = teamCustomization?.uniforms?.alternate?.jerseyColor ?? theme.secondary;
+          // Use jersey color for each kit, but guard against light alt jerseys
+          // by falling back to the brand secondary (always a dark team color).
+          const homeJersey = darkest(teamCustomization?.uniforms?.home?.jerseyColor, brandPrimary);
+          const altJersey  = darkest(teamCustomization?.uniforms?.alternate?.jerseyColor, brandSecondary);
           const activeBg: Record<typeof k.key, string> = {
             home:      homeJersey,
             away:      "#FFFFFF",
