@@ -455,8 +455,8 @@ function resolvePlay(
   const qb  = getPlayer(attacker, "QB");
   const wr1 = getPlayer(attacker, "WR");
   // QB accuracy and WR skill each shift completion % meaningfully
-  const qbThrowAcc  = qb  ? (qb.posRatings.throwAccMid  - 75) * 0.003 + (qb.posRatings.throwAccDeep - 75) * 0.002 : 0;
-  const wrCatchBonus = wr1 ? (wr1.posRatings.catching    - 75) * 0.003 + (wr1.posRatings.routeRunning - 75) * 0.001 : 0;
+  const qbThrowAcc  = qb  ? ((qb.posRatings?.throwAccMid  ?? 75) - 75) * 0.003 + ((qb.posRatings?.throwAccDeep ?? 75) - 75) * 0.002 : 0;
+  const wrCatchBonus = wr1 ? ((wr1.posRatings?.catching    ?? 75) - 75) * 0.003 + ((wr1.posRatings?.routeRunning ?? 75) - 75) * 0.001 : 0;
   const sackProb = clamp((netDef - netAtk) * 0.13 + 0.04, 0.015, 0.16);
   if (Math.random() < sackProb) return { result: "sack", yards: -irng(3, 10), isInjury: false };
 

@@ -4,7 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert, Animated, KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
+  Alert, Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -75,7 +75,7 @@ export default function LoadSaveScreen() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [gmMode,      setGmMode]      = useState<string>("solo");
 
-  const slideAnim = useRef(new Animated.Value(80)).current;
+  const scrollRef = useRef<ScrollView>(null);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
@@ -101,7 +101,7 @@ export default function LoadSaveScreen() {
       : `My Franchise · ${season?.year ?? 2026}`;
     setSaveName(suggested);
     setShowModal(true);
-    Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 80, friction: 10 }).start();
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120);
   }
 
   function closeModal() {
@@ -206,8 +206,10 @@ export default function LoadSaveScreen() {
       />
 
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={[styles.scroll, { paddingTop: topPad + 16, paddingBottom: Platform.OS === "web" ? 120 : 110 }]}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         {/* ── Header ──────────────────────────────────────────────────────── */}
         <View style={styles.headerRow}>
@@ -295,13 +297,55 @@ export default function LoadSaveScreen() {
 
               <View style={[styles.cardDivider, { backgroundColor: colors.border }]} />
 
-              <TouchableOpacity
-                onPress={openSaveModal}
-                style={[styles.actionBtn, { backgroundColor: primary }]}
-              >
-                <Feather name="save" size={16} color="#fff" />
-                <Text style={styles.actionBtnText}>Save Franchise Now</Text>
-              </TouchableOpacity>
+              {showModal ? (
+                // ── Inline name entry ──────────────────────────────────────
+                <View style={styles.inlineNaming}>
+                  <View style={[styles.inputWrap, { backgroundColor: colors.background, borderColor: primary + "80" }]}>
+                    <Feather name="edit-2" size={14} color={colors.mutedForeground} style={{ marginLeft: 12 }} />
+                    <TextInput
+                      value={saveName}
+                      onChangeText={setSaveName}
+                      style={[styles.nameInput, { color: colors.foreground }]}
+                      placeholderTextColor={colors.mutedForeground}
+                      placeholder="e.g. Sharks · Week 12 · 2025"
+                      maxLength={48}
+                      autoFocus
+                      selectTextOnFocus
+                      returnKeyType="done"
+                      onSubmitEditing={commitSave}
+                    />
+                    {saveName.length > 0 && (
+                      <TouchableOpacity onPress={() => setSaveName("")} style={{ padding: 10 }}>
+                        <Feather name="x-circle" size={14} color={colors.mutedForeground} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  <View style={styles.modalBtns}>
+                    <TouchableOpacity
+                      onPress={closeModal}
+                      style={[styles.cancelBtn, { borderColor: colors.border }]}
+                    >
+                      <Text style={[styles.cancelBtnText, { color: colors.mutedForeground }]}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={commitSave}
+                      disabled={saving || !saveName.trim()}
+                      style={[styles.confirmBtn, { backgroundColor: primary, opacity: (!saveName.trim() || saving) ? 0.5 : 1 }]}
+                    >
+                      <Feather name="save" size={14} color="#fff" />
+                      <Text style={styles.confirmBtnText}>{saving ? "Saving…" : "Save"}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  onPress={openSaveModal}
+                  style={[styles.actionBtn, { backgroundColor: primary }]}
+                >
+                  <Feather name="save" size={16} color="#fff" />
+                  <Text style={styles.actionBtnText}>Save Franchise Now</Text>
+                </TouchableOpacity>
+              )}
 
               <TouchableOpacity
                 onPress={handleReturnToLaunch}
@@ -356,78 +400,6 @@ export default function LoadSaveScreen() {
         </Text>
       </ScrollView>
 
-      {/* ── Save Name Modal ──────────────────────────────────────────────── */}
-      {showModal && (
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={[
-            StyleSheet.absoluteFillObject,
-            { zIndex: 9999, justifyContent: "flex-end" },
-          ]}
-        >
-          {/* Flex-1 dimmed spacer — tapping it closes modal */}
-          <TouchableOpacity
-            style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.65)" }}
-            onPress={closeModal}
-            activeOpacity={1}
-          />
-
-          {/* Sheet */}
-          <View
-            style={[
-              styles.modalSheet,
-              { backgroundColor: colors.card, borderColor: primary + "60", paddingBottom: insets.bottom + 16, zIndex: 9999 },
-            ]}
-          >
-            <View style={styles.modalHandle} />
-
-            <View style={styles.modalHeaderRow}>
-              <Text style={[styles.modalTitle, { color: colors.foreground }]}>Name This Save</Text>
-              <TouchableOpacity onPress={closeModal} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                <Feather name="x" size={20} color={colors.mutedForeground} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={[styles.inputWrap, { backgroundColor: colors.background, borderColor: primary + "60" }]}>
-              <Feather name="edit-2" size={15} color={colors.mutedForeground} style={{ marginLeft: 12 }} />
-              <TextInput
-                value={saveName}
-                onChangeText={setSaveName}
-                style={[styles.nameInput, { color: colors.foreground }]}
-                placeholderTextColor={colors.mutedForeground}
-                placeholder="e.g. Sharks · Week 12 · 2025"
-                maxLength={48}
-                autoFocus
-                selectTextOnFocus
-                returnKeyType="done"
-                onSubmitEditing={commitSave}
-              />
-              {saveName.length > 0 && (
-                <TouchableOpacity onPress={() => setSaveName("")} style={{ padding: 10 }}>
-                  <Feather name="x-circle" size={15} color={colors.mutedForeground} />
-                </TouchableOpacity>
-              )}
-            </View>
-
-            <View style={styles.modalBtns}>
-              <TouchableOpacity
-                onPress={closeModal}
-                style={[styles.cancelBtn, { borderColor: colors.border }]}
-              >
-                <Text style={[styles.cancelBtnText, { color: colors.mutedForeground }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={commitSave}
-                disabled={saving || !saveName.trim()}
-                style={[styles.confirmBtn, { backgroundColor: primary, opacity: (!saveName.trim() || saving) ? 0.5 : 1 }]}
-              >
-                <Feather name="save" size={15} color="#fff" />
-                <Text style={styles.confirmBtnText}>{saving ? "Saving…" : "Save"}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      )}
 
     </View>
   );
@@ -559,6 +531,7 @@ const styles = StyleSheet.create({
   modalTitle:         { fontSize: 19, fontFamily: "Inter_700Bold" },
   inputWrap:          { flexDirection: "row", alignItems: "center", borderRadius: 12, borderWidth: 1.5, overflow: "hidden" },
   nameInput:          { flex: 1, fontSize: 15, fontFamily: "Inter_500Medium", paddingHorizontal: 10, paddingVertical: 12 },
+  inlineNaming:       { gap: 10, paddingTop: 4 },
   modalBtns:          { flexDirection: "row", gap: 10 },
   cancelBtn:          { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, alignItems: "center" },
   cancelBtnText:      { fontSize: 14, fontFamily: "Inter_600SemiBold" },
