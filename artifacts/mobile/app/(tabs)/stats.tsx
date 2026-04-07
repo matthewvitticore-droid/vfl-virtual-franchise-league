@@ -401,6 +401,7 @@ export default function StatsScreen() {
   });
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [recordGroup, setRecordGroup] = useState<RecordGroup>("pass");
+  const [recordMode,  setRecordMode]  = useState<"season" | "alltime">("season");
   const [modalPlayer, setModalPlayer] = useState<PlayerWithTeam | null>(null);
 
   // Build full player list with team metadata
@@ -524,6 +525,91 @@ export default function StatsScreen() {
     };
   }, [allPlayers]);
 
+  // ── All-time records (summed career totals per player) ─────────────────────
+
+  const allTimeRecordCats = useMemo((): Record<RecordGroup, RecordCategory[]> => {
+    // Sum all career seasons + current season for each player
+    function sumStats(player: PlayerWithTeam): PlayerSeasonStats {
+      const all = [...(player.careerStats ?? []), player.stats];
+      return all.reduce<PlayerSeasonStats>((acc, s) => ({
+        season: undefined,
+        gamesPlayed: acc.gamesPlayed + s.gamesPlayed,
+        passingYards: acc.passingYards + s.passingYards,
+        passingTDs: acc.passingTDs + s.passingTDs,
+        interceptions: acc.interceptions + s.interceptions,
+        completions: acc.completions + s.completions,
+        attempts: acc.attempts + s.attempts,
+        qbRating: 0,
+        rushingYards: acc.rushingYards + s.rushingYards,
+        rushingTDs: acc.rushingTDs + s.rushingTDs,
+        carries: acc.carries + s.carries,
+        receivingYards: acc.receivingYards + s.receivingYards,
+        receivingTDs: acc.receivingTDs + s.receivingTDs,
+        receptions: acc.receptions + s.receptions,
+        targets: acc.targets + s.targets,
+        tackles: acc.tackles + s.tackles,
+        sacks: acc.sacks + s.sacks,
+        forcedFumbles: acc.forcedFumbles + s.forcedFumbles,
+        defensiveINTs: acc.defensiveINTs + s.defensiveINTs,
+        passDeflections: acc.passDeflections + s.passDeflections,
+        yardsPerCarry: 0, yardsPerCatch: 0,
+        fieldGoalsMade: acc.fieldGoalsMade + s.fieldGoalsMade,
+        fieldGoalsAttempted: acc.fieldGoalsAttempted + s.fieldGoalsAttempted,
+        puntsAverage: 0,
+      }), {
+        gamesPlayed:0,passingYards:0,passingTDs:0,interceptions:0,completions:0,attempts:0,
+        qbRating:0,rushingYards:0,rushingTDs:0,carries:0,receivingYards:0,receivingTDs:0,
+        receptions:0,targets:0,tackles:0,sacks:0,forcedFumbles:0,defensiveINTs:0,
+        passDeflections:0,yardsPerCarry:0,yardsPerCatch:0,fieldGoalsMade:0,fieldGoalsAttempted:0,
+        puntsAverage:0,
+      });
+    }
+
+    function allTop25(
+      filter: (p:PlayerWithTeam)=>boolean,
+      get: (s:PlayerSeasonStats)=>number,
+      fmt: (v:number)=>string,
+    ): RecordEntry[] {
+      return allPlayers
+        .filter(filter)
+        .map(p => { const tot = sumStats(p); return { val:get(tot), p }; })
+        .filter(x => x.val > 0)
+        .sort((a,b) => b.val - a.val)
+        .slice(0,25)
+        .map(({val,p},i) => ({
+          rank:i+1, value:fmt(val), rawVal:val,
+          playerName:p.name, team:p.teamAbbr, pos:p.position, playerId:p.id,
+          season: undefined,
+        }));
+    }
+
+    return {
+      pass: [
+        { title:"Passing Yards — Career",    entries: allTop25(p=>p.position==="QB", s=>s.passingYards,  v=>v.toLocaleString()) },
+        { title:"Passing TDs — Career",      entries: allTop25(p=>p.position==="QB", s=>s.passingTDs,    v=>String(v)) },
+        { title:"Completions — Career",      entries: allTop25(p=>p.position==="QB", s=>s.completions,   v=>v.toLocaleString()) },
+        { title:"INTs Thrown — Career",      entries: allTop25(p=>p.position==="QB", s=>s.interceptions, v=>String(v)) },
+      ],
+      rush: [
+        { title:"Rushing Yards — Career",    entries: allTop25(p=>["RB","QB"].includes(p.position), s=>s.rushingYards, v=>v.toLocaleString()) },
+        { title:"Rushing TDs — Career",      entries: allTop25(p=>["RB","QB"].includes(p.position), s=>s.rushingTDs,   v=>String(v)) },
+        { title:"Rush Attempts — Career",    entries: allTop25(p=>["RB","QB"].includes(p.position), s=>s.carries,      v=>v.toLocaleString()) },
+      ],
+      rec: [
+        { title:"Receiving Yards — Career",  entries: allTop25(p=>["WR","TE","RB"].includes(p.position), s=>s.receivingYards, v=>v.toLocaleString()) },
+        { title:"Receptions — Career",       entries: allTop25(p=>["WR","TE","RB"].includes(p.position), s=>s.receptions,     v=>v.toLocaleString()) },
+        { title:"Receiving TDs — Career",    entries: allTop25(p=>["WR","TE","RB"].includes(p.position), s=>s.receivingTDs,   v=>String(v)) },
+      ],
+      def: [
+        { title:"Tackles — Career",          entries: allTop25(p=>["LB","CB","S","DE","DT"].includes(p.position), s=>s.tackles,         v=>v.toLocaleString()) },
+        { title:"Sacks — Career",            entries: allTop25(p=>["DE","DT","LB"].includes(p.position),          s=>s.sacks,           v=>v.toFixed(1)) },
+        { title:"Interceptions — Career",    entries: allTop25(p=>["CB","S","LB"].includes(p.position),           s=>s.defensiveINTs,   v=>String(v)) },
+        { title:"Pass Deflections — Career", entries: allTop25(p=>["CB","S"].includes(p.position),                s=>s.passDeflections, v=>String(v)) },
+        { title:"Forced Fumbles — Career",   entries: allTop25(p=>["DE","LB","CB","S"].includes(p.position),      s=>s.forcedFumbles,   v=>String(v)) },
+      ],
+    };
+  }, [allPlayers]);
+
   // ── Tab config ─────────────────────────────────────────────────────────────
 
   const TABS: { key:StatTab; label:string; icon:any }[] = [
@@ -629,7 +715,26 @@ export default function StatsScreen() {
         ) : (
           /* Records */
           <View>
-            {/* Record group sub-tabs */}
+            {/* Mode toggle — Single Season | All-Time */}
+            <View style={[rec.modeBar, { backgroundColor:colors.card, borderBottomColor:colors.border }]}>
+              {(["season","alltime"] as const).map(mode => {
+                const active = recordMode === mode;
+                const label  = mode === "season" ? "Single Season" : "All-Time";
+                const icon   = mode === "season" ? "calendar"      : "star";
+                return (
+                  <TouchableOpacity key={mode} onPress={() => setRecordMode(mode)}
+                    style={[rec.modeBtn, {
+                      backgroundColor: active ? teamColor : "transparent",
+                      borderColor: active ? teamColor : colors.border,
+                    }]}>
+                    <Feather name={icon} size={11} color={active ? "#fff" : colors.mutedForeground} />
+                    <Text style={[rec.modeLabel, { color: active ? "#fff" : colors.mutedForeground }]}>{label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Sport / category group sub-tabs */}
             <View style={[rec.tabBar, { backgroundColor:colors.card, borderBottomColor:colors.border }]}>
               {RECORD_GROUPS.map(g => (
                 <TouchableOpacity key={g.key} onPress={() => setRecordGroup(g.key)}
@@ -640,11 +745,12 @@ export default function StatsScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+
             {gamesPlayed === 0 ? (
               <EmptyMsg message="Start simming games to build VFL history" />
             ) : (
               <RecordList
-                cats={recordCats[recordGroup]}
+                cats={(recordMode === "season" ? recordCats : allTimeRecordCats)[recordGroup]}
                 accentColor={teamColor}
                 onPlayerPress={id => {
                   const p = allPlayers.find(pl => pl.id === id);
@@ -683,6 +789,11 @@ const hd = StyleSheet.create({
 });
 
 const rec = StyleSheet.create({
+  modeBar:   { flexDirection:"row", gap:10, paddingHorizontal:14, paddingVertical:10,
+               borderBottomWidth:1 },
+  modeBtn:   { flex:1, flexDirection:"row", alignItems:"center", justifyContent:"center",
+               gap:6, paddingVertical:8, borderRadius:8, borderWidth:1 },
+  modeLabel: { fontSize:12, fontFamily:"Inter_600SemiBold" },
   tabBar:    { flexDirection:"row", borderBottomWidth:1 },
   groupBtn:  { flex:1, alignItems:"center", paddingVertical:11, borderBottomWidth:2.5 },
   groupLabel:{ fontSize:13, fontFamily:"Inter_600SemiBold" },

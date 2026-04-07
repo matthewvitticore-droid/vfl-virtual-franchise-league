@@ -218,86 +218,156 @@ function SeasonStats({ pos, stats, accent, gp }: {
   );
 }
 
+// ─── Career stat sum helper ────────────────────────────────────────────────────
+function sumCareerStats(seasons: PlayerSeasonStats[]): PlayerSeasonStats {
+  const t = seasons.reduce<PlayerSeasonStats>((acc, s) => ({
+    season: undefined,
+    gamesPlayed:          acc.gamesPlayed          + s.gamesPlayed,
+    passingYards:         acc.passingYards          + s.passingYards,
+    passingTDs:           acc.passingTDs            + s.passingTDs,
+    interceptions:        acc.interceptions          + s.interceptions,
+    completions:          acc.completions            + s.completions,
+    attempts:             acc.attempts               + s.attempts,
+    qbRating:             0, // computed below
+    rushingYards:         acc.rushingYards           + s.rushingYards,
+    rushingTDs:           acc.rushingTDs             + s.rushingTDs,
+    carries:              acc.carries                + s.carries,
+    receivingYards:       acc.receivingYards         + s.receivingYards,
+    receivingTDs:         acc.receivingTDs           + s.receivingTDs,
+    receptions:           acc.receptions             + s.receptions,
+    targets:              acc.targets                + s.targets,
+    tackles:              acc.tackles                + s.tackles,
+    sacks:                acc.sacks                  + s.sacks,
+    forcedFumbles:        acc.forcedFumbles           + s.forcedFumbles,
+    defensiveINTs:        acc.defensiveINTs           + s.defensiveINTs,
+    passDeflections:      acc.passDeflections         + s.passDeflections,
+    yardsPerCarry:        0,
+    yardsPerCatch:        0,
+    fieldGoalsMade:       acc.fieldGoalsMade          + s.fieldGoalsMade,
+    fieldGoalsAttempted:  acc.fieldGoalsAttempted     + s.fieldGoalsAttempted,
+    puntsAverage:         0,
+  }), {
+    gamesPlayed:0, passingYards:0, passingTDs:0, interceptions:0, completions:0, attempts:0,
+    qbRating:0, rushingYards:0, rushingTDs:0, carries:0, receivingYards:0, receivingTDs:0,
+    receptions:0, targets:0, tackles:0, sacks:0, forcedFumbles:0, defensiveINTs:0,
+    passDeflections:0, yardsPerCarry:0, yardsPerCatch:0, fieldGoalsMade:0, fieldGoalsAttempted:0,
+    puntsAverage:0,
+  });
+  // Weighted QB rating
+  const totalAttempts = seasons.reduce((a, s) => a + s.attempts, 0);
+  t.qbRating = totalAttempts > 0
+    ? seasons.reduce((a, s) => a + s.qbRating * s.attempts, 0) / totalAttempts
+    : 0;
+  t.yardsPerCarry = t.carries > 0 ? t.rushingYards / t.carries : 0;
+  t.yardsPerCatch = t.receptions > 0 ? t.receivingYards / t.receptions : 0;
+  const puntSeasons = seasons.filter(s => s.puntsAverage > 0);
+  t.puntsAverage = puntSeasons.length > 0
+    ? puntSeasons.reduce((a, s) => a + s.puntsAverage, 0) / puntSeasons.length
+    : 0;
+  return t;
+}
+
+// Build the cells array for a single season stat line (shared by season rows + career totals)
+function buildStatCells(pos: NFLPosition, s: PlayerSeasonStats): { label:string; value:string }[] {
+  const dec = (n: number, p = 1) => n > 0 ? n.toFixed(p) : "—";
+  const fmt = (n: number) => n > 0 ? n.toLocaleString() : "—";
+  if (pos === "QB") return [
+    { label:"YDS",  value: fmt(s.passingYards) },
+    { label:"TD",   value: s.passingTDs > 0 ? String(s.passingTDs) : "—" },
+    { label:"INT",  value: s.interceptions > 0 ? String(s.interceptions) : "—" },
+    { label:"CMP%", value: s.attempts > 0 ? `${((s.completions/s.attempts)*100).toFixed(0)}%` : "—" },
+    { label:"RTG",  value: s.qbRating > 0 ? s.qbRating.toFixed(1) : "—" },
+  ];
+  if (pos === "RB") return [
+    { label:"CAR", value: s.carries > 0 ? String(s.carries) : "—" },
+    { label:"YDS", value: fmt(s.rushingYards) },
+    { label:"YPC", value: s.carries > 0 ? dec(s.rushingYards / s.carries) : "—" },
+    { label:"TD",  value: s.rushingTDs > 0 ? String(s.rushingTDs) : "—" },
+  ];
+  if (pos === "WR" || pos === "TE") return [
+    { label:"REC", value: s.receptions > 0 ? String(s.receptions) : "—" },
+    { label:"YDS", value: fmt(s.receivingYards) },
+    { label:"YPR", value: s.receptions > 0 ? dec(s.receivingYards / s.receptions) : "—" },
+    { label:"TD",  value: s.receivingTDs > 0 ? String(s.receivingTDs) : "—" },
+  ];
+  if (pos === "K") return [
+    { label:"FGM", value: s.fieldGoalsMade > 0 ? String(s.fieldGoalsMade) : "—" },
+    { label:"FGA", value: s.fieldGoalsAttempted > 0 ? String(s.fieldGoalsAttempted) : "—" },
+    { label:"FG%", value: s.fieldGoalsAttempted > 0 ? `${((s.fieldGoalsMade/s.fieldGoalsAttempted)*100).toFixed(0)}%` : "—" },
+  ];
+  if (pos === "P") return [
+    { label:"AVG", value: dec(s.puntsAverage) },
+  ];
+  return [
+    { label:"TCK",  value: s.tackles > 0 ? String(s.tackles) : "—" },
+    { label:"SACK", value: s.sacks > 0 ? s.sacks.toFixed(1) : "—" },
+    { label:"INT",  value: s.defensiveINTs > 0 ? String(s.defensiveINTs) : "—" },
+    { label:"PD",   value: s.passDeflections > 0 ? String(s.passDeflections) : "—" },
+  ];
+}
+
 // ─── Career history rows ───────────────────────────────────────────────────────
-function CareerSection({ career, pos, accent }: {
-  career: PlayerSeasonStats[]; pos: NFLPosition; accent: string;
+function CareerSection({ career, currentStats, pos, accent }: {
+  career: PlayerSeasonStats[]; currentStats: PlayerSeasonStats;
+  pos: NFLPosition; accent: string;
 }) {
   const colors = useColors();
   if (career.length === 0) return <Empty message="No career history yet. Stats archive after each season." />;
+
+  // All seasons including current (if it has any data)
+  const hasCurrentData = currentStats.gamesPlayed > 0;
+  const allSeasons = hasCurrentData ? [...career, currentStats] : career;
+  const totals = sumCareerStats(allSeasons);
+
   return (
     <View style={{ gap:6 }}>
-      {[...career].reverse().map((s, i) => {
-        const yr = s.season ?? "—";
-        const dec = (n: number, p = 1) => n > 0 ? n.toFixed(p) : "—";
-        const fmt = (n: number) => n > 0 ? n.toString() : "—";
-        let cells: { label: string; value: string }[] = [];
-        if (pos === "QB") {
-          cells = [
-            { label:"YDS",  value:s.passingYards>0 ? s.passingYards.toLocaleString() : "—" },
-            { label:"TD",   value:fmt(s.passingTDs) },
-            { label:"INT",  value:fmt(s.interceptions) },
-            { label:"CMP%", value:s.attempts>0 ? `${((s.completions/s.attempts)*100).toFixed(0)}%` : "—" },
-            { label:"RTG",  value:s.qbRating>0 ? s.qbRating.toFixed(1) : "—" },
-          ];
-        } else if (pos === "RB") {
-          cells = [
-            { label:"CAR", value:fmt(s.carries) },
-            { label:"YDS", value:s.rushingYards>0 ? s.rushingYards.toLocaleString() : "—" },
-            { label:"YPC", value:s.carries>0 ? dec(s.rushingYards/s.carries) : "—" },
-            { label:"TD",  value:fmt(s.rushingTDs) },
-          ];
-        } else if (pos === "WR" || pos === "TE") {
-          cells = [
-            { label:"REC", value:fmt(s.receptions) },
-            { label:"YDS", value:s.receivingYards>0 ? s.receivingYards.toLocaleString() : "—" },
-            { label:"YPR", value:s.receptions>0 ? dec(s.receivingYards/s.receptions) : "—" },
-            { label:"TD",  value:fmt(s.receivingTDs) },
-          ];
-        } else if (pos === "K") {
-          cells = [
-            { label:"FGM", value:fmt(s.fieldGoalsMade) },
-            { label:"FGA", value:fmt(s.fieldGoalsAttempted) },
-            { label:"FG%", value:s.fieldGoalsAttempted>0 ? `${((s.fieldGoalsMade/s.fieldGoalsAttempted)*100).toFixed(0)}%` : "—" },
-          ];
-        } else if (pos === "P") {
-          cells = [{ label:"AVG", value:dec(s.puntsAverage) }];
-        } else {
-          cells = [
-            { label:"TCK",  value:fmt(s.tackles) },
-            { label:"SACK", value:s.sacks>0 ? s.sacks.toFixed(1) : "—" },
-            { label:"INT",  value:fmt(s.defensiveINTs) },
-            { label:"PD",   value:fmt(s.passDeflections) },
-          ];
-        }
-        return (
-          <View key={i} style={[cr.row, { backgroundColor:colors.card, borderColor:colors.border }]}>
-            <View style={[cr.badge, { backgroundColor:accent+"20", borderColor:accent+"40" }]}>
-              <Text style={[cr.yr, { color:accent }]}>{yr}</Text>
-              <Text style={[cr.gp, { color:colors.mutedForeground }]}>{s.gamesPlayed}G</Text>
-            </View>
-            <View style={cr.chips}>
-              {cells.map(c => (
-                <View key={c.label} style={cr.chip}>
-                  <Text style={[cr.chipVal, { color:colors.foreground }]}>{c.value}</Text>
-                  <Text style={[cr.chipLbl, { color:colors.mutedForeground }]}>{c.label}</Text>
-                </View>
-              ))}
-            </View>
+      {[...career].reverse().map((s, i) => (
+        <View key={i} style={[cr.row, { backgroundColor:colors.card, borderColor:colors.border }]}>
+          <View style={[cr.badge, { backgroundColor:accent+"20", borderColor:accent+"40" }]}>
+            <Text style={[cr.yr, { color:accent }]}>{s.season ?? "—"}</Text>
+            <Text style={[cr.gp, { color:colors.mutedForeground }]}>{s.gamesPlayed}G</Text>
           </View>
-        );
-      })}
+          <View style={cr.chips}>
+            {buildStatCells(pos, s).map(c => (
+              <View key={c.label} style={cr.chip}>
+                <Text style={[cr.chipVal, { color:colors.foreground }]}>{c.value}</Text>
+                <Text style={[cr.chipLbl, { color:colors.mutedForeground }]}>{c.label}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ))}
+
+      {/* ── Topps-style career totals line ── */}
+      <View style={[cr.divider, { borderColor: accent + "50" }]} />
+      <View style={[cr.row, cr.totalsRow, { backgroundColor: accent + "14", borderColor: accent + "50" }]}>
+        <View style={[cr.badge, { backgroundColor: accent + "35", borderColor: accent }]}>
+          <Text style={[cr.yr, { color: accent, fontSize:10, letterSpacing:0.5 }]}>TOTL</Text>
+          <Text style={[cr.gp, { color: accent + "BB" }]}>{totals.gamesPlayed}G</Text>
+        </View>
+        <View style={cr.chips}>
+          {buildStatCells(pos, totals).map(c => (
+            <View key={c.label} style={cr.chip}>
+              <Text style={[cr.chipVal, { color: accent, fontSize:14 }]}>{c.value}</Text>
+              <Text style={[cr.chipLbl, { color: accent + "99" }]}>{c.label}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
     </View>
   );
 }
 const cr = StyleSheet.create({
-  row:    { flexDirection:"row", alignItems:"center", borderRadius:10, borderWidth:1, padding:10, gap:8 },
-  badge:  { width:42, alignItems:"center", paddingVertical:4, borderRadius:7, borderWidth:1 },
-  yr:     { fontSize:12, fontFamily:"Inter_700Bold" },
-  gp:     { fontSize:8,  fontFamily:"Inter_500Medium" },
-  chips:  { flex:1, flexDirection:"row", justifyContent:"space-around" },
-  chip:   { alignItems:"center" },
-  chipVal:{ fontSize:13, fontFamily:"Inter_700Bold" },
-  chipLbl:{ fontSize:8, fontFamily:"Inter_700Bold", letterSpacing:0.6, opacity:0.55, marginTop:1 },
+  row:       { flexDirection:"row", alignItems:"center", borderRadius:10, borderWidth:1, padding:10, gap:8 },
+  totalsRow: { borderWidth:1.5 },
+  divider:   { borderTopWidth:1.5, borderStyle:"dashed", marginVertical:4 },
+  badge:     { width:42, alignItems:"center", paddingVertical:4, borderRadius:7, borderWidth:1 },
+  yr:        { fontSize:12, fontFamily:"Inter_700Bold" },
+  gp:        { fontSize:8,  fontFamily:"Inter_500Medium" },
+  chips:     { flex:1, flexDirection:"row", justifyContent:"space-around" },
+  chip:      { alignItems:"center" },
+  chipVal:   { fontSize:13, fontFamily:"Inter_700Bold" },
+  chipLbl:   { fontSize:8, fontFamily:"Inter_700Bold", letterSpacing:0.6, opacity:0.55, marginTop:1 },
 });
 
 // ─── Ratings tab ───────────────────────────────────────────────────────────────
@@ -532,7 +602,7 @@ export function PlayerStatsModal({ player, visible, onClose, teamPrimaryColor, t
                   accent={accent} gp={gamesPlayedThisSeason} />
               )}
               {tab === "career" && (
-                <CareerSection career={career} pos={player.position} accent={accent} />
+                <CareerSection career={career} currentStats={player.stats} pos={player.position} accent={accent} />
               )}
               {tab === "ratings" && (
                 <RatingsTab player={player} accent={accent} secondary={secondary} />
