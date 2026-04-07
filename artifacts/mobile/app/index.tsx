@@ -4,7 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Animated, Dimensions, KeyboardAvoidingView, Platform,
+  Alert, Animated, Dimensions, KeyboardAvoidingView, Platform,
   ScrollView, StyleSheet, Text, TextInput,
   TouchableOpacity, View,
 } from "react-native";
@@ -66,6 +66,8 @@ const TEAMS = [
 const SEASON_KEY = "vfl_season_v1";
 const CUSTOM_KEY = "vfl_customization_v1";
 const SAVES_KEY  = "vfl_named_saves";
+
+function saveDataKey(id: string) { return `vfl_save_data_${id}`; }
 
 export interface SaveSlot {
   id: string;
@@ -153,15 +155,33 @@ export default function LaunchScreen() {
   async function handleLoadSlot(slot: SaveSlot) {
     setLoading(slot.id);
     try {
-      await AsyncStorage.setItem(SEASON_KEY, slot.seasonData);
-      if (slot.customizationData) {
-        await AsyncStorage.setItem(CUSTOM_KEY, slot.customizationData);
+      // Season data is stored in a separate key to avoid localStorage size limits.
+      // Fall back to inline seasonData for any saves made before this change.
+      let seasonData     = slot.seasonData;
+      let customData     = slot.customizationData;
+
+      const dataRaw = await AsyncStorage.getItem(saveDataKey(slot.id));
+      if (dataRaw) {
+        try {
+          const parsed = JSON.parse(dataRaw);
+          if (parsed.seasonData)        seasonData = parsed.seasonData;
+          if (parsed.customizationData != null) customData = parsed.customizationData;
+        } catch {}
+      }
+
+      if (!seasonData) throw new Error("No season data found for this save.");
+
+      await AsyncStorage.setItem(SEASON_KEY, seasonData);
+      if (customData) {
+        await AsyncStorage.setItem(CUSTOM_KEY, customData);
       } else {
         await AsyncStorage.removeItem(CUSTOM_KEY);
       }
       await AsyncStorage.setItem("vfl_gm_mode", slot.gmMode ?? "solo");
       router.replace("/(tabs)");
-    } catch {
+    } catch (e) {
+      console.error("[VFL] Load failed:", e);
+      Alert.alert("Load Failed", String(e));
       setLoading(null);
     }
   }

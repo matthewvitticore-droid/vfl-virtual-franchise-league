@@ -20,6 +20,8 @@ const SAVES_KEY   = "vfl_named_saves";
 const GM_MODE_KEY = "vfl_gm_mode";
 const MAX_SAVES   = 8;
 
+function saveDataKey(id: string) { return `vfl_save_data_${id}`; }
+
 export interface SaveSlot {
   id: string;
   name: string;
@@ -109,8 +111,19 @@ export default function LoadSaveScreen() {
         ? `${myTeam.name} · ${weekLabel} · ${season.year ?? 2026}`
         : `Franchise · ${season.year ?? 2026}`;
 
+      const slotId = Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+
+      // Store the heavy season data in its own key (avoids localStorage 5 MB limit)
+      await AsyncStorage.setItem(
+        saveDataKey(slotId),
+        JSON.stringify({
+          seasonData:        JSON.stringify(season),
+          customizationData: teamCustomization ? JSON.stringify(teamCustomization) : null,
+        }),
+      );
+
       const slot: SaveSlot = {
-        id:                Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+        id:                slotId,
         name:              autoName,
         savedAt:           Date.now(),
         teamAbbr:          myTeam?.abbreviation ?? "???",
@@ -123,22 +136,30 @@ export default function LoadSaveScreen() {
         weekLabel,
         year:              season.year ?? 2026,
         gmMode:            gmModeVal,
-        seasonData:        JSON.stringify(season),
-        customizationData: teamCustomization ? JSON.stringify(teamCustomization) : null,
+        seasonData:        "",          // data lives in saveDataKey(slotId)
+        customizationData: null,
       };
 
       const existing = await AsyncStorage.getItem(SAVES_KEY);
       let slots: SaveSlot[] = [];
       if (existing) { try { slots = JSON.parse(existing); } catch {} }
       slots.unshift(slot);
-      if (slots.length > MAX_SAVES) slots = slots.slice(0, MAX_SAVES);
+      if (slots.length > MAX_SAVES) {
+        // Clean up data keys for evicted slots
+        const evicted = slots.slice(MAX_SAVES);
+        for (const ev of evicted) {
+          await AsyncStorage.removeItem(saveDataKey(ev.id));
+        }
+        slots = slots.slice(0, MAX_SAVES);
+      }
 
       await AsyncStorage.setItem(SAVES_KEY, JSON.stringify(slots));
       setSaves(slots);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (e) {
-      Alert.alert("Save Failed", "Could not save. Please try again.");
+      console.error("[VFL] Save failed:", e);
+      Alert.alert("Save Failed", String(e));
     } finally {
       setSaving(false);
     }
@@ -153,6 +174,7 @@ export default function LoadSaveScreen() {
         {
           text: "Delete", style: "destructive",
           onPress: async () => {
+            await AsyncStorage.removeItem(saveDataKey(id));
             const updated = saves.filter(s => s.id !== id);
             await AsyncStorage.setItem(SAVES_KEY, JSON.stringify(updated));
             setSaves(updated);
