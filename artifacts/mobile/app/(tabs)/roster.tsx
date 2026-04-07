@@ -113,8 +113,8 @@ export default function RosterScreen() {
           case "speed":          return p.speed;
           case "strength":       return p.strength ?? 50;
           case "awareness":      return p.awareness ?? 50;
-          case "acceleration":   return (p.positionRatings as any)?.acceleration ?? 50;
-          case "agility":        return (p.positionRatings as any)?.agility ?? 50;
+          case "acceleration":   return p.posRatings?.acceleration ?? 50;
+          case "agility":        return p.posRatings?.agility ?? 50;
           case "yearsExperience":return p.yearsExperience;
           case "salary":         return p.salary;
           default:               return p.overall;
@@ -406,11 +406,11 @@ export default function RosterScreen() {
 
       {/* ── Depth chart player detail — slide-up sheet ── */}
       {selectedPlayer && (
-        <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
-          <TouchableOpacity style={StyleSheet.absoluteFillObject}
+        <View style={StyleSheet.absoluteFillObject}>
+          <TouchableOpacity
             onPress={() => setSelectedPlayer(null)}
             activeOpacity={1}
-            style={[StyleSheet.absoluteFillObject, { backgroundColor: "rgba(0,0,0,0.55)" }]}
+            style={[StyleSheet.absoluteFillObject, { backgroundColor: "rgba(0,0,0,0.6)" }]}
           />
           <View style={[st.sheet, { backgroundColor: colors.card }]}>
             <View style={st.sheetHandle} />
@@ -603,8 +603,8 @@ function RosterPlayerRow({ p, rank, colors, accent, onPress, isOwnTeam, onManage
     sal >= 10 ? accent :
     colors.mutedForeground;
 
-  const acc = (p.positionRatings as any)?.acceleration ?? 50;
-  const agi = (p.positionRatings as any)?.agility ?? 50;
+  const acc = p.posRatings?.acceleration ?? 50;
+  const agi = p.posRatings?.agility ?? 50;
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.75}

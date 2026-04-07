@@ -375,7 +375,14 @@ function generateRoster(teamOverall: number): Player[] {
         if (pos === "OL")               return gaussian(56,               7, 43, 70); // linemen stay slow
         return gaussian(teamOverall - 5, 5, 58, 80);
       })(),
-      strength: genRating(teamOverall + (["OL","DE","DT"].includes(pos) ? 3 : -2), isStarter, false),
+      strength: (() => {
+        if (["OL","DT"].includes(pos))            return gaussian(teamOverall + 5,  7, 78, 99); // trench powerhouses
+        if (["DE","LB"].includes(pos))            return gaussian(teamOverall + 2,  8, 70, 95); // pass rushers/LBs
+        if (pos === "TE")                         return gaussian(teamOverall - 2,  8, 65, 88); // blocking TEs
+        if (["QB","RB"].includes(pos))            return gaussian(teamOverall - 8,  7, 58, 78); // mobile players
+        if (["WR","CB","S"].includes(pos))        return gaussian(teamOverall - 12, 7, 48, 72); // speed positions
+        return gaussian(teamOverall - 15, 6, 44, 68);                                           // K/P
+      })(),
       awareness: genRating(teamOverall + (["QB","S","LB"].includes(pos) ? 3 : -2), isStarter, false),
       specific: genRating(teamOverall + 2, isStarter, isElite),
       posRatings: genPosRatings(pos, overall, isStarter, isElite),
@@ -424,7 +431,14 @@ function generateFreeAgents(count = 60): Player[] {
       overall,
       potential: Math.min(99, overall + irng(0, 8)),
       speed: gaussian(overall, 8),
-      strength: gaussian(overall, 8),
+      strength: (() => {
+        if (["OL","DT"].includes(pos))      return gaussian(overall + 5,  7, 78, 99);
+        if (["DE","LB"].includes(pos))      return gaussian(overall + 2,  8, 70, 95);
+        if (pos === "TE")                   return gaussian(overall - 2,  8, 65, 88);
+        if (["QB","RB"].includes(pos))      return gaussian(overall - 8,  7, 58, 78);
+        if (["WR","CB","S"].includes(pos))  return gaussian(overall - 12, 7, 48, 72);
+        return gaussian(overall - 15, 6, 44, 68);
+      })(),
       awareness: gaussian(overall, 8),
       specific: gaussian(overall + 2, 5),
       posRatings: genPosRatings(pos, overall, false, false),

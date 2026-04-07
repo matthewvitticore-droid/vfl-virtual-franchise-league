@@ -87,7 +87,7 @@ export default function TabLayout() {
         name="standings"
         options={{
           title: "Standings",
-          tabBarIcon: ({ size, focused }) => <TabIcon name="bar-chart-2" size={size} focused={focused} teamColor={theme.primary} />,
+          tabBarIcon: ({ size, focused }) => <TabIcon name="list" size={size} focused={focused} teamColor={theme.primary} />,
         }}
       />
       <Tabs.Screen
@@ -110,7 +110,10 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="stats"
-        options={{ href: null }}
+        options={{
+          title: "Stats",
+          tabBarIcon: ({ size, focused }) => <TabIcon name="bar-chart-2" size={size} focused={focused} teamColor={theme.primary} />,
+        }}
       />
     </Tabs>
   );

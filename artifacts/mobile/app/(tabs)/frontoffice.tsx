@@ -135,8 +135,8 @@ export default function FrontOfficeScreen() {
           case "overall":          return p.overall;
           case "age":              return p.age;
           case "speed":            return p.speed;
-          case "acceleration":     return (p.positionRatings as any)?.acceleration ?? 50;
-          case "agility":          return (p.positionRatings as any)?.agility ?? 50;
+          case "acceleration":     return p.posRatings?.acceleration ?? 50;
+          case "agility":          return p.posRatings?.agility ?? 50;
           case "faInterestLevel":  return p.faInterestLevel;
           case "yearsExperience":  return p.yearsExperience;
           case "salary":           return p.salary;
@@ -238,8 +238,8 @@ export default function FrontOfficeScreen() {
           case "overall":        return p.overall;
           case "age":            return p.age;
           case "speed":          return p.speed;
-          case "acceleration":   return (p.positionRatings as any)?.acceleration ?? 50;
-          case "agility":        return (p.positionRatings as any)?.agility ?? 50;
+          case "acceleration":   return p.posRatings?.acceleration ?? 50;
+          case "agility":        return p.posRatings?.agility ?? 50;
           case "yearsExperience":return p.yearsExperience;
           case "salary":         return p.salary;
           default:               return p.overall;
@@ -1309,8 +1309,8 @@ function FARow({ p, rank, colors, teamColor, isGM, onSign }: {
 }) {
   const ratingColor = (v: number) => v >= 90 ? "#FFD700" : v >= 80 ? colors.success : v >= 70 ? colors.foreground : colors.mutedForeground;
   const interestColor = (v: number) => v >= 5 ? "#FFD700" : v >= 4 ? colors.success : v >= 3 ? colors.foreground : colors.mutedForeground;
-  const acc = (p.positionRatings as any)?.acceleration ?? 50;
-  const agi = (p.positionRatings as any)?.agility ?? 50;
+  const acc = p.posRatings?.acceleration ?? 50;
+  const agi = p.posRatings?.agility ?? 50;
 
   const interestDots = Array.from({ length: 5 }, (_, i) => i < p.faInterestLevel);
 
@@ -1395,8 +1395,8 @@ function TradePlayerRow({ p, rank, colors, teamColor, isMyTeam, isOffering, isRe
   onPress: () => void; onToggle: () => void;
 }) {
   const ratingColor = (v: number) => v >= 90 ? "#FFD700" : v >= 80 ? colors.success : v >= 70 ? colors.foreground : colors.mutedForeground;
-  const acc = (p.positionRatings as any)?.acceleration ?? 50;
-  const agi = (p.positionRatings as any)?.agility ?? 50;
+  const acc = p.posRatings?.acceleration ?? 50;
+  const agi = p.posRatings?.agility ?? 50;
   const selected = isOffering || isReceiving;
   const btnColor  = isMyTeam ? teamColor : colors.success;
   const btnLabel  = isMyTeam ? (isOffering ? "OFFER ✓" : "OFFER") : (isReceiving ? "GET ✓" : "GET");
