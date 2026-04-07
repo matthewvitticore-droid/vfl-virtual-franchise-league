@@ -22,6 +22,40 @@ const MAX_SAVES   = 8;
 
 function saveDataKey(id: string) { return `vfl_save_data_${id}`; }
 
+// Strip heavyweight data that isn't needed to restore game state.
+// Play-by-play on completed games is the biggest offender (100-200 events × 256 games).
+function stripSeasonForSave(season: any): any {
+  return {
+    ...season,
+    // Remove play-by-play + drives from every completed game (score + team stats kept)
+    games: (season.games ?? []).map((g: any) => ({
+      ...g,
+      plays:  [],
+      drives: [],
+    })),
+    // Keep only last 2 seasons of career stats per player — trims historical bloat
+    teams: (season.teams ?? []).map((t: any) => ({
+      ...t,
+      roster: (t.roster ?? []).map((p: any) => ({
+        ...p,
+        careerStats: (p.careerStats ?? []).slice(-2),
+      })),
+    })),
+    freeAgents: (season.freeAgents ?? []).map((p: any) => ({
+      ...p,
+      careerStats: (p.careerStats ?? []).slice(-2),
+    })),
+    // Keep only the 50 most recent news items
+    news: (season.news ?? []).slice(0, 50),
+    // Strip combine + college stats from already-drafted prospects (not needed post-draft)
+    draftProspects: (season.draftProspects ?? []).map((dp: any) =>
+      dp.isPickedUp
+        ? { id: dp.id, name: dp.name, position: dp.position, isPickedUp: dp.isPickedUp, pickedByTeamId: dp.pickedByTeamId }
+        : dp
+    ),
+  };
+}
+
 export interface SaveSlot {
   id: string;
   name: string;
@@ -73,6 +107,7 @@ export default function LoadSaveScreen() {
   const [saves,       setSaves]       = useState<SaveSlot[]>([]);
   const [saving,      setSaving]      = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError,   setSaveError]   = useState<string | null>(null);
   const [gmMode,      setGmMode]      = useState<string>("solo");
 
   const scrollRef = useRef<ScrollView>(null);
@@ -92,12 +127,14 @@ export default function LoadSaveScreen() {
   }
 
   async function handleInstantSave() {
+    console.log("[VFL] Save tapped — season:", !!season, "saving:", saving);
     if (!season) {
-      Alert.alert("No Active Franchise", "Load or start a franchise first.");
+      Alert.alert("No Active Franchise", "Load or start a franchise first.\n\nMake sure you have a franchise running before saving.");
       return;
     }
     if (saving) return;
     setSaving(true);
+    console.log("[VFL] Starting save for season year:", season.year, "teams:", season.teams?.length);
     try {
       const myTeam    = season.teams.find(t => t.id === season.playerTeamId);
       const gmModeVal = await AsyncStorage.getItem(GM_MODE_KEY) ?? "solo";
@@ -113,11 +150,14 @@ export default function LoadSaveScreen() {
 
       const slotId = Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 
-      // Store the heavy season data in its own key (avoids localStorage 5 MB limit)
+      // Strip bulky play-by-play data before storing (each game has 150+ events — too large)
+      const leanSeason = stripSeasonForSave(season);
+
+      // Store season data in its own key to avoid localStorage 5 MB single-key limit
       await AsyncStorage.setItem(
         saveDataKey(slotId),
         JSON.stringify({
-          seasonData:        JSON.stringify(season),
+          seasonData:        JSON.stringify(leanSeason),
           customizationData: teamCustomization ? JSON.stringify(teamCustomization) : null,
         }),
       );
@@ -154,12 +194,15 @@ export default function LoadSaveScreen() {
       }
 
       await AsyncStorage.setItem(SAVES_KEY, JSON.stringify(slots));
+      console.log("[VFL] Save complete:", slotId, autoName);
       setSaves(slots);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (e) {
-      console.error("[VFL] Save failed:", e);
-      Alert.alert("Save Failed", String(e));
+      console.error("[VFL] Save FAILED:", e);
+      const msg = String(e).replace("Error: ", "");
+      setSaveError(msg);
+      setTimeout(() => setSaveError(null), 6000);
     } finally {
       setSaving(false);
     }
@@ -294,6 +337,12 @@ export default function LoadSaveScreen() {
                     <Text style={styles.savedBadgeText}>Saved!</Text>
                   </View>
                 )}
+                {saveError && (
+                  <View style={[styles.savedBadge, { backgroundColor: "#C8102E" }]}>
+                    <Feather name="alert-circle" size={12} color="#fff" />
+                    <Text style={styles.savedBadgeText}>Error</Text>
+                  </View>
+                )}
               </View>
 
               <View style={[styles.cardDivider, { backgroundColor: colors.border }]} />
@@ -301,11 +350,18 @@ export default function LoadSaveScreen() {
               <TouchableOpacity
                 onPress={handleInstantSave}
                 disabled={saving}
+                activeOpacity={0.7}
                 style={[styles.actionBtn, { backgroundColor: primary, opacity: saving ? 0.6 : 1 }]}
               >
                 <Feather name="save" size={16} color="#fff" />
                 <Text style={styles.actionBtnText}>{saving ? "Saving…" : "Save Franchise Now"}</Text>
               </TouchableOpacity>
+
+              {saveError && (
+                <View style={{ backgroundColor: "#C8102E20", borderRadius: 8, padding: 10, marginTop: 6, borderWidth: 1, borderColor: "#C8102E50" }}>
+                  <Text style={{ color: "#C8102E", fontSize: 12, fontFamily: "Inter_400Regular" }}>{saveError}</Text>
+                </View>
+              )}
 
               <TouchableOpacity
                 onPress={handleReturnToLaunch}
