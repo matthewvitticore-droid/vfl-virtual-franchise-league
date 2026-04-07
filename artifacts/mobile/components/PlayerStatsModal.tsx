@@ -391,24 +391,26 @@ export function PlayerStatsModal({ player, visible, onClose, teamPrimaryColor, t
   const secondary = teamSecondaryColor ?? accent;
   const career    = player.careerStats ?? [];
 
-  // ── Kit-mapped tab colors (fixed per tab, mirrors HOME/AWAY/ALT) ────────────
-  const homeBg = teamPrimaryColor  ?? pc;    // Season  = HOME kit → primary
-  const awayBg = "#FFFFFF";                  // Career  = AWAY kit → white
-  const altBg  = teamSecondaryColor ?? pc;   // Ratings = ALT  kit → secondary
+  // ── Kit-mapped tab colors — exact mirror of KitToggle (HOME/AWAY/ALT) ────────
+  const primary   = teamPrimaryColor  ?? pc;
+  const secondary2 = teamSecondaryColor ?? pc;
 
-  // Per-tab active text (contrast-adaptive, same as KitToggle)
-  const homeOn = onColor(homeBg);
-  const awayOn = "#111111";   // always dark on white
-  const altOn  = onColor(altBg);
-
-  // Per-tab inactive text (readable against dark #14142A modal bg)
-  const homeOff = readableOnDark(homeBg);
-  const awayOff = "#9090A8";              // white→grey on dark bg
-  const altOff  = readableOnDark(altBg);
-
-  const TAB_BG:  Record<ModalTab, string> = { season: homeBg, career: awayBg, ratings: altBg };
-  const TAB_ON:  Record<ModalTab, string> = { season: homeOn, career: awayOn, ratings: altOn  };
-  const TAB_OFF: Record<ModalTab, string> = { season: homeOff,career: awayOff,ratings: altOff };
+  // Active bg per tab — matches HOME/AWAY/ALT active bg exactly
+  const TAB_ACTIVE_BG: Record<ModalTab, string> = {
+    season:  primary,     // HOME  → team primary
+    career:  "#FFFFFF",   // AWAY  → white
+    ratings: secondary2,  // ALT   → team secondary
+  };
+  // Active text — "#111111" for white bg (away), "#fff" for everything else
+  const TAB_ACTIVE_TXT: Record<ModalTab, string> = {
+    season:  "#ffffff",
+    career:  "#111111",
+    ratings: onColor(secondary2), // handles light secondaries
+  };
+  // Inactive bg + text — ALL tabs identical, same as kit toggle inactive
+  const inactiveBg  = primary + "22";
+  const inactiveBd  = primary + "55";
+  const inactiveTxt = primary;
 
   const devColor  = DEV_COLORS[player.developmentTrait] ?? "#8B949E";
   const devIcon   = (DEV_ICONS[player.developmentTrait]  ?? "user") as any;
@@ -499,15 +501,17 @@ export function PlayerStatsModal({ player, visible, onClose, teamPrimaryColor, t
               )}
             </View>
 
-            {/* ── Tab bar — HOME/AWAY/ALT kit colors mapped to Season/Career/Ratings ── */}
-            <View style={[modal.tabBar, { backgroundColor: colors.secondary, borderColor: accent + "30" }]}>
+            {/* ── Tab bar — HOME/AWAY/ALT kit pattern: Season/Career/Ratings ── */}
+            <View style={[modal.tabBar, { backgroundColor: colors.secondary, borderColor: inactiveBd }]}>
               {TABS.map(t => {
                 const isActive = tab === t.key;
-                const bg  = isActive ? TAB_BG[t.key]  : TAB_BG[t.key] + "22";
-                const txt = isActive ? TAB_ON[t.key]  : TAB_OFF[t.key];
+                const bg  = isActive ? TAB_ACTIVE_BG[t.key]  : inactiveBg;
+                const bd  = isActive ? TAB_ACTIVE_BG[t.key]  : inactiveBd;
+                const txt = isActive ? TAB_ACTIVE_TXT[t.key] : inactiveTxt;
                 return (
                   <TouchableOpacity key={t.key} onPress={() => setTab(t.key)}
-                    style={[modal.tabBtn, { backgroundColor: bg }]}>
+                    activeOpacity={0.75}
+                    style={[modal.tabBtn, { backgroundColor: bg, borderWidth: 1, borderColor: bd }]}>
                     <Feather name={t.icon} size={10} color={txt} />
                     <Text style={[modal.tabLabel, {
                       color: txt,
