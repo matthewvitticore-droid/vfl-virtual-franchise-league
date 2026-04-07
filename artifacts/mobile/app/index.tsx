@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { VFLLogo } from "@/components/VFLLogo";
-import { bigGet } from "@/utils/bigStorage";
+import { bigGet, bigSet } from "@/utils/bigStorage";
 
 // ─── Brand ─────────────────────────────────────────────────────────────────────
 const VFL_RED  = "#C8102E";
@@ -172,7 +172,7 @@ export default function LaunchScreen() {
 
       if (!seasonData) throw new Error("No season data found for this save.");
 
-      await AsyncStorage.setItem(SEASON_KEY, seasonData);
+      await bigSet(SEASON_KEY, seasonData);
       if (customData) {
         await AsyncStorage.setItem(CUSTOM_KEY, customData);
       } else {

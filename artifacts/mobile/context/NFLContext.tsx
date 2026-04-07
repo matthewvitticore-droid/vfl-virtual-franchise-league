@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { bigGet, bigSet } from "@/utils/bigStorage";
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { supabase, SUPABASE_ENABLED } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
@@ -861,7 +862,7 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
     setSeason(s => {
       if (!s) return s;
       const updated = { ...s, games: s.games.map(g => g.id === gameId ? { ...g, gameDayUniform: uniform } : g) };
-      AsyncStorage.setItem(CACHE_KEY, JSON.stringify(updated)).catch(() => {});
+      bigSet(CACHE_KEY, JSON.stringify(updated)).catch(() => {});
       return updated;
     });
   }, []);
@@ -906,18 +907,18 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
         await loadFromSupabase(membership.franchiseId);
       } else {
         let raw: string | null = null;
-        try { raw = await AsyncStorage.getItem(CACHE_KEY); } catch {}
+        try { raw = await bigGet(CACHE_KEY); } catch {}
         if (raw) {
           let s: Season = JSON.parse(raw);
           s = migrateTeams(s);
           s = await applyCustomizationToSeason(s);
           setSeason(s);
-          try { await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(s)); } catch {}
+          try { await bigSet(CACHE_KEY, JSON.stringify(s)); } catch {}
         } else {
           let s = initSeason();
           s = await applyCustomizationToSeason(s);
           setSeason(s);
-          try { await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(s)); } catch {}
+          try { await bigSet(CACHE_KEY, JSON.stringify(s)); } catch {}
         }
       }
     } finally {
@@ -971,7 +972,7 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       if (SUPABASE_ENABLED && membership?.franchiseId) {
         await saveToSupabase(membership.franchiseId, s);
       } else {
-        try { await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(s)); } catch {}
+        try { await bigSet(CACHE_KEY, JSON.stringify(s)); } catch {}
       }
     }, 600);
   }, [membership?.franchiseId, user?.id]);
@@ -1469,7 +1470,7 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       });
       const finalSeason = { ...season, teams };
       setSeason(finalSeason);
-      try { await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(finalSeason)); } catch {}
+      try { await bigSet(CACHE_KEY, JSON.stringify(finalSeason)); } catch {}
       return;
     }
 
@@ -1511,7 +1512,7 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
 
     const finalSeason = { ...season, teams, draftProspects: prospects, draftState: state };
     setSeason(finalSeason);
-    try { await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(finalSeason)); } catch {}
+    try { await bigSet(CACHE_KEY, JSON.stringify(finalSeason)); } catch {}
   }, [season, setSeason]);
 
   function advanceDraftState(state: DraftState, completedPick: CompletedDraftPick, playerTeamId: string): DraftState {
@@ -1750,7 +1751,7 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
     if (SUPABASE_ENABLED && membership?.franchiseId) {
       await saveToSupabase(membership.franchiseId, s);
     } else {
-      try { await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(s)); } catch {}
+      try { await bigSet(CACHE_KEY, JSON.stringify(s)); } catch {}
     }
     setSeason(s);
   }, [membership]);
@@ -1759,7 +1760,7 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
     setSeason(s => {
       if (!s) return s;
       const updated = { ...s, coGMMode: !s.coGMMode };
-      AsyncStorage.setItem(CACHE_KEY, JSON.stringify(updated)).catch(() => {});
+      bigSet(CACHE_KEY, JSON.stringify(updated)).catch(() => {});
       return updated;
     });
   }, []);
