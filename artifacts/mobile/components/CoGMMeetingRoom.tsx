@@ -247,11 +247,46 @@ const pc = StyleSheet.create({
 export function CoGMMeetingRoom() {
   const colors  = useColors();
   const theme   = useTeamTheme();
-  const { user, membership } = useAuth();
+  const { user, membership, session, refreshMembership } = useAuth();
   const { season, pendingProposals, coGMMembers, voteOnProposal, isCoGMMode } = useNFL();
   const [filter, setFilter] = useState<"pending" | "all">("pending");
+  const [refreshing, setRefreshing] = useState(false);
 
-  if (!isCoGMMode || !membership) return null;
+  // ── Not connected to Supabase: show a reconnect prompt ─────────────────────
+  if (!isCoGMMode || !membership) {
+    async function handleReconnect() {
+      setRefreshing(true);
+      await refreshMembership();
+      setRefreshing(false);
+    }
+    return (
+      <View style={mr.offlineBox}>
+        <LinearGradient
+          colors={["#003087" + "30", "transparent"]}
+          style={StyleSheet.absoluteFill}
+        />
+        <Feather name="wifi-off" size={32} color={colors.mutedForeground} style={{ marginBottom: 12 }} />
+        <Text style={[mr.offlineTitle, { color: colors.foreground }]}>
+          {session ? "Reconnecting to Franchise…" : "Sign in Required"}
+        </Text>
+        <Text style={[mr.offlineSub, { color: colors.mutedForeground }]}>
+          {session
+            ? "Your Co-GM membership isn't loaded yet. Tap below to reconnect."
+            : "You need to sign in with your Co-GM account to access the Meeting Room."}
+        </Text>
+        <TouchableOpacity
+          onPress={handleReconnect}
+          disabled={refreshing}
+          style={[mr.offlineBtn, { backgroundColor: "#003087" }]}
+        >
+          {refreshing
+            ? <ActivityIndicator color="#fff" size="small" />
+            : <><Feather name="refresh-cw" size={14} color="#fff" /><Text style={mr.offlineBtnTxt}>Reconnect</Text></>
+          }
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   const tc = theme.primary;
   const tc2 = theme.secondary;
@@ -461,4 +496,11 @@ const mr = StyleSheet.create({
   howIcon:     { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   howLabel:    { fontFamily: "Inter_700Bold", fontSize: 13, marginBottom: 2 },
   howDesc:     { fontFamily: "Inter_400Regular", fontSize: 11, lineHeight: 16 },
+  offlineBox:  { margin: 16, borderRadius: 16, padding: 28, alignItems: "center", overflow: "hidden",
+                 borderWidth: 1, borderColor: "#003087" + "50", backgroundColor: "#07182E" },
+  offlineTitle:{ fontFamily: "Inter_700Bold", fontSize: 17, marginBottom: 6, textAlign: "center" },
+  offlineSub:  { fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center", lineHeight: 18, marginBottom: 20 },
+  offlineBtn:  { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 24,
+                 paddingVertical: 12, borderRadius: 12 },
+  offlineBtnTxt: { fontFamily: "Inter_700Bold", fontSize: 14, color: "#fff" },
 });

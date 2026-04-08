@@ -284,7 +284,7 @@ export default function LoadSaveScreen() {
         </View>
 
         {/* ── Co-GM Tab Switcher ─────────────────────────────────────────── */}
-        {isCoGMMode && (
+        {(isCoGMMode || gmMode === "cogm" || gmMode === "join") && (
           <View style={styles.cogmTabRow}>
             {([
               { key: "meeting", label: "Meeting Room", icon: "users" as const },
@@ -315,10 +315,10 @@ export default function LoadSaveScreen() {
         )}
 
         {/* ── Meeting Room (Co-GM only) ─────────────────────────────────── */}
-        {isCoGMMode && activeView === "meeting" && <CoGMMeetingRoom />}
+        {(isCoGMMode || gmMode === "cogm" || gmMode === "join") && activeView === "meeting" && <CoGMMeetingRoom />}
 
         {/* ── Below only shown in franchise (save/load) view ─────────────── */}
-        {(!isCoGMMode || activeView === "franchise") && <>
+        {(!(isCoGMMode || gmMode === "cogm" || gmMode === "join") || activeView === "franchise") && <>
 
         {/* ── Active franchise card ────────────────────────────────────────── */}
         {season && myTeam ? (
