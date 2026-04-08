@@ -3,15 +3,13 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 
-// Read from app.config.js extra (server-side injection, most reliable) then
-// fall back to EXPO_PUBLIC_ env vars that Metro inlines at bundle time.
 const extra = Constants.expoConfig?.extra ?? {};
-const supabaseUrl: string =
-  extra.supabaseUrl ||
-  (process.env.EXPO_PUBLIC_SUPABASE_URL ?? "");
-const supabaseAnonKey: string =
-  extra.supabaseAnonKey ||
-  (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "");
+const rawA: string = extra.supabaseUrl || (process.env.EXPO_PUBLIC_SUPABASE_URL ?? "");
+const rawB: string = extra.supabaseAnonKey || (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "");
+
+// Auto-correct if the two secrets are accidentally swapped
+const supabaseUrl: string  = rawA.startsWith("https://") ? rawA : rawB.startsWith("https://") ? rawB : rawA;
+const supabaseAnonKey: string = rawA.startsWith("https://") ? rawB : rawB.startsWith("https://") ? rawA : rawB;
 
 export const SUPABASE_ENABLED =
   supabaseUrl.startsWith("https://") && supabaseAnonKey.length > 0;
