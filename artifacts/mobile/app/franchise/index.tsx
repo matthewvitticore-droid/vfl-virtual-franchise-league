@@ -7,6 +7,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -90,6 +91,9 @@ export default function FranchiseLobbyScreen() {
   const [joinRole, setJoinRole] = useState<FranchiseMemberRole>("GM");
   const [joinDisplayName, setJoinDisplayName] = useState("");
 
+  // Created franchise join code (shown on success screen)
+  const [createdJoinCode, setCreatedJoinCode] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -111,9 +115,10 @@ export default function FranchiseLobbyScreen() {
     if (!franchiseName.trim()) { setError("Please enter a franchise name."); return; }
     if (!displayName.trim()) { setError("Please enter your display name."); return; }
     setLoading(true); setError(null);
-    const err = await createFranchise(franchiseName.trim(), selectedTeamId, createRole, displayName.trim());
+    const { error: err, joinCode: created } = await createFranchise(franchiseName.trim(), selectedTeamId, createRole, displayName.trim());
     setLoading(false);
     if (err) { setError(err); return; }
+    setCreatedJoinCode(created);
     setScreen("success");
   };
 
@@ -303,25 +308,26 @@ export default function FranchiseLobbyScreen() {
               <Text style={{ fontSize: 54 }}>🏆</Text>
             </View>
             <Text style={[styles.successTitle, { color: colors.foreground }]}>
-              You're a GM!
+              Franchise Created!
             </Text>
             <Text style={[styles.successSub, { color: colors.mutedForeground }]}>
-              Your franchise is ready. Customize your team's identity, logo, and uniforms — or jump right in.
+              Share this code with your co-GM so they can join.
             </Text>
-            <TouchableOpacity
-              onPress={() => router.replace("/customize")}
-              style={[styles.successBtnPrimary, { backgroundColor: colors.nflBlue }]}
-            >
-              <Feather name="edit-2" size={16} color="#fff" />
-              <Text style={styles.successBtnText}>Customize Team →</Text>
-            </TouchableOpacity>
+            {createdJoinCode && (
+              <TouchableOpacity
+                onPress={() => Share.share({ message: `Join my VFL franchise! Use code: ${createdJoinCode}` })}
+                style={[styles.joinCodeBox, { backgroundColor: colors.card, borderColor: colors.nflGold }]}
+              >
+                <Text style={[styles.joinCodeText, { color: colors.nflGold }]}>{createdJoinCode}</Text>
+                <Feather name="share-2" size={16} color={colors.nflGold} style={{ marginTop: 6 }} />
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               onPress={() => router.replace("/(tabs)")}
-              style={[styles.successBtnSecondary, { borderColor: colors.border }]}
+              style={[styles.successBtnPrimary, { backgroundColor: colors.nflBlue }]}
             >
-              <Text style={[styles.successBtnSecondaryText, { color: colors.mutedForeground }]}>
-                Skip for Now
-              </Text>
+              <Feather name="arrow-right" size={16} color="#fff" />
+              <Text style={styles.successBtnText}>Enter Franchise HQ</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -516,6 +522,8 @@ const styles = StyleSheet.create({
   successBtnText: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#fff" },
   successBtnSecondary: { paddingVertical: 14, borderRadius: 14, borderWidth: 1, width: "100%" as any, alignItems: "center" },
   successBtnSecondaryText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  joinCodeBox: { alignItems: "center", borderRadius: 16, borderWidth: 2, paddingVertical: 20, paddingHorizontal: 32, width: "100%" as any },
+  joinCodeText: { fontSize: 32, fontFamily: "Inter_700Bold", letterSpacing: 6 },
   typeSubtitle: { fontSize: 13, fontFamily: "Inter_400Regular", marginBottom: 16, lineHeight: 20 },
   typeCard: {
     flexDirection: "row", alignItems: "center", gap: 14,
