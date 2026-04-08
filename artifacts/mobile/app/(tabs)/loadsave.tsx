@@ -264,7 +264,7 @@ export default function LoadSaveScreen() {
         .eq("franchise_id", membership.franchiseId)
         .maybeSingle();
       if (!error && data?.state_json) {
-        await bigSet("vfl_season_v1", data.state_json);
+        await bigSet("vfl_season_v1", JSON.stringify(data.state_json));
         setSyncMsg("Pulled! Loading fresh state…");
         setTimeout(() => router.replace("/(tabs)"), 900);
       } else {

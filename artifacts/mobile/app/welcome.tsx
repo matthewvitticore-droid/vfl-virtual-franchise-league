@@ -50,7 +50,7 @@ export default function WelcomeScreen() {
         .eq("franchise_id", membership.franchiseId)
         .maybeSingle();
       if (data?.state_json) {
-        await bigSet("vfl_season_v1", data.state_json);
+        await bigSet("vfl_season_v1", JSON.stringify(data.state_json));
         await AsyncStorage.setItem("vfl_gm_mode", "co-gm");
       }
     } catch {}

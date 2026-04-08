@@ -122,7 +122,7 @@ export default function FranchiseLobbyScreen() {
     // Create a fresh season, save locally and push to Supabase so co-GMs share the same state
     try {
       const season = initSeason(selectedTeamId);
-      await bigSet("vfl_season_v1", season);
+      await bigSet("vfl_season_v1", JSON.stringify(season));
       await AsyncStorage.setItem("vfl_gm_mode", "co-gm");
       if (franchiseId) {
         await supabase.from("franchise_state").upsert(
@@ -156,7 +156,7 @@ export default function FranchiseLobbyScreen() {
           .eq("franchise_id", memberRow.franchise_id)
           .maybeSingle();
         if (stateRow?.state_json) {
-          await bigSet("vfl_season_v1", stateRow.state_json);
+          await bigSet("vfl_season_v1", JSON.stringify(stateRow.state_json));
         }
       }
       await AsyncStorage.setItem("vfl_gm_mode", "co-gm");
@@ -169,7 +169,7 @@ export default function FranchiseLobbyScreen() {
     setLoading(true);
     try {
       const season = initSeason(soloTeamId);
-      await bigSet("vfl_season_v1", season);
+      await bigSet("vfl_season_v1", JSON.stringify(season));
       await AsyncStorage.setItem("vfl_gm_mode", "solo");
       router.replace("/(tabs)");
     } catch (e) {
