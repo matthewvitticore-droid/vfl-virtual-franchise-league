@@ -210,11 +210,6 @@ export default function LoginScreen() {
           <Text style={[styles.secondaryText, { color: colors.nflBlue }]}>Create Account</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.replace("/(tabs)")} style={styles.offlineBtn}>
-          <Text style={[styles.offlineText, { color: colors.mutedForeground }]}>
-            Continue Offline (local only)
-          </Text>
-        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -242,6 +237,4 @@ const styles = StyleSheet.create({
   dividerText:  { fontSize: 12, fontFamily: "Inter_400Regular" },
   secondaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, marginBottom: 20 },
   secondaryText:{ fontSize: 15, fontFamily: "Inter_600SemiBold" },
-  offlineBtn:   { alignItems: "center", paddingVertical: 8 },
-  offlineText:  { fontSize: 12, fontFamily: "Inter_400Regular", textDecorationLine: "underline" },
 });
