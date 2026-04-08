@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
 import { VFLLogo } from "@/components/VFLLogo";
+import { supabase } from "@/lib/supabase";
 
 export default function LoginScreen() {
   const colors = useColors();
@@ -38,6 +39,16 @@ export default function LoginScreen() {
       if (code) router.replace("/auth/franchise-created");
     });
   }, []);
+
+  const handleGoogleSignIn = async () => {
+    setError(null);
+    const redirectTo = typeof window !== "undefined" ? window.location.origin + "/auth/callback" : undefined;
+    const { error: err } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo },
+    });
+    if (err) setError(err.message);
+  };
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
@@ -129,6 +140,20 @@ export default function LoginScreen() {
         <Text style={[styles.subheading, { color: colors.mutedForeground }]}>
           Sign in to create or join a franchise and play in real time with your co-GMs.
         </Text>
+
+        <TouchableOpacity
+          onPress={handleGoogleSignIn}
+          style={[styles.googleBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+        >
+          <Text style={styles.googleG}>G</Text>
+          <Text style={[styles.googleText, { color: colors.foreground }]}>Continue with Google</Text>
+        </TouchableOpacity>
+
+        <View style={styles.dividerRow}>
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+          <Text style={[styles.dividerText, { color: colors.mutedForeground }]}>or sign in with email</Text>
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+        </View>
 
         <View style={styles.form}>
           <View style={styles.field}>
@@ -239,6 +264,9 @@ const styles = StyleSheet.create({
   dividerRow:   { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 16 },
   divider:      { flex: 1, height: 1 },
   dividerText:  { fontSize: 12, fontFamily: "Inter_400Regular" },
+  googleBtn:    { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, marginBottom: 20 },
+  googleG:      { fontSize: 18, fontFamily: "Inter_700Bold", color: "#4285F4" },
+  googleText:   { fontSize: 15, fontFamily: "Inter_600SemiBold" },
   forgotBtn:    { alignItems: "center", paddingVertical: 10 },
   forgotText:   { fontSize: 13, fontFamily: "Inter_400Regular", textDecorationLine: "underline" },
   secondaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, marginBottom: 20 },

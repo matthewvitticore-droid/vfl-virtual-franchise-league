@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 export default function RegisterScreen() {
   const colors = useColors();
@@ -30,6 +31,15 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  const handleGoogleSignIn = async () => {
+    const redirectTo = typeof window !== "undefined" ? window.location.origin + "/auth/callback" : undefined;
+    const { error: err } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo },
+    });
+    if (err) setError(err.message);
+  };
 
   const handleRegister = async () => {
     if (!displayName.trim()) { setError("Please enter a display name."); return; }
@@ -84,6 +94,20 @@ export default function RegisterScreen() {
         <Text style={[styles.subheading, { color: colors.mutedForeground }]}>
           Set up your Co-GM profile. You'll use this to join or create a franchise.
         </Text>
+
+        <TouchableOpacity
+          onPress={handleGoogleSignIn}
+          style={[styles.googleBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+        >
+          <Text style={styles.googleG}>G</Text>
+          <Text style={[styles.googleText, { color: colors.foreground }]}>Continue with Google</Text>
+        </TouchableOpacity>
+
+        <View style={styles.dividerRow}>
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+          <Text style={[styles.dividerText, { color: colors.mutedForeground }]}>or create with email</Text>
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+        </View>
 
         <View style={styles.form}>
           <View style={styles.field}>
@@ -192,6 +216,12 @@ const styles = StyleSheet.create({
   input: { flex: 1, fontSize: 15, fontFamily: "Inter_400Regular" },
   errorBox: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 10, borderWidth: 1 },
   errorText: { fontSize: 13, fontFamily: "Inter_400Regular", flex: 1 },
+  googleBtn:    { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, marginBottom: 20 },
+  googleG:      { fontSize: 18, fontFamily: "Inter_700Bold", color: "#4285F4" },
+  googleText:   { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  dividerRow:   { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 20 },
+  divider:      { flex: 1, height: 1 },
+  dividerText:  { fontSize: 12, fontFamily: "Inter_400Regular" },
   submitBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 15, borderRadius: 14, marginTop: 4 },
   submitText: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#fff" },
   successBadge: { width: 100, height: 100, borderRadius: 28, alignItems: "center", justifyContent: "center", marginBottom: 24 },
