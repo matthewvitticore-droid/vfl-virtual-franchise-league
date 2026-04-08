@@ -123,11 +123,13 @@ export default function LaunchScreen() {
   const { user, membership, isLoading: authLoading } = useAuth();
 
   const [saves,       setSaves]       = useState<SaveSlot[]>([]);
-  const [legacySave,  setLegacySave]  = useState(false); // old vfl_season_v1 with no name
+  const [legacySave,  setLegacySave]  = useState(false);
   const [activeView,  setActiveView]  = useState<View>("saves");
   const [mode,        setMode]        = useState<Mode>("solo");
   const [inviteCode,  setInviteCode]  = useState(genInviteCode);
   const [joinInput,   setJoinInput]   = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [joinRole,    setJoinRole]    = useState<"GM" | "Coach" | "Scout">("Coach");
   const [teamIdx,     setTeamIdx]     = useState(13);
   const [pickerOpen,  setPickerOpen]  = useState(false);
   const [loading,     setLoading]     = useState<string | null>(null);
@@ -202,17 +204,37 @@ export default function LaunchScreen() {
     router.replace("/(tabs)");
   }
 
-  function handleCreate() {
+  async function handleCreate() {
+    const team = TEAMS[teamIdx];
     if (mode === "solo") {
-      AsyncStorage.setItem("vfl_gm_mode", "solo").then(() => router.replace("/(tabs)"));
+      await AsyncStorage.setItem("vfl_gm_mode", "solo");
+      router.replace("/(tabs)");
     } else if (mode === "cogm") {
-      AsyncStorage.setItem("vfl_gm_mode", "cogm").then(() => router.push("/auth/login"));
+      const pending = JSON.stringify({
+        type: "create",
+        franchiseName: `${team.city} ${team.name}`,
+        teamId: team.abbr,
+        role: "GM",
+        displayName: displayName.trim() || "Commissioner",
+      });
+      await Promise.all([
+        AsyncStorage.setItem("vfl_gm_mode", "cogm"),
+        AsyncStorage.setItem("vfl_pending_action", pending),
+      ]);
+      router.push("/auth/login");
     } else {
-      if (joinInput.trim().length < 4) return;
-      Promise.all([
-        AsyncStorage.setItem("vfl_gm_mode", "join"),
-        AsyncStorage.setItem("vfl_pending_join_code", joinInput.trim().toUpperCase()),
-      ]).then(() => router.push("/auth/login"));
+      if (joinInput.trim().length < 4 || !displayName.trim()) return;
+      const pending = JSON.stringify({
+        type: "join",
+        code: joinInput.trim().toUpperCase(),
+        displayName: displayName.trim(),
+        role: joinRole,
+      });
+      await Promise.all([
+        AsyncStorage.setItem("vfl_gm_mode", "cogm"),
+        AsyncStorage.setItem("vfl_pending_action", pending),
+      ]);
+      router.push("/auth/login");
     }
   }
 
@@ -222,7 +244,9 @@ export default function LaunchScreen() {
   }
 
   const team     = TEAMS[teamIdx];
-  const canCreate = mode !== "join" || joinInput.trim().length >= 4;
+  const canCreate = mode === "solo"
+    || (mode === "cogm" /* display name optional, defaults to "Commissioner" */)
+    || (mode === "join" && joinInput.trim().length >= 4 && displayName.trim().length >= 2);
   const hasSaves  = saves.length > 0 || legacySave;
 
   return (
@@ -456,33 +480,56 @@ export default function LaunchScreen() {
                 {mode === "cogm" && (
                   <View style={st.modeDetail}>
                     <Feather name="users" size={18} color="#22C55E" />
-                    <View style={{ flex: 1 }}>
+                    <View style={{ flex: 1, gap: 8 }}>
                       <Text style={st.modeCardTitle}>Co-GM Mode</Text>
-                      <Text style={st.modeCardSub}>Share your invite code to manage with a friend.</Text>
-                      <View style={st.inviteBox}>
-                        <Text style={st.inviteCode}>{inviteCode}</Text>
-                        <TouchableOpacity onPress={() => setInviteCode(genInviteCode())} style={st.refreshBtn}>
-                          <Feather name="refresh-cw" size={13} color={VFL_BLUE} />
-                        </TouchableOpacity>
-                      </View>
+                      <Text style={st.modeCardSub}>Create the franchise — your co-GMs will join with a code after setup.</Text>
+                      <TextInput
+                        style={st.joinInput}
+                        placeholder="Your name (e.g. ChiefsBoss)"
+                        placeholderTextColor="#3A5070"
+                        value={displayName}
+                        onChangeText={setDisplayName}
+                        autoCapitalize="words"
+                        maxLength={24}
+                      />
                     </View>
                   </View>
                 )}
                 {mode === "join" && (
                   <View style={st.modeDetail}>
                     <Feather name="user-plus" size={18} color="#F59E0B" />
-                    <View style={{ flex: 1 }}>
+                    <View style={{ flex: 1, gap: 8 }}>
                       <Text style={st.modeCardTitle}>Join a Franchise</Text>
-                      <Text style={st.modeCardSub}>Enter the invite code your commissioner shared.</Text>
+                      <Text style={st.modeCardSub}>Enter the invite code and pick your role.</Text>
                       <TextInput
                         style={st.joinInput}
-                        placeholder="VFL-447-XTK"
+                        placeholder="Join code (e.g. VFL-447-XTK)"
                         placeholderTextColor="#3A5070"
                         value={joinInput}
                         onChangeText={t => setJoinInput(t.toUpperCase())}
                         autoCapitalize="characters"
                         maxLength={12}
                       />
+                      <TextInput
+                        style={st.joinInput}
+                        placeholder="Your name (e.g. CoachMike)"
+                        placeholderTextColor="#3A5070"
+                        value={displayName}
+                        onChangeText={setDisplayName}
+                        autoCapitalize="words"
+                        maxLength={24}
+                      />
+                      <View style={{ flexDirection: "row", gap: 6, marginTop: 2 }}>
+                        {(["GM", "Coach", "Scout"] as const).map(r => (
+                          <TouchableOpacity
+                            key={r}
+                            onPress={() => setJoinRole(r)}
+                            style={[st.roleBtn, joinRole === r && { backgroundColor: VFL_BLUE, borderColor: VFL_BLUE }]}
+                          >
+                            <Text style={[st.roleBtnText, joinRole === r && { color: "#fff" }]}>{r}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
                     </View>
                   </View>
                 )}
@@ -603,6 +650,8 @@ const st = StyleSheet.create({
   slotIcon:      { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   cogmBadge:     { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
   cogmBadgeText: { fontFamily: "Inter_700Bold", fontSize: 9, letterSpacing: 0.7 },
+  roleBtn:       { flex: 1, alignItems: "center", paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: "#1E3A5F", backgroundColor: "#0D1E33" },
+  roleBtnText:   { color: "#6080A0", fontFamily: "Inter_600SemiBold", fontSize: 12 },
   slotSwatch:    { width: 14, height: 38, borderRadius: 4, position: "relative", overflow: "visible" },
   slotSwatchAlt: { position: "absolute", right: -6, top: 6, width: 8, height: 26, borderRadius: 3 },
   slotName:      { color: "#E0EAF8", fontFamily: "Inter_700Bold", fontSize: 14 },

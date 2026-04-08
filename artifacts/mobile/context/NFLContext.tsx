@@ -973,7 +973,15 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       if (error || !data) {
         const s = initSeason(membership?.teamId);
         setSeason(s);
-        await saveToSupabase(franchiseId, s);
+        // INSERT-only (no upsert): if the creator already wrote a row, skip to avoid overwriting.
+        // This guards against a joiner racing ahead of the creator's first save.
+        await supabase.from("franchise_state").insert({
+          franchise_id: franchiseId,
+          state_json: s,
+          updated_by: user?.id,
+        }).then(({ error: iErr }) => {
+          if (iErr && iErr.code !== "23505") console.warn("[VFL] franchise_state seed failed:", iErr.message);
+        });
       } else {
         setSeason(data.state_json as Season);
       }

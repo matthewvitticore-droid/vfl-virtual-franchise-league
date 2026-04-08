@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -21,13 +22,14 @@ export default function LoginScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { signIn } = useAuth();
+  const { signIn, joinFranchise, createFranchise } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
@@ -36,9 +38,57 @@ export default function LoginScreen() {
     }
     setLoading(true);
     setError(null);
-    const err = await signIn(email.trim(), password);
+    setStatus(null);
+
+    const signInErr = await signIn(email.trim(), password);
+    if (signInErr) {
+      setLoading(false);
+      setError(signInErr);
+      return;
+    }
+
+    // Process any pending Co-GM action (create or join)
+    try {
+      const raw = await AsyncStorage.getItem("vfl_pending_action");
+      if (raw) {
+        const action = JSON.parse(raw);
+
+        if (action.type === "create") {
+          setStatus("Creating franchise…");
+          const err = await createFranchise(
+            action.franchiseName,
+            action.teamId,
+            action.role ?? "GM",
+            action.displayName ?? "Commissioner",
+          );
+          if (err) {
+            setLoading(false);
+            setError(`Franchise creation failed: ${err}`);
+            return;
+          }
+        } else if (action.type === "join") {
+          setStatus("Joining franchise…");
+          const err = await joinFranchise(
+            action.code,
+            action.role ?? "Coach",
+            action.displayName ?? "Co-GM",
+          );
+          if (err) {
+            setLoading(false);
+            setError(`Join failed: ${err}`);
+            return;
+          }
+        }
+
+        await AsyncStorage.removeItem("vfl_pending_action");
+        await AsyncStorage.setItem("vfl_gm_mode", "cogm");
+      }
+    } catch (e) {
+      console.warn("[VFL] Pending action failed:", e);
+    }
+
     setLoading(false);
-    if (err) setError(err);
+    router.replace("/(tabs)");
   };
 
   return (
@@ -103,6 +153,13 @@ export default function LoginScreen() {
             <View style={[styles.errorBox, { backgroundColor: colors.danger + "20", borderColor: colors.danger }]}>
               <Feather name="alert-circle" size={14} color={colors.danger} />
               <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>
+            </View>
+          )}
+
+          {status && !error && (
+            <View style={[styles.errorBox, { backgroundColor: "#003087" + "30", borderColor: "#003087" }]}>
+              <ActivityIndicator size="small" color="#60A5FA" />
+              <Text style={[styles.errorText, { color: "#60A5FA" }]}>{status}</Text>
             </View>
           )}
 
