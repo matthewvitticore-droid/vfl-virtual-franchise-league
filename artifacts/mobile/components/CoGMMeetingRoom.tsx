@@ -315,16 +315,23 @@ export function CoGMMeetingRoom() {
   const localTeamName = myTeam ? `${myTeam.city} ${myTeam.name}` : "My Franchise";
 
   const displayFranchiseName = membership?.franchiseName || storedFranchiseName || localTeamName;
-  const displayCode          = membership?.joinCode      || storedCode;
-  const displayRole          = membership?.role          || "GM";
-  const displayName          = membership?.displayName   || user?.email?.split("@")[0] || "Co-GM";
+  // Raw 6-char code — Supabase preferred, then permanent local key, then temp local key
+  const rawCode     = membership?.joinCode || storedCode;
+  // Formatted for display: always VFL-XXXXXX
+  const displayCode = rawCode ? (rawCode.startsWith("VFL-") ? rawCode : `VFL-${rawCode}`) : "";
+  const displayRole = membership?.role          || "GM";
+  const displayName = membership?.displayName   || user?.email?.split("@")[0] || "Co-GM";
+
+  // Code is still loading when session exists but membership hasn't arrived yet
+  const codeLoading = !!session && !membership && (isLoading || retrying);
 
   // Can we show the full room? Yes if Supabase membership, OR if local franchise exists
   const isLocalFranchise = localLoaded && (localGmMode === "cogm" || localGmMode === "join") && !!season;
   const canShowRoom      = !!membership || isLocalFranchise;
 
   function copyCode() {
-    Clipboard.setString(displayCode ?? "");
+    // Copy the raw code without VFL- prefix so it can be pasted directly into the join field
+    Clipboard.setString(rawCode ?? displayCode ?? "");
     setCopied(true);
     setTimeout(() => setCopied(false), 2200);
   }
@@ -444,12 +451,26 @@ export function CoGMMeetingRoom() {
             <Text style={[mr.inviteLabel, { color: VFL_GOLD }]}>FRANCHISE INVITE CODE</Text>
             <Text style={[mr.inviteHint, { color: colors.mutedForeground }]}>Share with Co-GMs</Text>
           </View>
-          {displayCode ? (
+          {codeLoading ? (
+            <View style={{ alignItems: "center", paddingVertical: 14 }}>
+              <ActivityIndicator size="small" color={VFL_GOLD} />
+            </View>
+          ) : displayCode ? (
             <>
               <View style={mr.inviteCodeRow}>
                 {displayCode.split("").map((ch, i) => (
-                  <View key={i} style={[mr.inviteLetter, { backgroundColor: colors.background, borderColor: VFL_GOLD + "60" }]}>
-                    <Text style={[mr.inviteLetterTxt, { color: colors.foreground }]}>{ch}</Text>
+                  <View
+                    key={i}
+                    style={[
+                      mr.inviteLetter,
+                      {
+                        backgroundColor: colors.background,
+                        borderColor: ch === "-" ? "transparent" : VFL_GOLD + "60",
+                        minWidth: ch === "-" ? 8 : undefined,
+                      },
+                    ]}
+                  >
+                    <Text style={[mr.inviteLetterTxt, { color: ch === "-" ? VFL_GOLD : colors.foreground }]}>{ch}</Text>
                   </View>
                 ))}
               </View>
@@ -459,9 +480,13 @@ export function CoGMMeetingRoom() {
               </TouchableOpacity>
             </>
           ) : (
-            <Text style={[mr.offlineSub, { color: colors.mutedForeground, textAlign: "center", marginTop: 8 }]}>
-              Sign in to your Co-GM account to view the invite code.
-            </Text>
+            <TouchableOpacity
+              onPress={async () => { setRetrying(true); await refreshMembership(); setRetrying(false); }}
+              style={[mr.copyBtn, { backgroundColor: VFL_BLUE, marginTop: 10 }]}
+            >
+              <Feather name="refresh-cw" size={13} color="#fff" />
+              <Text style={[mr.copyBtnTxt, { color: "#fff" }]}>Load Code</Text>
+            </TouchableOpacity>
           )}
         </View>
       </View>
