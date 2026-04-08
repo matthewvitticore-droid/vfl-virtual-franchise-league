@@ -10,9 +10,11 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { NFLTeamBadge } from "@/components/NFLTeamBadge";
 import { VFLLogo } from "@/components/VFLLogo";
+import { CoGMMeetingRoom } from "@/components/CoGMMeetingRoom";
 import { useColors } from "@/hooks/useColors";
 import { useTeamTheme } from "@/hooks/useTeamTheme";
 import { useNFL } from "@/context/NFLContext";
+import { useAuth } from "@/context/AuthContext";
 import { bigSet, bigGet, bigDelete } from "@/utils/bigStorage";
 
 const SEASON_KEY  = "vfl_season_v1";
@@ -103,13 +105,15 @@ export default function LoadSaveScreen() {
   const theme  = useTeamTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { season, teamCustomization } = useNFL();
+  const { season, teamCustomization, isCoGMMode, pendingProposals } = useNFL();
+  const { membership } = useAuth();
 
   const [saves,       setSaves]       = useState<SaveSlot[]>([]);
   const [saving,      setSaving]      = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError,   setSaveError]   = useState<string | null>(null);
   const [gmMode,      setGmMode]      = useState<string>("solo");
+  const [activeView,  setActiveView]  = useState<"franchise" | "meeting">("meeting");
 
   const scrollRef = useRef<ScrollView>(null);
 
@@ -279,6 +283,43 @@ export default function LoadSaveScreen() {
           </View>
         </View>
 
+        {/* ── Co-GM Tab Switcher ─────────────────────────────────────────── */}
+        {isCoGMMode && (
+          <View style={styles.cogmTabRow}>
+            {([
+              { key: "meeting", label: "Meeting Room", icon: "users" as const },
+              { key: "franchise", label: "Saves",        icon: "save" as const },
+            ] as const).map(tab => (
+              <TouchableOpacity
+                key={tab.key}
+                onPress={() => setActiveView(tab.key)}
+                style={[styles.cogmTab, {
+                  backgroundColor: activeView === tab.key ? primary : primary + "18",
+                  borderColor:     activeView === tab.key ? primary : primary + "35",
+                }]}
+              >
+                <Feather name={tab.icon} size={13} color={activeView === tab.key ? "#fff" : "rgba(255,255,255,0.55)"} />
+                <Text style={[styles.cogmTabText, { color: activeView === tab.key ? "#fff" : "rgba(255,255,255,0.55)" }]}>
+                  {tab.label}
+                </Text>
+                {tab.key === "meeting" && pendingProposals.length > 0 && (
+                  <View style={[styles.cogmBadge, { backgroundColor: activeView === "meeting" ? "#fff" : primary }]}>
+                    <Text style={[styles.cogmBadgeText, { color: activeView === "meeting" ? primary : "#fff" }]}>
+                      {pendingProposals.length}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {/* ── Meeting Room (Co-GM only) ─────────────────────────────────── */}
+        {isCoGMMode && activeView === "meeting" && <CoGMMeetingRoom />}
+
+        {/* ── Below only shown in franchise (save/load) view ─────────────── */}
+        {(!isCoGMMode || activeView === "franchise") && <>
+
         {/* ── Active franchise card ────────────────────────────────────────── */}
         {season && myTeam ? (
           <View style={[styles.franchiseCard, { backgroundColor: colors.card, borderColor: primary + "50" }]}>
@@ -415,6 +456,7 @@ export default function LoadSaveScreen() {
         <Text style={[styles.footer, { color: colors.mutedForeground }]}>
           Virtual Franchise League · Season {season?.year ?? 2026}
         </Text>
+        </>}
       </ScrollView>
 
 
@@ -539,6 +581,13 @@ const styles = StyleSheet.create({
   codeText:           { fontSize: 28, fontFamily: "Inter_700Bold", letterSpacing: 10 },
 
   footer:             { fontSize: 11, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 8 },
+
+  cogmTabRow:         { flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
+  cogmTab:            { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7,
+                        paddingVertical: 10, borderRadius: 14, borderWidth: 1 },
+  cogmTabText:        { fontFamily: "Inter_700Bold", fontSize: 13, letterSpacing: 0.2 },
+  cogmBadge:          { paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8, minWidth: 18, alignItems: "center" },
+  cogmBadgeText:      { fontFamily: "Inter_700Bold", fontSize: 10 },
 
   // Modal
   modalOverlay:       { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.65)", justifyContent: "flex-end" },

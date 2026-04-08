@@ -407,6 +407,63 @@ export interface NFLTeam {
   depthChart: Partial<Record<NFLPosition, string[]>>;
 }
 
+// ─── Co-GM Proposals ──────────────────────────────────────────────────────────
+
+export type ProposalType = 'free_agent_signing' | 'trade_submission' | 'draft_pick' | 'phase_advance';
+export type ProposalStatus = 'pending' | 'approved' | 'rejected';
+
+export interface CoGMMember {
+  userId: string;
+  displayName: string;
+  role: 'GM' | 'Coach' | 'Scout';
+}
+
+export interface CoGMVote {
+  userId: string;
+  displayName: string;
+  vote: 'yes' | 'no';
+  votedAt: number;
+}
+
+export interface CoGMProposalPayload {
+  // Free agent signing
+  playerId?: string;
+  playerName?: string;
+  playerPosition?: NFLPosition;
+  playerOverall?: number;
+  playerAge?: number;
+  contractYears?: number;
+  contractSalary?: number;
+  // Trade submission
+  tradeOffer?: TradeOffer;
+  tradeOfferingNames?: string[];
+  tradeReceivingNames?: string[];
+  toTeamName?: string;
+  // Draft pick
+  prospectId?: string;
+  prospectName?: string;
+  prospectPosition?: NFLPosition;
+  prospectGrade?: number;
+  prospectCollege?: string;
+  draftRound?: number;
+  draftPickNum?: number;
+  // Phase advance
+  targetPhase?: SeasonPhase;
+}
+
+export interface CoGMProposal {
+  id: string;
+  type: ProposalType;
+  status: ProposalStatus;
+  description: string;
+  createdBy: string;
+  createdByName: string;
+  createdAt: number;
+  requiredVotes: number;
+  votes: CoGMVote[];
+  payload: CoGMProposalPayload;
+}
+
 // ─── Franchise History ────────────────────────────────────────────────────────
 
 export interface VFLBowlRecord {
@@ -466,6 +523,7 @@ export interface Season {
   playoffRound?: PlayoffRound;
   vflBowlWinnerId?: string;
   history?: FranchiseHistory;
+  proposals?: CoGMProposal[];
 }
 
 // ─── Uniform & Customization ──────────────────────────────────────────────────
@@ -542,7 +600,7 @@ export interface NFLContextValue {
   getStandings: (conference?: Conference) => NFLTeam[];
   getWeekGames: (week: number) => NFLGame[];
   // Roster
-  signFreeAgent: (playerId: string, contractYears: number, salary: number) => Promise<void>;
+  signFreeAgent: (playerId: string, contractYears: number, salary: number) => Promise<'signed' | 'proposed' | 'error'>;
   releasePlayer: (playerId: string) => Promise<void>;
   restructureContract: (playerId: string) => Promise<void>;
   updateDepthOrder: (position: NFLPosition, orderedIds: string[]) => Promise<void>;
@@ -555,7 +613,7 @@ export interface NFLContextValue {
   simulateWeek: () => Promise<void>;
   simulateSeason: () => Promise<void>;
   // Draft
-  userDraftPick: (prospectId: string) => Promise<void>;
+  userDraftPick: (prospectId: string) => Promise<'picked' | 'proposed' | 'error'>;
   simulateDraftPick: () => Promise<void>;
   simPicksUntilUserTurn: () => Promise<void>;
   simRemainderOfDraft: () => Promise<void>;
@@ -573,4 +631,9 @@ export interface NFLContextValue {
   setGameDayUniform: (gameId: string, uniform: "home" | "away" | "alternate") => Promise<void>;
   // Co-GM mode
   toggleCoGMMode: () => Promise<void>;
+  isCoGMMode: boolean;
+  coGMMembers: CoGMMember[];
+  pendingProposals: CoGMProposal[];
+  createProposal: (type: ProposalType, payload: CoGMProposalPayload, description: string) => Promise<void>;
+  voteOnProposal: (proposalId: string, vote: 'yes' | 'no') => Promise<void>;
 }
