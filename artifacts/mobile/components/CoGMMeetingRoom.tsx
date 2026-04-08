@@ -10,6 +10,7 @@ import { useColors } from "@/hooks/useColors";
 import { useTeamTheme } from "@/hooks/useTeamTheme";
 import { useAuth } from "@/context/AuthContext";
 import { useNFL } from "@/context/NFLContext";
+import { supabase, SUPABASE_ENABLED } from "@/lib/supabase";
 import type { CoGMProposal, CoGMMember } from "@/context/types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -249,65 +250,94 @@ export function CoGMMeetingRoom() {
   const colors  = useColors();
   const theme   = useTeamTheme();
   const router  = useRouter();
-  const { user, membership, session, refreshMembership } = useAuth();
+  const { user, membership, session, isLoading, refreshMembership } = useAuth();
   const { season, pendingProposals, coGMMembers, voteOnProposal, isCoGMMode } = useNFL();
   const [filter,     setFilter]     = useState<"pending" | "all">("pending");
-  const [refreshing, setRefreshing] = useState(false);
+  const [retrying,   setRetrying]   = useState(false);
   const [copied,     setCopied]     = useState(false);
-  const didAutoRefresh = useRef(false);
+  const [onlineIds,  setOnlineIds]  = useState<string[]>([]);
+  const channelRef   = useRef<any>(null);
+  const autoAttempted = useRef(false);
 
-  // ── Auto-reconnect when session exists but membership hasn't loaded ─────────
+  // ── Auto-reconnect: fires once when auth finishes loading but no membership ─
   useEffect(() => {
-    if (session && !membership && !didAutoRefresh.current) {
-      didAutoRefresh.current = true;
-      setRefreshing(true);
-      refreshMembership().finally(() => setRefreshing(false));
+    if (!isLoading && session && !membership && !autoAttempted.current) {
+      autoAttempted.current = true;
+      setRetrying(true);
+      refreshMembership().finally(() => setRetrying(false));
     }
-  }, [session, membership]);
+  }, [isLoading, session, membership]);
 
-  // ── Not connected: show loading spinner or sign-in prompt ──────────────────
-  if (!isCoGMMode || !membership) {
-    // While auto-refresh is in progress, show a spinner
-    if (refreshing || (session && !didAutoRefresh.current)) {
-      return (
-        <View style={mr.offlineBox}>
-          <ActivityIndicator size="large" color="#003087" style={{ marginBottom: 12 }} />
-          <Text style={[mr.offlineTitle, { color: colors.foreground }]}>Loading Franchise…</Text>
-          <Text style={[mr.offlineSub, { color: colors.mutedForeground }]}>Connecting to your Co-GM franchise</Text>
-        </View>
-      );
-    }
+  // ── Supabase Realtime presence — tracks who's online ───────────────────────
+  useEffect(() => {
+    if (!membership?.franchiseId || !user?.id || !SUPABASE_ENABLED) return;
 
-    // Session exists but membership still not found after refresh → manual retry
-    if (session) {
-      return (
-        <View style={mr.offlineBox}>
-          <LinearGradient colors={["#003087" + "30", "transparent"]} style={StyleSheet.absoluteFill} />
-          <Feather name="wifi-off" size={32} color={colors.mutedForeground} style={{ marginBottom: 12 }} />
-          <Text style={[mr.offlineTitle, { color: colors.foreground }]}>Couldn't Load Franchise</Text>
-          <Text style={[mr.offlineSub, { color: colors.mutedForeground }]}>
-            Your account was found but no franchise is linked. You may need to create or join one first.
-          </Text>
-          <TouchableOpacity
-            onPress={async () => { setRefreshing(true); await refreshMembership(); setRefreshing(false); }}
-            disabled={refreshing}
-            style={[mr.offlineBtn, { backgroundColor: "#003087" }]}
-          >
-            <Feather name="refresh-cw" size={14} color="#fff" />
-            <Text style={mr.offlineBtnTxt}>Try Again</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
+    const ch = supabase.channel(`vfl:presence:${membership.franchiseId}`, {
+      config: { presence: { key: user.id } },
+    });
 
-    // No session at all → route to sign-in
+    ch.on("presence", { event: "sync" }, () => {
+      setOnlineIds(Object.keys(ch.presenceState()));
+    });
+
+    ch.subscribe(async (status: string) => {
+      if (status === "SUBSCRIBED") {
+        await ch.track({ userId: user.id, displayName: membership.displayName });
+        setOnlineIds(prev => prev.includes(user.id) ? prev : [...prev, user.id]);
+      }
+    });
+
+    channelRef.current = ch;
+    return () => { ch.unsubscribe(); };
+  }, [membership?.franchiseId, user?.id]);
+
+  function copyCode() {
+    Clipboard.setString(membership?.joinCode ?? "");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2200);
+  }
+
+  // ── Auth still loading → spinner ───────────────────────────────────────────
+  if (isLoading || retrying) {
     return (
       <View style={mr.offlineBox}>
-        <LinearGradient colors={["#C8102E" + "20", "transparent"]} style={StyleSheet.absoluteFill} />
-        <Feather name="lock" size={32} color={colors.mutedForeground} style={{ marginBottom: 12 }} />
-        <Text style={[mr.offlineTitle, { color: colors.foreground }]}>Sign In to Continue</Text>
+        <ActivityIndicator size="large" color="#003087" style={{ marginBottom: 14 }} />
+        <Text style={[mr.offlineTitle, { color: colors.foreground }]}>Loading Franchise…</Text>
+        <Text style={[mr.offlineSub, { color: colors.mutedForeground }]}>Connecting to your Co-GM account</Text>
+      </View>
+    );
+  }
+
+  // ── Signed in but no franchise linked yet ─────────────────────────────────
+  if (session && !membership) {
+    return (
+      <View style={mr.offlineBox}>
+        <LinearGradient colors={["#003087" + "30", "transparent"]} style={StyleSheet.absoluteFill} />
+        <Feather name="alert-circle" size={32} color={colors.mutedForeground} style={{ marginBottom: 12 }} />
+        <Text style={[mr.offlineTitle, { color: colors.foreground }]}>No Franchise Linked</Text>
         <Text style={[mr.offlineSub, { color: colors.mutedForeground }]}>
-          Sign in with your Co-GM account to open the Meeting Room.
+          Your account doesn't have a franchise yet. Create one from the launch screen or ask your commissioner for an invite code.
+        </Text>
+        <TouchableOpacity
+          onPress={async () => { setRetrying(true); await refreshMembership(); setRetrying(false); }}
+          style={[mr.offlineBtn, { backgroundColor: "#003087" }]}
+        >
+          <Feather name="refresh-cw" size={14} color="#fff" />
+          <Text style={mr.offlineBtnTxt}>Refresh</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // ── Not signed in ─────────────────────────────────────────────────────────
+  if (!session || !membership) {
+    return (
+      <View style={mr.offlineBox}>
+        <LinearGradient colors={["#C8102E20", "transparent"]} style={StyleSheet.absoluteFill} />
+        <Feather name="lock" size={32} color={colors.mutedForeground} style={{ marginBottom: 12 }} />
+        <Text style={[mr.offlineTitle, { color: colors.foreground }]}>Sign In to Access</Text>
+        <Text style={[mr.offlineSub, { color: colors.mutedForeground }]}>
+          Sign in with your Co-GM account to open the Meeting Room and sync with your franchise.
         </Text>
         <TouchableOpacity
           onPress={() => router.push("/auth/login")}
@@ -318,12 +348,6 @@ export function CoGMMeetingRoom() {
         </TouchableOpacity>
       </View>
     );
-  }
-
-  function copyCode() {
-    Clipboard.setString(membership.joinCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   }
 
   const tc = theme.primary;
@@ -356,11 +380,25 @@ export function CoGMMeetingRoom() {
           </View>
         </View>
 
-        {/* Members */}
+        {/* Members with online status */}
         <View style={mr.membersRow}>
-          {coGMMembers.map(m => (
-            <MemberAvatar key={m.userId} member={m} accent={tc} />
-          ))}
+          {coGMMembers.map(m => {
+            const isOnline = onlineIds.includes(m.userId);
+            return (
+              <View key={m.userId} style={{ alignItems: "center" }}>
+                <View style={{ position: "relative" }}>
+                  <MemberAvatar member={m} accent={tc} />
+                  <View style={[mr.onlineDot, {
+                    backgroundColor: isOnline ? "#10B981" : "#6B7280",
+                    borderColor: colors.card,
+                  }]} />
+                </View>
+                <Text style={[mr.onlineLabel, { color: isOnline ? "#10B981" : colors.mutedForeground }]}>
+                  {isOnline ? "online" : "offline"}
+                </Text>
+              </View>
+            );
+          })}
           {coGMMembers.length < 3 && (
             <View style={[mr.addSlot, { borderColor: colors.border }]}>
               <Feather name="user-plus" size={16} color={colors.mutedForeground} />
@@ -566,4 +604,7 @@ const mr = StyleSheet.create({
   copyBtn:     { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 24,
                  paddingVertical: 10, borderRadius: 10, alignSelf: "stretch", justifyContent: "center" },
   copyBtnTxt:  { fontFamily: "Inter_700Bold", fontSize: 13, color: "#000", letterSpacing: 0.5 },
+  onlineDot:   { position: "absolute", bottom: 2, right: 2, width: 10, height: 10,
+                 borderRadius: 5, borderWidth: 2 },
+  onlineLabel: { fontFamily: "Inter_400Regular", fontSize: 9, letterSpacing: 0.3, marginTop: 2 },
 });
