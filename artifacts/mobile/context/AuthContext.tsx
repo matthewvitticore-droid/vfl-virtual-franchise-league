@@ -21,7 +21,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<string | null>;
   signUp: (email: string, password: string, displayName: string) => Promise<string | null>;
   signOut: () => Promise<void>;
-  createFranchise: (franchiseName: string, teamId: string, role: FranchiseMemberRole, displayName: string) => Promise<string | null>;
+  createFranchise: (franchiseName: string, teamId: string, role: FranchiseMemberRole, displayName: string) => Promise<{ error: string | null; joinCode: string | null }>;
   joinFranchise: (joinCode: string, role: FranchiseMemberRole, displayName: string) => Promise<string | null>;
   leaveFranchise: () => Promise<void>;
   refreshMembership: () => Promise<void>;
@@ -118,30 +118,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     teamId: string,
     role: FranchiseMemberRole,
     displayName: string
-  ): Promise<string | null> => {
-    if (!user) return "Not authenticated";
+  ): Promise<{ error: string | null; joinCode: string | null }> => {
+    if (!user) return { error: "Not authenticated", joinCode: null };
 
-    // Generate unique join code
-    let joinCode = generateJoinCode();
+    const joinCode = generateJoinCode();
 
-    // Insert franchise
     const { data: franchise, error: fErr } = await supabase
       .from("franchises")
       .insert({ name: franchiseName, team_id: teamId, join_code: joinCode, created_by: user.id })
       .select()
       .single();
 
-    if (fErr || !franchise) return fErr?.message ?? "Failed to create franchise";
+    if (fErr || !franchise) return { error: fErr?.message ?? "Failed to create franchise", joinCode: null };
 
-    // Add creator as member
     const { error: mErr } = await supabase
       .from("franchise_members")
       .insert({ franchise_id: franchise.id, user_id: user.id, display_name: displayName, role });
 
-    if (mErr) return mErr.message;
+    if (mErr) return { error: mErr.message, joinCode: null };
 
     await fetchMembership(user.id);
-    return null;
+    return { error: null, joinCode };
   };
 
   const joinFranchise = async (
