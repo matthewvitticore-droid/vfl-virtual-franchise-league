@@ -56,6 +56,7 @@ function RootLayoutNav() {
           <Stack.Screen name="auth/welcome"           options={{ animation: "none" }} />
           <Stack.Screen name="auth/login"             options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="auth/register"          options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="auth/callback"          options={{ animation: "none" }} />
           <Stack.Screen name="auth/franchise-created" options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="franchise/index" />
           <Stack.Screen
