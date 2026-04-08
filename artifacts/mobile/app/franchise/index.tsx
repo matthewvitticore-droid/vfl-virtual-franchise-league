@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -21,6 +21,7 @@ import { useColors } from "@/hooks/useColors";
 import { FranchiseMemberRole, useAuth } from "@/context/AuthContext";
 import { initSeason } from "@/context/NFLContext";
 import { bigSet } from "@/utils/bigStorage";
+import { supabase } from "@/lib/supabase";
 
 const VFL_TEAMS = [
   // Ironclad Conference — East
@@ -75,9 +76,10 @@ export default function FranchiseLobbyScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { initialScreen } = useLocalSearchParams<{ initialScreen?: string }>();
   const { user, createFranchise, joinFranchise, signOut } = useAuth();
 
-  const [screen, setScreen] = useState<Screen>("type");
+  const [screen, setScreen] = useState<Screen>((initialScreen as Screen) ?? "type");
   const [soloTeamId, setSoloTeamId] = useState("team-13"); // Coastal Sharks default
 
   // Create state
@@ -115,9 +117,21 @@ export default function FranchiseLobbyScreen() {
     if (!franchiseName.trim()) { setError("Please enter a franchise name."); return; }
     if (!displayName.trim()) { setError("Please enter your display name."); return; }
     setLoading(true); setError(null);
-    const { error: err, joinCode: created } = await createFranchise(franchiseName.trim(), selectedTeamId, createRole, displayName.trim());
+    const { error: err, joinCode: created, franchiseId } = await createFranchise(franchiseName.trim(), selectedTeamId, createRole, displayName.trim());
+    if (err) { setLoading(false); setError(err); return; }
+    // Create a fresh season, save locally and push to Supabase so co-GMs share the same state
+    try {
+      const season = initSeason(selectedTeamId);
+      await bigSet("vfl_season_v1", season);
+      await AsyncStorage.setItem("vfl_gm_mode", "co-gm");
+      if (franchiseId) {
+        await supabase.from("franchise_state").upsert(
+          { franchise_id: franchiseId, state_json: season, updated_by: user?.id },
+          { onConflict: "franchise_id" }
+        );
+      }
+    } catch {}
     setLoading(false);
-    if (err) { setError(err); return; }
     setCreatedJoinCode(created);
     setScreen("success");
   };
@@ -127,8 +141,27 @@ export default function FranchiseLobbyScreen() {
     if (!joinDisplayName.trim()) { setError("Please enter your display name."); return; }
     setLoading(true); setError(null);
     const err = await joinFranchise(joinCode.trim(), joinRole, joinDisplayName.trim());
+    if (err) { setLoading(false); setError(err); return; }
+    // Pull the shared franchise state from Supabase so this co-GM has the same save
+    try {
+      const { data: memberRow } = await supabase
+        .from("franchise_members")
+        .select("franchise_id")
+        .eq("user_id", user?.id)
+        .maybeSingle();
+      if (memberRow?.franchise_id) {
+        const { data: stateRow } = await supabase
+          .from("franchise_state")
+          .select("state_json")
+          .eq("franchise_id", memberRow.franchise_id)
+          .maybeSingle();
+        if (stateRow?.state_json) {
+          await bigSet("vfl_season_v1", stateRow.state_json);
+        }
+      }
+      await AsyncStorage.setItem("vfl_gm_mode", "co-gm");
+    } catch {}
     setLoading(false);
-    if (err) { setError(err); return; }
     router.replace("/(tabs)");
   };
 

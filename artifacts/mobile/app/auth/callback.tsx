@@ -39,12 +39,9 @@ export default function AuthCallbackScreen() {
 
         const hasCloudFranchise = !!(membershipRows && membershipRows.length > 0);
 
-        if (hasSoloFranchise || hasCloudFranchise) {
-          router.replace("/(tabs)");
-        } else {
-          // Brand new user — send them to franchise type selector
-          router.replace("/franchise");
-        }
+        // Always show the welcome hub after sign-in so the user can
+        // choose what to load/create rather than being dropped straight in.
+        router.replace("/welcome");
       } catch {
         setError("Something went wrong. Redirecting to sign in…");
         setTimeout(() => router.replace("/auth/login"), 3000);

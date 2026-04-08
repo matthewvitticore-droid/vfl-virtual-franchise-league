@@ -21,7 +21,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<string | null>;
   signUp: (email: string, password: string, displayName: string) => Promise<string | null>;
   signOut: () => Promise<void>;
-  createFranchise: (franchiseName: string, teamId: string, role: FranchiseMemberRole, displayName: string) => Promise<{ error: string | null; joinCode: string | null }>;
+  createFranchise: (franchiseName: string, teamId: string, role: FranchiseMemberRole, displayName: string) => Promise<{ error: string | null; joinCode: string | null; franchiseId: string | null }>;
   joinFranchise: (joinCode: string, role: FranchiseMemberRole, displayName: string) => Promise<string | null>;
   leaveFranchise: () => Promise<void>;
   refreshMembership: () => Promise<void>;
@@ -152,16 +152,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .select()
       .single();
 
-    if (fErr || !franchise) return { error: fErr?.message ?? "Failed to create franchise", joinCode: null };
+    if (fErr || !franchise) return { error: fErr?.message ?? "Failed to create franchise", joinCode: null, franchiseId: null };
 
     const { error: mErr } = await supabase
       .from("franchise_members")
       .insert({ franchise_id: franchise.id, user_id: user.id, display_name: displayName, role });
 
-    if (mErr) return { error: mErr.message, joinCode: null };
+    if (mErr) return { error: mErr.message, joinCode: null, franchiseId: null };
 
     await fetchMembership(user.id);
-    return { error: null, joinCode };
+    return { error: null, joinCode, franchiseId: franchise.id };
   };
 
   const joinFranchise = async (
