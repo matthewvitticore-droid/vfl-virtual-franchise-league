@@ -76,10 +76,12 @@ export default function LoginScreen() {
           }
           await AsyncStorage.removeItem("vfl_pending_action");
           await AsyncStorage.setItem("vfl_gm_mode", "cogm");
-          // Persist code to AsyncStorage — the success screen reads it there
-          // (avoids state-loss when AuthGate briefly unmounts this screen)
+          // Temp key — read by franchise-created screen then cleared
           await AsyncStorage.setItem("vfl_created_join_code", joinCode ?? "");
           await AsyncStorage.setItem("vfl_created_franchise_name", action.franchiseName ?? "");
+          // Permanent key — Meeting Room reads this forever (never cleared)
+          if (joinCode) await AsyncStorage.setItem("vfl_franchise_code", joinCode);
+          if (action.franchiseName) await AsyncStorage.setItem("vfl_franchise_name", action.franchiseName);
           setLoading(false);
           router.replace("/auth/franchise-created");
           return;
