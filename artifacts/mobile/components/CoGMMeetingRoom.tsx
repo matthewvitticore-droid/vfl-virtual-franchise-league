@@ -479,14 +479,29 @@ export function CoGMMeetingRoom() {
                 <Text style={mr.copyBtnTxt}>{copied ? "COPIED!" : "COPY CODE"}</Text>
               </TouchableOpacity>
             </>
-          ) : (
+          ) : session ? (
+            // Session exists but membership query returned no code — retry fetch
             <TouchableOpacity
               onPress={async () => { setRetrying(true); await refreshMembership(); setRetrying(false); }}
               style={[mr.copyBtn, { backgroundColor: VFL_BLUE, marginTop: 10 }]}
             >
               <Feather name="refresh-cw" size={13} color="#fff" />
-              <Text style={[mr.copyBtnTxt, { color: "#fff" }]}>Load Code</Text>
+              <Text style={[mr.copyBtnTxt, { color: "#fff" }]}>Reload Code</Text>
             </TouchableOpacity>
+          ) : (
+            // No session at all — must sign in to fetch the code from Supabase
+            <>
+              <Text style={[mr.inviteHint, { color: colors.mutedForeground, textAlign: "center", marginTop: 6, marginBottom: 4 }]}>
+                Sign in to view your franchise invite code
+              </Text>
+              <TouchableOpacity
+                onPress={() => router.push("/auth/login")}
+                style={[mr.copyBtn, { backgroundColor: "#C8102E", marginTop: 6 }]}
+              >
+                <Feather name="log-in" size={13} color="#fff" />
+                <Text style={[mr.copyBtnTxt, { color: "#fff" }]}>Sign In to View Code</Text>
+              </TouchableOpacity>
+            </>
           )}
         </View>
       </View>

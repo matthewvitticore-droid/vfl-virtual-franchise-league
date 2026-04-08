@@ -44,6 +44,9 @@ export default function FranchiseCreatedScreen() {
   };
 
   const handleEnter = async () => {
+    // Persist permanently before wiping temp keys so Meeting Room can always show the code
+    if (joinCode) await AsyncStorage.setItem("vfl_franchise_code", joinCode);
+    if (franchiseName) await AsyncStorage.setItem("vfl_franchise_name", franchiseName);
     await AsyncStorage.multiRemove(["vfl_created_join_code", "vfl_created_franchise_name"]);
     router.replace("/(tabs)");
   };
