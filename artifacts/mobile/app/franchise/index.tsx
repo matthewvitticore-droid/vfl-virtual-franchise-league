@@ -65,9 +65,7 @@ const VFL_TEAMS = [
 ];
 
 const ROLES: { value: FranchiseMemberRole; label: string; desc: string; icon: string }[] = [
-  { value: "GM",    label: "General Manager", desc: "Roster, contracts, trades, draft. Build the team.",         icon: "briefcase" },
-  { value: "Coach", label: "Head Coach",      desc: "Depth chart, game plan, formations. Win on gameday.",       icon: "target"    },
-  { value: "Scout", label: "Scout",           desc: "View everything, suggest draft prospects. Read-only.",      icon: "search"    },
+  { value: "GM", label: "Co-General Manager", desc: "Team up and make proposals to elevate your roster and bring a shared vision for a team to life across seasons!", icon: "briefcase" },
 ];
 
 type Screen = "type" | "choose" | "create" | "join" | "success" | "solo-team";
@@ -89,7 +87,7 @@ export default function FranchiseLobbyScreen() {
 
   // Join state
   const [joinCode, setJoinCode] = useState("");
-  const [joinRole, setJoinRole] = useState<FranchiseMemberRole>("Coach");
+  const [joinRole, setJoinRole] = useState<FranchiseMemberRole>("GM");
   const [joinDisplayName, setJoinDisplayName] = useState("");
 
   const [loading, setLoading] = useState(false);
@@ -403,23 +401,6 @@ export default function FranchiseLobbyScreen() {
               ))}
             </ScrollView>
 
-            {/* Role Picker */}
-            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Your Role</Text>
-            {ROLES.map(r => (
-              <TouchableOpacity
-                key={r.value}
-                onPress={() => setCreateRole(r.value)}
-                style={[styles.roleOption, { backgroundColor: createRole === r.value ? colors.nflBlue + "20" : colors.card, borderColor: createRole === r.value ? colors.nflBlue : colors.border }]}
-              >
-                <Feather name={r.icon as any} size={18} color={createRole === r.value ? colors.nflBlue : colors.mutedForeground} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.roleLabel, { color: createRole === r.value ? colors.nflBlue : colors.foreground }]}>{r.label}</Text>
-                  <Text style={[styles.roleDesc, { color: colors.mutedForeground }]}>{r.desc}</Text>
-                </View>
-                {createRole === r.value && <Feather name="check-circle" size={16} color={colors.nflBlue} />}
-              </TouchableOpacity>
-            ))}
-
             {error && <ErrorBox error={error} />}
 
             <TouchableOpacity onPress={handleCreate} disabled={loading} style={[styles.submitBtn, { backgroundColor: loading ? colors.secondary : colors.nflBlue }]}>
@@ -448,22 +429,6 @@ export default function FranchiseLobbyScreen() {
             </Text>
 
             <InputField label="Your Display Name" placeholder="e.g. CoachMike" value={joinDisplayName} onChangeText={setJoinDisplayName} icon="user" />
-
-            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Choose a Role</Text>
-            {ROLES.map(r => (
-              <TouchableOpacity
-                key={r.value}
-                onPress={() => setJoinRole(r.value)}
-                style={[styles.roleOption, { backgroundColor: joinRole === r.value ? colors.nflRed + "20" : colors.card, borderColor: joinRole === r.value ? colors.nflRed : colors.border }]}
-              >
-                <Feather name={r.icon as any} size={18} color={joinRole === r.value ? colors.nflRed : colors.mutedForeground} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.roleLabel, { color: joinRole === r.value ? colors.nflRed : colors.foreground }]}>{r.label}</Text>
-                  <Text style={[styles.roleDesc, { color: colors.mutedForeground }]}>{r.desc}</Text>
-                </View>
-                {joinRole === r.value && <Feather name="check-circle" size={16} color={colors.nflRed} />}
-              </TouchableOpacity>
-            ))}
 
             {error && <ErrorBox error={error} />}
 
@@ -536,8 +501,8 @@ const styles = StyleSheet.create({
   roleOption: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 12, borderWidth: 1.5 },
   roleLabel: { fontSize: 14, fontFamily: "Inter_700Bold" },
   roleDesc: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2, lineHeight: 16 },
-  codeInputWrap: { flexDirection: "row", alignItems: "center", gap: 14, borderRadius: 16, borderWidth: 2, paddingHorizontal: 20, paddingVertical: 16 },
-  codeInput: { flex: 1, fontSize: 32, fontFamily: "Inter_700Bold", letterSpacing: 8 },
+  codeInputWrap: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 16, borderWidth: 2, paddingHorizontal: 16, paddingVertical: 16 },
+  codeInput: { flex: 1, fontSize: 22, fontFamily: "Inter_700Bold", letterSpacing: 4 },
   codeHint: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: -6 },
   submitBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 15, borderRadius: 14, marginTop: 4 },
   submitText: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#fff" },
