@@ -56,9 +56,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // Launch screen is always accessible
   if (inLaunchScreen) return <>{children}</>;
 
-  // Co-GM / Join: require login
+  // Not signed in — show welcome screen (unless already in auth group)
   if (!session && !inAuthGroup) {
-    return <Redirect href="/auth/login" />;
+    return <Redirect href="/auth/welcome" />;
   }
 
   // Logged in but no franchise yet → force to franchise lobby
@@ -77,9 +77,10 @@ function RootLayoutNav() {
           <Stack.Screen name="index"  options={{ animation: "none" }} />
           <Stack.Screen name="launch" options={{ animation: "none" }} />
           <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="auth/login" />
-          <Stack.Screen name="auth/register" />
-          <Stack.Screen name="auth/franchise-created" />
+          <Stack.Screen name="auth/welcome"           options={{ animation: "none" }} />
+          <Stack.Screen name="auth/login"             options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="auth/register"          options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="auth/franchise-created" options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="franchise/index" />
           <Stack.Screen
             name="game/[id]"

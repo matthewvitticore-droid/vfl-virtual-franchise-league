@@ -3,7 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  ActivityIndicator, Alert, Platform, ScrollView,
+  ActivityIndicator, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, TouchableOpacity, View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -40,7 +40,7 @@ export default function HomeScreen() {
   const theme    = useTeamTheme();
   const insets   = useSafeAreaInsets();
   const router   = useRouter();
-  const { membership, signOut } = useAuth();
+  const { user, membership, signOut } = useAuth();
   const {
     season, isLoading, isSyncing, syncError,
     teamCustomization,
@@ -48,10 +48,21 @@ export default function HomeScreen() {
     simulateWeek, simulateSeason, advancePhase, toggleCoGMMode,
   } = useNFL();
 
-  const [simulating, setSimulating] = useState(false);
-  const [simSeason,  setSimSeason]  = useState(false);
-  const [advancing,  setAdvancing]  = useState(false);
+  const [simulating,   setSimulating]   = useState(false);
+  const [simSeason,    setSimSeason]    = useState(false);
+  const [advancing,    setAdvancing]    = useState(false);
   const [warRoomCount, setWarRoomCount] = useState(0);
+  const [showProfile,  setShowProfile]  = useState(false);
+
+  // Resolve best available display name
+  const displayName = membership?.displayName
+    || user?.user_metadata?.display_name
+    || user?.email?.split("@")[0]
+    || null;
+  const userEmail   = user?.email ?? null;
+  const initials    = displayName
+    ? displayName.slice(0, 2).toUpperCase()
+    : user ? "GM" : null;
 
   const team    = getPlayerTeam();
   const topPad  = Platform.OS === "web" ? 16 : insets.top;
@@ -149,13 +160,15 @@ export default function HomeScreen() {
           {isSyncing && <ActivityIndicator color="#003087" size="small" style={{ transform:[{scale:0.7}] }} />}
           {syncError && !isSyncing && <Feather name="wifi-off" size={14} color={colors.danger} />}
           <TouchableOpacity
-            onPress={() => Alert.alert("Sign Out", "Leave this session?", [
-              { text: "Cancel" },
-              { text: "Sign Out", style: "destructive", onPress: signOut },
-            ])}
-            style={[st.avatarBtn, { backgroundColor: "#003087" + "30", borderColor: "#003087" + "80" }]}
+            onPress={() => setShowProfile(true)}
+            style={[st.avatarBtn, { backgroundColor: "#003087" + "40", borderColor: "#003087" }]}
+            activeOpacity={0.75}
           >
-            <Feather name="user" size={14} color="#C8102E" />
+            {initials ? (
+              <Text style={st.avatarInitials}>{initials}</Text>
+            ) : (
+              <Feather name="user" size={14} color="#C8102E" />
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -536,6 +549,83 @@ export default function HomeScreen() {
         </View>
 
       </ScrollView>
+
+      {/* ── Profile modal ──────────────────────────────────────────────────── */}
+      <Modal
+        visible={showProfile}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowProfile(false)}
+      >
+        <Pressable style={st.modalOverlay} onPress={() => setShowProfile(false)}>
+          <Pressable style={[st.profileCard, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => {}}>
+            <LinearGradient colors={["#003087" + "30", "transparent"]} style={StyleSheet.absoluteFill} />
+
+            {/* Avatar + name */}
+            <View style={st.profileHeader}>
+              <View style={[st.profileAvatar, { backgroundColor: "#003087" }]}>
+                <Text style={st.profileAvatarTxt}>{initials ?? "GM"}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                {displayName && (
+                  <Text style={[st.profileName, { color: colors.foreground }]} numberOfLines={1}>
+                    {displayName}
+                  </Text>
+                )}
+                {userEmail && (
+                  <Text style={[st.profileEmail, { color: colors.mutedForeground }]} numberOfLines={1}>
+                    {userEmail}
+                  </Text>
+                )}
+                {!displayName && !userEmail && (
+                  <Text style={[st.profileName, { color: colors.foreground }]}>Solo GM</Text>
+                )}
+              </View>
+            </View>
+
+            {/* Franchise info */}
+            {membership && (
+              <View style={[st.profileRow, { borderTopColor: colors.border }]}>
+                <Feather name="shield" size={14} color="#003087" />
+                <View style={{ flex: 1 }}>
+                  <Text style={[st.profileRowLabel, { color: colors.mutedForeground }]}>FRANCHISE</Text>
+                  <Text style={[st.profileRowValue, { color: colors.foreground }]} numberOfLines={1}>
+                    {membership.franchiseName}
+                  </Text>
+                </View>
+                <View style={[st.roleBadge, { backgroundColor: "#003087" + "25", borderColor: "#003087" + "60" }]}>
+                  <Text style={[st.roleBadgeTxt, { color: "#6EA8FF" }]}>{membership.role}</Text>
+                </View>
+              </View>
+            )}
+
+            {/* Sign out */}
+            {user && (
+              <TouchableOpacity
+                onPress={async () => { setShowProfile(false); await signOut(); }}
+                style={st.signOutBtn}
+                activeOpacity={0.8}
+              >
+                <Feather name="log-out" size={15} color="#fff" />
+                <Text style={st.signOutTxt}>Sign Out</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Sign in (for offline/solo users) */}
+            {!user && (
+              <TouchableOpacity
+                onPress={() => { setShowProfile(false); router.push("/auth/welcome"); }}
+                style={[st.signOutBtn, { backgroundColor: "#003087" }]}
+                activeOpacity={0.8}
+              >
+                <Feather name="log-in" size={15} color="#fff" />
+                <Text style={st.signOutTxt}>Sign In / Create Account</Text>
+              </TouchableOpacity>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
     </View>
   );
 }
@@ -790,7 +880,24 @@ const st = StyleSheet.create({
   topRight:  { flexDirection:"row", alignItems:"center", gap:8 },
   seasonLbl: { fontSize:10, fontFamily:"Inter_600SemiBold", letterSpacing:1.5 },
   weekLbl:   { fontSize:22, fontFamily:"Inter_700Bold", letterSpacing:-0.5 },
-  avatarBtn: { width:32, height:32, borderRadius:16, alignItems:"center", justifyContent:"center", borderWidth:1.5 },
+  avatarBtn:         { width:36, height:36, borderRadius:18, alignItems:"center", justifyContent:"center", borderWidth:1.5 },
+  avatarInitials:    { fontFamily:"Inter_700Bold", fontSize:12, color:"#fff" },
+
+  // Profile modal
+  modalOverlay:      { flex:1, backgroundColor:"rgba(0,0,0,0.6)", justifyContent:"flex-start", alignItems:"flex-end", paddingTop:70, paddingRight:16 },
+  profileCard:       { width:280, borderRadius:18, borderWidth:1, overflow:"hidden", padding:0 },
+  profileHeader:     { flexDirection:"row", alignItems:"center", gap:12, padding:18, paddingBottom:14 },
+  profileAvatar:     { width:46, height:46, borderRadius:23, alignItems:"center", justifyContent:"center", flexShrink:0 },
+  profileAvatarTxt:  { fontFamily:"Inter_700Bold", fontSize:17, color:"#fff" },
+  profileName:       { fontFamily:"Inter_700Bold", fontSize:15, letterSpacing:-0.2 },
+  profileEmail:      { fontFamily:"Inter_400Regular", fontSize:12, marginTop:2 },
+  profileRow:        { flexDirection:"row", alignItems:"center", gap:10, paddingHorizontal:18, paddingVertical:12, borderTopWidth:StyleSheet.hairlineWidth },
+  profileRowLabel:   { fontFamily:"Inter_700Bold", fontSize:9, letterSpacing:1, marginBottom:2 },
+  profileRowValue:   { fontFamily:"Inter_600SemiBold", fontSize:13 },
+  roleBadge:         { paddingHorizontal:8, paddingVertical:3, borderRadius:8, borderWidth:1 },
+  roleBadgeTxt:      { fontFamily:"Inter_700Bold", fontSize:10, letterSpacing:0.5 },
+  signOutBtn:        { flexDirection:"row", alignItems:"center", justifyContent:"center", gap:8, margin:12, marginTop:8, paddingVertical:13, borderRadius:12, backgroundColor:"#C8102E" },
+  signOutTxt:        { fontFamily:"Inter_700Bold", fontSize:14, color:"#fff", letterSpacing:0.3 },
 
   hero:      { paddingBottom: 16 },
   heroAccent:{ height: 3 },
