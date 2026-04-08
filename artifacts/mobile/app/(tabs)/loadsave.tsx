@@ -4,7 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react"; // useRef kept for ScrollView ref
 import {
-  Alert, Platform, ScrollView, StyleSheet,
+  Alert, Platform, ScrollView, Share, StyleSheet,
   Text, TouchableOpacity, View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -435,20 +435,35 @@ export default function LoadSaveScreen() {
         {/* ── Co-GM invite code ────────────────────────────────────────────── */}
         {gmMode !== "solo" && season?.inviteCode && (
           <>
-            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>CO-GM</Text>
+            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>INVITE CO-GMs</Text>
             <View style={[styles.saveCard, { backgroundColor: colors.card, borderColor: colors.nflGold + "50" }]}>
               <View style={styles.saveRow}>
                 <View style={[styles.saveIconWrap, { backgroundColor: colors.nflGold + "20" }]}>
                   <Feather name="users" size={18} color={colors.nflGold} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.saveTitle, { color: colors.foreground }]}>Invite Code</Text>
-                  <Text style={[styles.saveSub, { color: colors.mutedForeground }]}>Share with your co-GMs to join</Text>
+                  <Text style={[styles.saveTitle, { color: colors.foreground }]}>Franchise Invite Code</Text>
+                  <Text style={[styles.saveSub, { color: colors.mutedForeground }]}>Send to a friend — they enter it in the VFL app</Text>
                 </View>
               </View>
               <View style={[styles.codeBox, { backgroundColor: colors.nflGold + "15", borderColor: colors.nflGold + "50" }]}>
                 <Text style={[styles.codeText, { color: colors.nflGold }]}>{season.inviteCode}</Text>
               </View>
+              <TouchableOpacity
+                onPress={async () => {
+                  try {
+                    await Share.share({
+                      message: `🏈 Join my VFL franchise as a Co-GM!\n\nOpen the VFL app → Franchise → Join with Code → enter:\n\n${season.inviteCode}\n\nSee you in the war room!`,
+                      title: "VFL Franchise Invite",
+                    });
+                  } catch {}
+                }}
+                style={[styles.actionBtn, { backgroundColor: colors.nflGold, marginTop: 8 }]}
+                activeOpacity={0.8}
+              >
+                <Feather name="share-2" size={16} color="#000" />
+                <Text style={[styles.actionBtnText, { color: "#000" }]}>Send Invite via iMessage / Email…</Text>
+              </TouchableOpacity>
             </View>
           </>
         )}

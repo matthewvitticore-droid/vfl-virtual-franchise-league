@@ -20,7 +20,7 @@
       "backgroundColor": "#07070F"
     },
     "web": {
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.svg"
     },
     "plugins": [
       [

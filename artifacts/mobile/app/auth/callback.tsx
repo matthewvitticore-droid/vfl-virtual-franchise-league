@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { Text, View, StyleSheet } from "react-native";
@@ -9,19 +10,40 @@ export default function AuthCallbackScreen() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Supabase automatically reads the access_token / code from the URL hash
-    // when getSession() is called — just wait for it to settle then navigate.
     const handle = async () => {
       try {
         // Give Supabase a tick to parse the URL hash
         await new Promise(r => setTimeout(r, 500));
         const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          router.replace("/(tabs)");
-        } else {
-          // Session not set — could mean link expired or already used
+
+        if (!session) {
           setError("Link expired or already used. Please sign in.");
           setTimeout(() => router.replace("/auth/login"), 3000);
+          return;
+        }
+
+        // Check if this user already has a franchise set up (solo or co-gm)
+        const [seasonRaw, gmMode] = await Promise.all([
+          AsyncStorage.getItem("vfl_season_v1"),
+          AsyncStorage.getItem("vfl_gm_mode"),
+        ]);
+
+        const hasSoloFranchise = !!(seasonRaw || gmMode);
+
+        // Also check if there's a cloud (Co-GM) membership via Supabase
+        const { data: membershipRows } = await supabase
+          .from("franchise_members")
+          .select("id")
+          .eq("user_id", session.user.id)
+          .limit(1);
+
+        const hasCloudFranchise = !!(membershipRows && membershipRows.length > 0);
+
+        if (hasSoloFranchise || hasCloudFranchise) {
+          router.replace("/(tabs)");
+        } else {
+          // Brand new user — send them to franchise type selector
+          router.replace("/franchise");
         }
       } catch {
         setError("Something went wrong. Redirecting to sign in…");

@@ -146,12 +146,12 @@ export default function HomeScreen() {
           <VFLLogo size="sm" />
           <View>
             <Text style={[st.seasonLbl, { color: colors.mutedForeground }]}>
-              {(season?.year ?? 2025) + 1} VIRTUAL FRANCHISE LEAGUE
+              {season?.year ?? 2026} VIRTUAL FRANCHISE LEAGUE
             </Text>
             <Text style={[st.weekLbl, { color: colors.foreground }]}>
               {isOffseason
                 ? <Text style={{ color: "#C8102E" }}>{PHASE_LABELS[currentPhase].toUpperCase()}</Text>
-                : <>SEASON{" "}<Text style={{ color: "#C8102E" }}>{(season?.year ?? 2025) - 2024}</Text></>
+                : <>SEASON{" "}<Text style={{ color: "#C8102E" }}>{(season?.year ?? 2026) - 2025}</Text></>
               }
             </Text>
           </View>
@@ -239,6 +239,15 @@ export default function HomeScreen() {
                   ))}
                 </View>
               )}
+
+              {/* Draft class placeholder */}
+              <View style={[st.draftBadge, { borderColor: "#003087" + "60", backgroundColor: "#003087" + "15" }]}>
+                <Feather name="users" size={10} color="#003087" />
+                <Text style={st.draftBadgeTxt}>
+                  {(season?.year ?? 2026)} DRAFT CLASS
+                </Text>
+                <Text style={[st.draftBadgeSub, { color: colors.mutedForeground }]}>Coming soon</Text>
+              </View>
             </View>
           </View>
         </LinearGradient>
@@ -914,6 +923,13 @@ const st = StyleSheet.create({
   ratingRow:    { flexDirection: "row", alignItems: "baseline", gap: 6 },
   ratingLbl:    { fontSize: 9, fontFamily: "Inter_700Bold", letterSpacing: 1.2, width: 28 },
   ratingVal:    { fontSize: 20, fontFamily: "Inter_700Bold", letterSpacing: -0.5, lineHeight: 24 },
+  draftBadge: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    marginTop: 10, paddingHorizontal: 9, paddingVertical: 5,
+    borderRadius: 8, borderWidth: 1,
+  },
+  draftBadgeTxt: { fontSize: 9, fontFamily: "Inter_700Bold", color: "#003087", letterSpacing: 0.8, flex: 1 },
+  draftBadgeSub: { fontSize: 9, fontFamily: "Inter_400Regular", letterSpacing: 0.3 },
 
   kitRow:    { flexDirection:"row", alignItems:"center", borderTopWidth:1, borderBottomWidth:1,
                paddingVertical:10, paddingHorizontal:14, gap:10, marginBottom:4 },

@@ -15,8 +15,11 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { NFLTeamBadge } from "@/components/NFLTeamBadge";
+import { VFLLogo } from "@/components/VFLLogo";
 import { useColors } from "@/hooks/useColors";
 import { FranchiseMemberRole, useAuth } from "@/context/AuthContext";
+import { initSeason } from "@/context/NFLContext";
+import { bigSet } from "@/utils/bigStorage";
 
 const VFL_TEAMS = [
   // Ironclad Conference — East
@@ -67,7 +70,7 @@ const ROLES: { value: FranchiseMemberRole; label: string; desc: string; icon: st
   { value: "Scout", label: "Scout",           desc: "View everything, suggest draft prospects. Read-only.",      icon: "search"    },
 ];
 
-type Screen = "choose" | "create" | "join" | "success";
+type Screen = "type" | "choose" | "create" | "join" | "success" | "solo-team";
 
 export default function FranchiseLobbyScreen() {
   const colors = useColors();
@@ -75,7 +78,8 @@ export default function FranchiseLobbyScreen() {
   const router = useRouter();
   const { user, createFranchise, joinFranchise, signOut } = useAuth();
 
-  const [screen, setScreen] = useState<Screen>("choose");
+  const [screen, setScreen] = useState<Screen>("type");
+  const [soloTeamId, setSoloTeamId] = useState("team-13"); // Coastal Sharks default
 
   // Create state
   const [franchiseName, setFranchiseName] = useState("");
@@ -102,7 +106,8 @@ export default function FranchiseLobbyScreen() {
     });
   }, []);
 
-  const selectedTeam = VFL_TEAMS.find(t => t.id === selectedTeamId) ?? VFL_TEAMS[13];
+  const selectedTeam     = VFL_TEAMS.find(t => t.id === selectedTeamId) ?? VFL_TEAMS[13];
+  const selectedSoloTeam = VFL_TEAMS.find(t => t.id === soloTeamId) ?? VFL_TEAMS[13];
 
   const handleCreate = async () => {
     if (!franchiseName.trim()) { setError("Please enter a franchise name."); return; }
@@ -124,6 +129,20 @@ export default function FranchiseLobbyScreen() {
     router.replace("/(tabs)");
   };
 
+  const handleSoloCreate = async () => {
+    setLoading(true);
+    try {
+      const season = initSeason(soloTeamId);
+      await bigSet("vfl_season_v1", season);
+      await AsyncStorage.setItem("vfl_gm_mode", "solo");
+      router.replace("/(tabs)");
+    } catch (e) {
+      setError("Failed to create franchise. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -136,14 +155,24 @@ export default function FranchiseLobbyScreen() {
       >
         {/* Header */}
         <View style={styles.headerRow}>
-          {screen !== "choose" && (
-            <TouchableOpacity onPress={() => { setScreen("choose"); setError(null); }}>
+          {screen !== "type" && (
+            <TouchableOpacity onPress={() => {
+              if (screen === "choose" || screen === "solo-team") setScreen("type");
+              else if (screen === "create" || screen === "join") setScreen("choose");
+              setError(null);
+            }}>
               <Feather name="arrow-left" size={20} color={colors.foreground} />
             </TouchableOpacity>
           )}
+          {screen === "type" && <VFLLogo size="sm" />}
           <View style={{ flex: 1 }}>
             <Text style={[styles.heading, { color: colors.foreground }]}>
-              {screen === "choose" ? "Your Franchise" : screen === "create" ? "Create Franchise" : screen === "join" ? "Join Franchise" : "Franchise Created!"}
+              {screen === "type" ? "Choose League Type"
+                : screen === "solo-team" ? "Pick Your Team"
+                : screen === "choose" ? "Co-GM Mode"
+                : screen === "create" ? "Create Franchise"
+                : screen === "join" ? "Join Franchise"
+                : "Franchise Created!"}
             </Text>
             <Text style={[styles.userEmail, { color: colors.mutedForeground }]}>Signed in as {user?.email}</Text>
           </View>
@@ -152,6 +181,122 @@ export default function FranchiseLobbyScreen() {
             <Text style={[styles.signOutText, { color: colors.mutedForeground }]}>Sign out</Text>
           </TouchableOpacity>
         </View>
+
+        {/* ── TYPE SELECTOR ──────────────────────────────────────────────── */}
+        {screen === "type" && (
+          <>
+            <Text style={[styles.typeSubtitle, { color: colors.mutedForeground }]}>
+              How do you want to run your franchise?
+            </Text>
+
+            {/* Solo GM */}
+            <TouchableOpacity
+              onPress={() => setScreen("solo-team")}
+              style={[styles.typeCard, { backgroundColor: colors.card, borderColor: "#003087" + "70" }]}
+            >
+              <View style={[styles.typeIconWrap, { backgroundColor: "#003087" + "25" }]}>
+                <Feather name="user" size={26} color="#003087" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.typeTitle, { color: colors.foreground }]}>Solo GM</Text>
+                <Text style={[styles.typeDesc, { color: colors.mutedForeground }]}>
+                  Just you. Run every aspect of your franchise — roster, trades, draft, and sim.
+                </Text>
+                <View style={[styles.typePill, { backgroundColor: "#003087" + "20", borderColor: "#003087" + "50" }]}>
+                  <Text style={[styles.typePillTxt, { color: "#003087" }]}>OFFLINE · INSTANT START</Text>
+                </View>
+              </View>
+              <Feather name="chevron-right" size={20} color="#003087" />
+            </TouchableOpacity>
+
+            {/* Co-GM */}
+            <TouchableOpacity
+              onPress={() => setScreen("choose")}
+              style={[styles.typeCard, { backgroundColor: colors.card, borderColor: "#C8102E" + "70" }]}
+            >
+              <View style={[styles.typeIconWrap, { backgroundColor: "#C8102E" + "25" }]}>
+                <Feather name="users" size={26} color="#C8102E" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.typeTitle, { color: colors.foreground }]}>Co-GM</Text>
+                <Text style={[styles.typeDesc, { color: colors.mutedForeground }]}>
+                  One team, up to 3 GMs. Share decisions — trades and signings need group approval.
+                </Text>
+                <View style={[styles.typePill, { backgroundColor: "#C8102E" + "20", borderColor: "#C8102E" + "50" }]}>
+                  <Text style={[styles.typePillTxt, { color: "#C8102E" }]}>CLOUD · UP TO 3 USERS · 1 TEAM</Text>
+                </View>
+              </View>
+              <Feather name="chevron-right" size={20} color="#C8102E" />
+            </TouchableOpacity>
+
+            {/* Multiplayer - Coming Soon */}
+            <View style={[styles.typeCard, { backgroundColor: colors.card, borderColor: colors.border, opacity: 0.45 }]}>
+              <View style={[styles.typeIconWrap, { backgroundColor: "#D97706" + "25" }]}>
+                <Feather name="globe" size={26} color="#D97706" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.typeTitle, { color: colors.foreground }]}>Multiplayer League</Text>
+                <Text style={[styles.typeDesc, { color: colors.mutedForeground }]}>
+                  Each user controls their own team. Up to 32 GMs in one live league.
+                </Text>
+                <View style={[styles.typePill, { backgroundColor: "#D97706" + "20", borderColor: "#D97706" + "50" }]}>
+                  <Text style={[styles.typePillTxt, { color: "#D97706" }]}>COMING SOON · UP TO 32 USERS</Text>
+                </View>
+              </View>
+              <Feather name="lock" size={18} color={colors.mutedForeground} />
+            </View>
+          </>
+        )}
+
+        {/* ── SOLO TEAM PICKER ────────────────────────────────────────────── */}
+        {screen === "solo-team" && (
+          <View style={{ gap: 16 }}>
+            <View style={[styles.banner, { backgroundColor: "#003087" + "18", borderColor: "#003087" + "50" }]}>
+              <Text style={{ fontSize: 36 }}>🏈</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.bannerTitle, { color: colors.foreground }]}>Your Team</Text>
+                <Text style={[styles.bannerSub, { color: colors.mutedForeground }]}>
+                  Pick the franchise you want to build into a dynasty.
+                </Text>
+              </View>
+            </View>
+
+            <View style={[styles.selectedTeamRow, { backgroundColor: selectedSoloTeam.color + "20", borderColor: selectedSoloTeam.color + "60" }]}>
+              <NFLTeamBadge abbreviation={selectedSoloTeam.abbr} primaryColor={selectedSoloTeam.color} size="md" />
+              <Text style={[styles.selectedTeamName, { color: colors.foreground }]}>
+                {selectedSoloTeam.city} {selectedSoloTeam.name}
+              </Text>
+            </View>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.teamPickerRow}>
+              {VFL_TEAMS.map(t => (
+                <TouchableOpacity
+                  key={t.id}
+                  onPress={() => setSoloTeamId(t.id)}
+                  style={[styles.teamPickerItem, {
+                    borderColor: soloTeamId === t.id ? t.color : "transparent",
+                    backgroundColor: soloTeamId === t.id ? t.color + "25" : colors.card,
+                  }]}
+                >
+                  <Text style={[styles.teamPickerAbbr, { color: t.color }]}>{t.abbr}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {error && <ErrorBox error={error} />}
+
+            <TouchableOpacity
+              onPress={handleSoloCreate}
+              disabled={loading}
+              style={[styles.submitBtn, { backgroundColor: loading ? colors.secondary : "#003087" }]}
+            >
+              {loading
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <><Feather name="play" size={18} color="#fff" /><Text style={styles.submitText}>Start My Franchise →</Text></>
+              }
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* ── SUCCESS ────────────────────────────────────────────────────── */}
         {screen === "success" && (
@@ -406,4 +551,20 @@ const styles = StyleSheet.create({
   successBtnText: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#fff" },
   successBtnSecondary: { paddingVertical: 14, borderRadius: 14, borderWidth: 1, width: "100%" as any, alignItems: "center" },
   successBtnSecondaryText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  typeSubtitle: { fontSize: 13, fontFamily: "Inter_400Regular", marginBottom: 16, lineHeight: 20 },
+  typeCard: {
+    flexDirection: "row", alignItems: "center", gap: 14,
+    padding: 16, borderRadius: 16, borderWidth: 1.5, marginBottom: 14,
+  },
+  typeIconWrap: {
+    width: 52, height: 52, borderRadius: 14,
+    alignItems: "center", justifyContent: "center",
+  },
+  typeTitle: { fontSize: 17, fontFamily: "Inter_700Bold", marginBottom: 4 },
+  typeDesc: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 17, marginBottom: 8 },
+  typePill: {
+    alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: 6, borderWidth: 1,
+  },
+  typePillTxt: { fontSize: 9, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
 });

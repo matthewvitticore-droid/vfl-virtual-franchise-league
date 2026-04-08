@@ -746,7 +746,7 @@ function generateDraftPicks(teamId: string): DraftPick[] {
     id: uid(),
     round,
     pick: irng(1, 32),
-    year: 2025,
+    year: 2026,
     fromTeam: teamId,
     ownedByTeamId: teamId,
   }));
@@ -754,7 +754,7 @@ function generateDraftPicks(teamId: string): DraftPick[] {
 
 // ─── initSeason ───────────────────────────────────────────────────────────────
 
-function initSeason(playerTeamId?: string): Season {
+export function initSeason(playerTeamId?: string): Season {
   const teams: NFLTeam[] = NFL_TEAMS.map((t, i) => {
     const id = `team-${i}`;
     return {
@@ -779,12 +779,12 @@ function initSeason(playerTeamId?: string): Season {
 
   const finalPlayerTeamId = playerTeamId ?? teams[13].id; // Coastal Sharks default
   const { games, byeWeeks } = generateSchedule(teams);
-  const draftProspects = generateDraftClass(2025, 252);
+  const draftProspects = generateDraftClass(2026, 252);
   const teamIds = teams.map(t => t.id);
   const draftState = initDraftState(teamIds, finalPlayerTeamId);
 
   return {
-    year: 2025,
+    year: 2026,
     currentWeek: 1,
     totalWeeks: 18,
     phase: "regular",
