@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { VFLLogo } from "@/components/VFLLogo";
+import { useAuth } from "@/context/AuthContext";
 import { bigGet, bigSet } from "@/utils/bigStorage";
 
 // ─── Brand ─────────────────────────────────────────────────────────────────────
@@ -119,6 +120,7 @@ export default function LaunchScreen() {
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
   const { width: SW } = Dimensions.get("window");
+  const { user, membership, isLoading: authLoading } = useAuth();
 
   const [saves,       setSaves]       = useState<SaveSlot[]>([]);
   const [legacySave,  setLegacySave]  = useState(false); // old vfl_season_v1 with no name
@@ -133,6 +135,11 @@ export default function LaunchScreen() {
   const fadeAnim  = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
+  // When auth finishes loading and user has a membership, ensure saves view is shown
+  useEffect(() => {
+    if (!authLoading && membership) setActiveView("saves");
+  }, [authLoading, membership]);
+
   useEffect(() => {
     Promise.all([
       AsyncStorage.getItem(SAVES_KEY),
@@ -144,6 +151,8 @@ export default function LaunchScreen() {
       // If there's an old auto-save but no named saves, show legacy option
       if (rawSeason && slots.length === 0) setLegacySave(true);
       // Default view: saves if any exist, create if none
+      // Show saves view if: has local saves, has a legacy save, OR is logged in to Co-GM
+      // (membership check happens after auth loads, so we default to saves and let it fall through)
       setActiveView(slots.length > 0 || rawSeason ? "saves" : "create");
     });
 
@@ -269,7 +278,70 @@ export default function LaunchScreen() {
         {/* ── LOAD VIEW ───────────────────────────────────────────────────── */}
         {activeView === "saves" && (
           <Animated.View style={{ opacity: fadeAnim, gap: 10 }}>
-            {saves.length === 0 && !legacySave && (
+
+            {/* ── Co-GM Cloud Franchise Card ─────────────────────────────── */}
+            {membership && (
+              <TouchableOpacity
+                onPress={async () => {
+                  setLoading("cogm-resume");
+                  await AsyncStorage.setItem("vfl_gm_mode", "cogm");
+                  router.replace("/(tabs)");
+                }}
+                disabled={!!loading}
+                activeOpacity={0.85}
+                style={[st.slotCard, {
+                  borderLeftColor: VFL_BLUE,
+                  borderLeftWidth: 4,
+                  opacity: loading && loading !== "cogm-resume" ? 0.5 : 1,
+                }]}
+              >
+                <LinearGradient
+                  colors={[VFL_BLUE + "25", "transparent"]}
+                  style={StyleSheet.absoluteFill}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                />
+                <View style={st.slotCardTop}>
+                  <View style={[st.slotIcon, { backgroundColor: VFL_BLUE + "30" }]}>
+                    <Feather name="users" size={18} color={VFL_BLUE} />
+                  </View>
+                  <View style={{ flex: 1, gap: 3 }}>
+                    <Text style={[st.slotName, { color: "#fff" }]}>{membership.franchiseName}</Text>
+                    <Text style={st.slotMeta}>
+                      {membership.role} · {membership.displayName}
+                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
+                      <View style={[st.cogmBadge, { backgroundColor: "#10B98130" }]}>
+                        <Feather name="wifi" size={9} color="#10B981" />
+                        <Text style={[st.cogmBadgeText, { color: "#10B981" }]}>LIVE SYNC</Text>
+                      </View>
+                      <View style={[st.cogmBadge, { backgroundColor: VFL_BLUE + "40" }]}>
+                        <Text style={[st.cogmBadgeText, { color: "#93C5FD" }]}>CO-GM</Text>
+                      </View>
+                      <Text style={[st.slotMeta, { fontSize: 10, letterSpacing: 0.8 }]}>
+                        Code: {membership.joinCode}
+                      </Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    onPress={async () => {
+                      setLoading("cogm-resume");
+                      await AsyncStorage.setItem("vfl_gm_mode", "cogm");
+                      router.replace("/(tabs)");
+                    }}
+                    disabled={!!loading}
+                    style={[st.loadBtn, { backgroundColor: VFL_BLUE, minWidth: 70 }]}
+                  >
+                    {loading === "cogm-resume" ? (
+                      <Text style={st.loadBtnText}>…</Text>
+                    ) : (
+                      <Text style={st.loadBtnText}>RESUME</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            )}
+
+            {saves.length === 0 && !legacySave && !membership && (
               <View style={st.emptySaves}>
                 <Feather name="inbox" size={36} color="#2A4060" />
                 <Text style={st.emptySavesTitle}>No Saved Franchises</Text>
@@ -529,6 +601,8 @@ const st = StyleSheet.create({
   slotCard:      { backgroundColor: CARD_BG, borderWidth: 1, borderLeftWidth: 4, borderColor: BORDER, borderRadius: 14, padding: 14, gap: 10 },
   slotCardTop:   { flexDirection: "row", alignItems: "center", gap: 10 },
   slotIcon:      { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  cogmBadge:     { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  cogmBadgeText: { fontFamily: "Inter_700Bold", fontSize: 9, letterSpacing: 0.7 },
   slotSwatch:    { width: 14, height: 38, borderRadius: 4, position: "relative", overflow: "visible" },
   slotSwatchAlt: { position: "absolute", right: -6, top: 6, width: 8, height: 26, borderRadius: 3 },
   slotName:      { color: "#E0EAF8", fontFamily: "Inter_700Bold", fontSize: 14 },
