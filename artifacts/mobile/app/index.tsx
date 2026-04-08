@@ -468,12 +468,12 @@ export default function LaunchScreen() {
                 style={[st.cta, !canCreate && { opacity: 0.4 }]}
               >
                 <LinearGradient
-                  colors={[VFL_RED, "#A00C22"]}
+                  colors={mode === "join" ? ["#003087", "#001a4d"] : [VFL_RED, "#A00C22"]}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                   style={st.ctaGradient}
                 >
-                  <Feather name="arrow-right-circle" size={20} color="#fff" />
-                  <Text style={st.ctaText}>CREATE FRANCHISE</Text>
+                  <Feather name={mode === "join" ? "log-in" : "arrow-right-circle"} size={20} color="#fff" />
+                  <Text style={st.ctaText}>{mode === "join" ? "JOIN FRANCHISE" : "CREATE FRANCHISE"}</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
