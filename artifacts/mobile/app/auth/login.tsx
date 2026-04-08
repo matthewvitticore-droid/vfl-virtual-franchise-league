@@ -1,8 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Clipboard from "expo-clipboard";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -32,10 +31,13 @@ export default function LoginScreen() {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
-  // After franchise creation: show the share code screen
-  const [createdCode, setCreatedCode] = useState<string | null>(null);
-  const [franchiseName, setFranchiseName] = useState<string>("");
-  const [copied, setCopied] = useState(false);
+  // If franchise was just created (code stored), go straight to the success screen.
+  // This fires even after AuthGate briefly unmounts/remounts this component.
+  useEffect(() => {
+    AsyncStorage.getItem("vfl_created_join_code").then(code => {
+      if (code) router.replace("/auth/franchise-created");
+    });
+  }, []);
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
@@ -74,10 +76,12 @@ export default function LoginScreen() {
           }
           await AsyncStorage.removeItem("vfl_pending_action");
           await AsyncStorage.setItem("vfl_gm_mode", "cogm");
+          // Persist code to AsyncStorage — the success screen reads it there
+          // (avoids state-loss when AuthGate briefly unmounts this screen)
+          await AsyncStorage.setItem("vfl_created_join_code", joinCode ?? "");
+          await AsyncStorage.setItem("vfl_created_franchise_name", action.franchiseName ?? "");
           setLoading(false);
-          // Show the join code before entering the game
-          setCreatedCode(joinCode ?? "");
-          setFranchiseName(action.franchiseName ?? "");
+          router.replace("/auth/franchise-created");
           return;
 
         } else if (action.type === "join") {
@@ -104,71 +108,6 @@ export default function LoginScreen() {
     router.replace("/(tabs)");
   };
 
-  const handleCopy = async () => {
-    if (!createdCode) return;
-    await Clipboard.setStringAsync(createdCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
-  };
-
-  // ── Franchise Created Screen ─────────────────────────────────────────────────
-  if (createdCode !== null) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ScrollView
-          contentContainerStyle={[styles.content, { paddingTop: insets.top + 60, paddingBottom: insets.bottom + 40 }]}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Success badge */}
-          <View style={styles.successBadge}>
-            <Feather name="check-circle" size={48} color="#22C55E" />
-          </View>
-
-          <Text style={[styles.heading, { color: colors.foreground, textAlign: "center" }]}>
-            Franchise Created!
-          </Text>
-          <Text style={[styles.subheading, { color: colors.mutedForeground, textAlign: "center" }]}>
-            {franchiseName}
-          </Text>
-
-          {/* Code block */}
-          <View style={[styles.codeBlock, { borderColor: "#22C55E55", backgroundColor: "#22C55E08" }]}>
-            <Text style={[styles.codeLabel, { color: colors.mutedForeground }]}>SHARE THIS CODE WITH YOUR CO-GMs</Text>
-            <Text style={[styles.codeText, { color: "#22C55E" }]}>{createdCode}</Text>
-            <Text style={[styles.codeSub, { color: colors.mutedForeground }]}>
-              They'll enter it on the "Join Franchise" screen to connect to your franchise.
-            </Text>
-          </View>
-
-          {/* Copy button */}
-          <TouchableOpacity
-            onPress={handleCopy}
-            style={[styles.copyBtn, { borderColor: copied ? "#22C55E" : colors.nflBlue + "60", backgroundColor: copied ? "#22C55E15" : colors.card }]}
-          >
-            <Feather name={copied ? "check" : "copy"} size={16} color={copied ? "#22C55E" : colors.nflBlue} />
-            <Text style={[styles.copyText, { color: copied ? "#22C55E" : colors.nflBlue }]}>
-              {copied ? "Copied!" : "Copy Code"}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Enter game */}
-          <TouchableOpacity
-            onPress={() => router.replace("/(tabs)")}
-            style={[styles.submitBtn, { backgroundColor: colors.nflBlue, marginTop: 8 }]}
-          >
-            <Feather name="arrow-right-circle" size={18} color="#fff" />
-            <Text style={styles.submitText}>Enter My Franchise</Text>
-          </TouchableOpacity>
-
-          <Text style={[styles.codeHint, { color: colors.mutedForeground }]}>
-            You can also find this code in the Franchise → Meeting Room tab once you're in the game.
-          </Text>
-        </ScrollView>
-      </View>
-    );
-  }
-
-  // ── Sign In Screen ────────────────────────────────────────────────────────────
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -233,7 +172,7 @@ export default function LoginScreen() {
           )}
 
           {status && !error && (
-            <View style={[styles.errorBox, { backgroundColor: "#003087" + "30", borderColor: "#003087" }]}>
+            <View style={[styles.statusBox, { backgroundColor: "#003087" + "30", borderColor: "#003087" }]}>
               <ActivityIndicator size="small" color="#60A5FA" />
               <Text style={[styles.errorText, { color: "#60A5FA" }]}>{status}</Text>
             </View>
@@ -292,6 +231,7 @@ const styles = StyleSheet.create({
   inputWrap:    { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13 },
   input:        { flex: 1, fontSize: 15, fontFamily: "Inter_400Regular" },
   errorBox:     { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 10, borderWidth: 1 },
+  statusBox:    { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 10, borderWidth: 1 },
   errorText:    { fontSize: 13, fontFamily: "Inter_400Regular", flex: 1 },
   submitBtn:    { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 15, borderRadius: 14 },
   submitText:   { fontSize: 16, fontFamily: "Inter_700Bold", color: "#fff" },
@@ -302,13 +242,4 @@ const styles = StyleSheet.create({
   secondaryText:{ fontSize: 15, fontFamily: "Inter_600SemiBold" },
   offlineBtn:   { alignItems: "center", paddingVertical: 8 },
   offlineText:  { fontSize: 12, fontFamily: "Inter_400Regular", textDecorationLine: "underline" },
-  // Franchise Created screen
-  successBadge: { alignItems: "center", marginBottom: 24 },
-  codeBlock:    { borderWidth: 1.5, borderRadius: 16, padding: 24, alignItems: "center", gap: 10, marginBottom: 16 },
-  codeLabel:    { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 1.5, textTransform: "uppercase" },
-  codeText:     { fontSize: 36, fontFamily: "Inter_700Bold", letterSpacing: 4 },
-  codeSub:      { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 18 },
-  copyBtn:      { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 13, borderRadius: 12, borderWidth: 1.5, marginBottom: 12 },
-  copyText:     { fontSize: 15, fontFamily: "Inter_600SemiBold" },
-  codeHint:     { fontSize: 11, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 16, marginTop: 16 },
 });

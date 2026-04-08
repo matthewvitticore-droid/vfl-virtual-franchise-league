@@ -79,6 +79,7 @@ function RootLayoutNav() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="auth/login" />
           <Stack.Screen name="auth/register" />
+          <Stack.Screen name="auth/franchise-created" />
           <Stack.Screen name="franchise/index" />
           <Stack.Screen
             name="game/[id]"
