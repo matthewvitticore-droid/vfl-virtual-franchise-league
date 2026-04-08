@@ -1,11 +1,18 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import Constants from "expo-constants";
 import { Platform } from "react-native";
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
+// Read from app.config.js extra (server-side injection, most reliable) then
+// fall back to EXPO_PUBLIC_ env vars that Metro inlines at bundle time.
+const extra = Constants.expoConfig?.extra ?? {};
+const supabaseUrl: string =
+  extra.supabaseUrl ||
+  (process.env.EXPO_PUBLIC_SUPABASE_URL ?? "");
+const supabaseAnonKey: string =
+  extra.supabaseAnonKey ||
+  (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "");
 
-// Whether Supabase is configured — if not, app runs in offline/local mode
 export const SUPABASE_ENABLED =
   supabaseUrl.startsWith("https://") && supabaseAnonKey.length > 0;
 
@@ -14,7 +21,7 @@ let _client: SupabaseClient | null = null;
 function getClient(): SupabaseClient {
   if (_client) return _client;
   if (!SUPABASE_ENABLED) {
-    throw new Error("Supabase is not configured. Run in offline mode.");
+    throw new Error("AUTH_NOT_CONFIGURED");
   }
   _client = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
@@ -27,7 +34,6 @@ function getClient(): SupabaseClient {
   return _client;
 }
 
-// Proxy object — lazily initializes, throws helpful error if not configured
 export const supabase = new Proxy({} as SupabaseClient, {
   get(_target, prop) {
     const client = getClient();

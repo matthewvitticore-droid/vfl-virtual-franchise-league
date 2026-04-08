@@ -99,17 +99,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn = async (email: string, password: string): Promise<string | null> => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return error?.message ?? null;
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      return error?.message ?? null;
+    } catch (e: any) {
+      if (e?.message === "AUTH_NOT_CONFIGURED") {
+        return "Sign-in is currently unavailable. Please contact the administrator.";
+      }
+      return "An unexpected error occurred. Please try again.";
+    }
   };
 
   const signUp = async (email: string, password: string, displayName: string): Promise<string | null> => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { display_name: displayName } },
-    });
-    return error?.message ?? null;
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { display_name: displayName } },
+      });
+      return error?.message ?? null;
+    } catch (e: any) {
+      if (e?.message === "AUTH_NOT_CONFIGURED") {
+        return "Account creation is currently unavailable. Please contact the administrator.";
+      }
+      return "An unexpected error occurred. Please try again.";
+    }
   };
 
   const signOut = async () => {
