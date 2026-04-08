@@ -126,7 +126,7 @@ export default function FranchiseLobbyScreen() {
       await AsyncStorage.setItem("vfl_gm_mode", "co-gm");
       if (franchiseId) {
         const myTeam = season.teams.find((t: any) => t.id === season.playerTeamId);
-        await supabase.from("franchise_seasons").upsert({
+        const { error: newErr } = await supabase.from("franchise_seasons").upsert({
           franchise_id: franchiseId,
           year:  season.year  ?? 2026,
           phase: season.phase ?? "regular",
@@ -137,6 +137,13 @@ export default function FranchiseLobbyScreen() {
           sim_state:  season,
           updated_by: user?.id,
         }, { onConflict: "franchise_id" });
+        if (newErr) {
+          // v1 fallback
+          await supabase.from("franchise_state").upsert(
+            { franchise_id: franchiseId, state_json: season, updated_by: user?.id },
+            { onConflict: "franchise_id" }
+          );
+        }
       }
     } catch {}
     setLoading(false);
@@ -158,13 +165,19 @@ export default function FranchiseLobbyScreen() {
         .eq("user_id", user?.id)
         .maybeSingle();
       if (memberRow?.franchise_id) {
-        const { data: stateRow } = await supabase
-          .from("franchise_seasons")
-          .select("sim_state")
-          .eq("franchise_id", memberRow.franchise_id)
-          .maybeSingle();
-        if (stateRow?.sim_state) {
-          await bigSet("vfl_season_v1", JSON.stringify(stateRow.sim_state));
+        const { data: newRow, error: newErr } = await supabase
+          .from("franchise_seasons").select("sim_state")
+          .eq("franchise_id", memberRow.franchise_id).maybeSingle();
+        if (!newErr && newRow?.sim_state) {
+          await bigSet("vfl_season_v1", JSON.stringify(newRow.sim_state));
+        } else {
+          // v1 fallback
+          const { data: oldRow } = await supabase
+            .from("franchise_state").select("state_json")
+            .eq("franchise_id", memberRow.franchise_id).maybeSingle();
+          if (oldRow?.state_json) {
+            await bigSet("vfl_season_v1", JSON.stringify(oldRow.state_json));
+          }
         }
       }
       await AsyncStorage.setItem("vfl_gm_mode", "co-gm");

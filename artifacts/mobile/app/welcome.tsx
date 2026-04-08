@@ -44,13 +44,17 @@ export default function WelcomeScreen() {
     if (!membership) { setError("You're not in a Co-GM franchise yet. Join one first."); return; }
     setLoading(true);
     try {
-      const { data } = await supabase
-        .from("franchise_seasons")
-        .select("sim_state")
-        .eq("franchise_id", membership.franchiseId)
-        .maybeSingle();
-      if (data?.sim_state) {
-        await bigSet("vfl_season_v1", JSON.stringify(data.sim_state));
+      const { data: newData, error: newErr } = await supabase
+        .from("franchise_seasons").select("sim_state")
+        .eq("franchise_id", membership.franchiseId).maybeSingle();
+      const simState = (!newErr && newData?.sim_state) ? newData.sim_state : null;
+      const fallbackData = simState ? null : await supabase
+        .from("franchise_state").select("state_json")
+        .eq("franchise_id", membership.franchiseId).maybeSingle()
+        .then(r => r.data?.state_json ?? null);
+      const resolved = simState ?? fallbackData;
+      if (resolved) {
+        await bigSet("vfl_season_v1", JSON.stringify(resolved));
         await AsyncStorage.setItem("vfl_gm_mode", "co-gm");
       }
     } catch {}

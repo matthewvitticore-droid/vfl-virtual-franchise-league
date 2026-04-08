@@ -857,7 +857,7 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
     const fid = membership.franchiseId;
     realtimeSub.current = supabase
       .channel(`vfl:sync:${fid}`)
-      // sim-state changes written by any co-GM
+      // v2 schema: franchise_seasons UPDATE
       .on("postgres_changes", {
         event: "UPDATE", schema: "public", table: "franchise_seasons",
         filter: `franchise_id=eq.${fid}`,
@@ -865,12 +865,20 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
         const remote = payload.new?.sim_state as Season | undefined;
         if (remote?.year) { setSeason(remote); setSyncError(null); }
       })
-      // proposal created or status changed
+      // v1 fallback: franchise_state UPDATE
+      .on("postgres_changes", {
+        event: "UPDATE", schema: "public", table: "franchise_state",
+        filter: `franchise_id=eq.${fid}`,
+      }, (payload: any) => {
+        const remote = payload.new?.state_json as Season | undefined;
+        if (remote?.year) { setSeason(remote); setSyncError(null); }
+      })
+      // proposal created or status changed (v2 only — silently ignored if table absent)
       .on("postgres_changes", {
         event: "*", schema: "public", table: "franchise_proposals",
         filter: `franchise_id=eq.${fid}`,
       }, () => fetchProposals(fid))
-      // vote cast
+      // vote cast (v2 only)
       .on("postgres_changes", {
         event: "INSERT", schema: "public", table: "franchise_votes",
         filter: `franchise_id=eq.${fid}`,
@@ -1007,40 +1015,63 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Returns true when franchise_seasons table exists (migration v2 applied)
+  async function tryNewSchema(franchiseId: string): Promise<{ simState: Season | null; hasNewSchema: boolean }> {
+    const { data, error } = await supabase
+      .from("franchise_seasons")
+      .select("sim_state")
+      .eq("franchise_id", franchiseId)
+      .maybeSingle();
+    if (error) return { simState: null, hasNewSchema: false };
+    return { simState: data?.sim_state as Season ?? null, hasNewSchema: true };
+  }
+
   async function loadFromSupabase(franchiseId: string) {
     setIsSyncing(true);
     try {
-      const { data, error } = await supabase
-        .from("franchise_seasons")
-        .select("sim_state, year, phase, week")
-        .eq("franchise_id", franchiseId)
-        .maybeSingle();
+      const { simState, hasNewSchema } = await tryNewSchema(franchiseId);
 
-      if (error || !data?.sim_state) {
-        // No season row yet — seed a fresh one (INSERT-only to avoid clobbering creator's save)
-        const s = initSeason(membership?.teamId);
-        setSeason(s);
-        const myTeam = s.teams.find(t => t.id === s.playerTeamId);
-        await supabase.from("franchise_seasons").insert({
-          franchise_id: franchiseId,
-          year:  s.year,
-          phase: s.phase,
-          week:  s.currentWeek,
-          record: myTeam
-            ? { wins: myTeam.wins, losses: myTeam.losses, ties: myTeam.ties }
-            : { wins: 0, losses: 0, ties: 0 },
-          sim_state:  s,
-          updated_by: user?.id,
-        }).then(({ error: iErr }) => {
-          if (iErr && iErr.code !== "23505")
-            console.warn("[VFL] franchise_seasons seed failed:", iErr.message);
-        });
+      if (hasNewSchema) {
+        // ── v2 schema: franchise_seasons ─────────────────────────────────────
+        if (!simState) {
+          const s = initSeason(membership?.teamId);
+          setSeason(s);
+          const myTeam = s.teams.find(t => t.id === s.playerTeamId);
+          await supabase.from("franchise_seasons").insert({
+            franchise_id: franchiseId,
+            year: s.year, phase: s.phase, week: s.currentWeek,
+            record: myTeam
+              ? { wins: myTeam.wins, losses: myTeam.losses, ties: myTeam.ties }
+              : { wins: 0, losses: 0, ties: 0 },
+            sim_state: s, updated_by: user?.id,
+          }).then(({ error: iErr }) => {
+            if (iErr && iErr.code !== "23505")
+              console.warn("[VFL] franchise_seasons seed failed:", iErr.message);
+          });
+        } else {
+          setSeason(simState);
+        }
+        await fetchProposals(franchiseId);
       } else {
-        setSeason(data.sim_state as Season);
+        // ── v1 schema fallback: franchise_state ───────────────────────────────
+        console.log("[VFL] franchise_seasons not found — using legacy franchise_state");
+        const { data: oldData } = await supabase
+          .from("franchise_state")
+          .select("state_json")
+          .eq("franchise_id", franchiseId)
+          .maybeSingle();
+        if (oldData?.state_json) {
+          setSeason(oldData.state_json as Season);
+        } else {
+          const s = initSeason(membership?.teamId);
+          setSeason(s);
+          await supabase.from("franchise_state").upsert(
+            { franchise_id: franchiseId, state_json: s, updated_by: user?.id },
+            { onConflict: "franchise_id" }
+          );
+        }
       }
 
-      // Load proposals from their own table
-      await fetchProposals(franchiseId);
       setSyncError(null);
     } catch (e: any) {
       setSyncError(e.message);
@@ -1053,17 +1084,22 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
     setIsSyncing(true);
     try {
       const myTeam = s.teams.find(t => t.id === s.playerTeamId);
-      await supabase.from("franchise_seasons").upsert({
+      const { error: newErr } = await supabase.from("franchise_seasons").upsert({
         franchise_id: franchiseId,
-        year:  s.year  ?? 2026,
-        phase: s.phase ?? 'regular',
-        week:  s.currentWeek ?? 1,
+        year: s.year ?? 2026, phase: s.phase ?? 'regular', week: s.currentWeek ?? 1,
         record: myTeam
           ? { wins: myTeam.wins, losses: myTeam.losses, ties: myTeam.ties }
           : { wins: 0, losses: 0, ties: 0 },
-        sim_state:  s,
-        updated_by: user?.id,
+        sim_state: s, updated_by: user?.id,
       }, { onConflict: "franchise_id" });
+
+      if (newErr) {
+        // v1 fallback
+        await supabase.from("franchise_state").upsert(
+          { franchise_id: franchiseId, state_json: s, updated_by: user?.id },
+          { onConflict: "franchise_id" }
+        );
+      }
       setSyncError(null);
     } catch (e: any) {
       setSyncError(e.message);

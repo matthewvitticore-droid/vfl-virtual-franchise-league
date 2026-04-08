@@ -243,7 +243,7 @@ export default function LoadSaveScreen() {
     setSyncing(true); setSyncMsg(null);
     try {
       const myTeam = season.teams.find(t => t.id === season.playerTeamId);
-      const { error } = await supabase
+      const { error: newErr } = await supabase
         .from("franchise_seasons")
         .upsert({
           franchise_id: membership.franchiseId,
@@ -256,7 +256,16 @@ export default function LoadSaveScreen() {
           sim_state:  season,
           updated_by: user?.id,
         }, { onConflict: "franchise_id" });
-      setSyncMsg(error ? "Push failed — check connection" : "State pushed to cloud!");
+      if (newErr) {
+        // v1 fallback
+        const { error: oldErr } = await supabase.from("franchise_state").upsert(
+          { franchise_id: membership.franchiseId, state_json: season, updated_by: user?.id },
+          { onConflict: "franchise_id" }
+        );
+        setSyncMsg(oldErr ? "Push failed — check connection" : "State pushed to cloud!");
+      } else {
+        setSyncMsg("State pushed to cloud!");
+      }
     } catch { setSyncMsg("Push failed"); }
     setSyncing(false);
     setTimeout(() => setSyncMsg(null), 3500);
@@ -266,17 +275,27 @@ export default function LoadSaveScreen() {
     if (!membership?.franchiseId) return;
     setSyncing(true); setSyncMsg(null);
     try {
-      const { data, error } = await supabase
+      // Try v2 table first, fall back to v1
+      const { data: newData, error: newErr } = await supabase
         .from("franchise_seasons")
         .select("sim_state")
         .eq("franchise_id", membership.franchiseId)
         .maybeSingle();
-      if (!error && data?.sim_state) {
-        await bigSet("vfl_season_v1", JSON.stringify(data.sim_state));
+      if (!newErr && newData?.sim_state) {
+        await bigSet("vfl_season_v1", JSON.stringify(newData.sim_state));
         setSyncMsg("Pulled! Loading fresh state…");
         setTimeout(() => router.replace("/(tabs)"), 900);
       } else {
-        setSyncMsg("No cloud state found yet. Ask your GM to push first.");
+        const { data: oldData } = await supabase
+          .from("franchise_state").select("state_json")
+          .eq("franchise_id", membership.franchiseId).maybeSingle();
+        if (oldData?.state_json) {
+          await bigSet("vfl_season_v1", JSON.stringify(oldData.state_json));
+          setSyncMsg("Pulled! Loading fresh state…");
+          setTimeout(() => router.replace("/(tabs)"), 900);
+        } else {
+          setSyncMsg("No cloud state found yet. Ask your GM to push first.");
+        }
       }
     } catch { setSyncMsg("Pull failed"); }
     setSyncing(false);
