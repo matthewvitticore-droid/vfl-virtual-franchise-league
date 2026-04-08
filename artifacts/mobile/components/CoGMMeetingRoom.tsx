@@ -252,7 +252,7 @@ export function CoGMMeetingRoom() {
   const theme   = useTeamTheme();
   const router  = useRouter();
   const { user, membership, session, isLoading, refreshMembership } = useAuth();
-  const { season, pendingProposals, coGMMembers, voteOnProposal } = useNFL();
+  const { season, proposals, pendingProposals, coGMMembers, voteOnProposal } = useNFL();
   const [filter,     setFilter]     = useState<"pending" | "all">("pending");
   const [retrying,   setRetrying]   = useState(false);
   const [copied,     setCopied]     = useState(false);
@@ -390,7 +390,7 @@ export function CoGMMeetingRoom() {
   // ── Full Meeting Room ──────────────────────────────────────────────────────
   const tc = theme.primary;
   const tc2 = theme.secondary;
-  const allProposals  = season?.proposals ?? [];
+  const allProposals  = proposals;
   const shownProposals = filter === "pending"
     ? allProposals.filter(p => p.status === "pending")
     : allProposals;

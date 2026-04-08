@@ -66,15 +66,47 @@ export type Database = {
         };
         Insert: Omit<Database["public"]["Tables"]["franchise_members"]["Row"], "id" | "joined_at">;
       };
-      franchise_state: {
+      franchise_seasons: {
         Row: {
           id: string;
           franchise_id: string;
-          state_json: any;
-          updated_at: string;
+          year: number;
+          phase: string;
+          week: number;
+          record: { wins: number; losses: number; ties: number };
+          sim_state: any;
           updated_by: string;
+          updated_at: string;
         };
-        Insert: Omit<Database["public"]["Tables"]["franchise_state"]["Row"], "id" | "updated_at">;
+        Insert: Omit<Database["public"]["Tables"]["franchise_seasons"]["Row"], "id" | "updated_at">;
+      };
+      franchise_proposals: {
+        Row: {
+          id: string;
+          franchise_id: string;
+          type: string;
+          description: string;
+          payload: any;
+          status: "pending" | "approved" | "rejected";
+          required_votes: number;
+          created_by: string;
+          created_by_name: string;
+          created_at: string;
+          resolved_at: string | null;
+        };
+        Insert: Omit<Database["public"]["Tables"]["franchise_proposals"]["Row"], "id" | "created_at" | "resolved_at">;
+      };
+      franchise_votes: {
+        Row: {
+          id: string;
+          proposal_id: string;
+          franchise_id: string;
+          user_id: string;
+          vote: "yes" | "no";
+          display_name: string;
+          voted_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["franchise_votes"]["Row"], "id" | "voted_at">;
       };
     };
   };

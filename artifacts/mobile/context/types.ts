@@ -633,6 +633,7 @@ export interface NFLContextValue {
   toggleCoGMMode: () => Promise<void>;
   isCoGMMode: boolean;
   coGMMembers: CoGMMember[];
+  proposals: CoGMProposal[];
   pendingProposals: CoGMProposal[];
   createProposal: (type: ProposalType, payload: CoGMProposalPayload, description: string) => Promise<void>;
   voteOnProposal: (proposalId: string, vote: 'yes' | 'no') => Promise<void>;

@@ -242,12 +242,20 @@ export default function LoadSaveScreen() {
     if (!season || !membership?.franchiseId) return;
     setSyncing(true); setSyncMsg(null);
     try {
+      const myTeam = season.teams.find(t => t.id === season.playerTeamId);
       const { error } = await supabase
-        .from("franchise_state")
-        .upsert(
-          { franchise_id: membership.franchiseId, state_json: season, updated_by: user?.id },
-          { onConflict: "franchise_id" }
-        );
+        .from("franchise_seasons")
+        .upsert({
+          franchise_id: membership.franchiseId,
+          year:  season.year  ?? 2026,
+          phase: season.phase ?? "regular",
+          week:  season.currentWeek ?? 1,
+          record: myTeam
+            ? { wins: myTeam.wins, losses: myTeam.losses, ties: myTeam.ties }
+            : { wins: 0, losses: 0, ties: 0 },
+          sim_state:  season,
+          updated_by: user?.id,
+        }, { onConflict: "franchise_id" });
       setSyncMsg(error ? "Push failed — check connection" : "State pushed to cloud!");
     } catch { setSyncMsg("Push failed"); }
     setSyncing(false);
@@ -259,12 +267,12 @@ export default function LoadSaveScreen() {
     setSyncing(true); setSyncMsg(null);
     try {
       const { data, error } = await supabase
-        .from("franchise_state")
-        .select("state_json")
+        .from("franchise_seasons")
+        .select("sim_state")
         .eq("franchise_id", membership.franchiseId)
         .maybeSingle();
-      if (!error && data?.state_json) {
-        await bigSet("vfl_season_v1", JSON.stringify(data.state_json));
+      if (!error && data?.sim_state) {
+        await bigSet("vfl_season_v1", JSON.stringify(data.sim_state));
         setSyncMsg("Pulled! Loading fresh state…");
         setTimeout(() => router.replace("/(tabs)"), 900);
       } else {

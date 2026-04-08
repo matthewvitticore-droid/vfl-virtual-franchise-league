@@ -11,7 +11,7 @@ import type {
   OffenseScheme, Conference, Division, PlayerSeasonStats, DevelopmentTrait,
   DraftState, CompletedDraftPick, TeamCustomization, PosRatings, CombineMeasurables,
   EthnicityCode, FaceVariant, PlayoffSeed, PlayoffRound,
-  CoGMProposal, CoGMProposalPayload, CoGMVote, CoGMMember, ProposalType,
+  CoGMProposal, CoGMProposalPayload, CoGMMember, ProposalType,
 } from "./types";
 
 export type { Season, NFLTeam, Player, DraftProspect, DraftPick, NFLGame, NewsItem,
@@ -829,6 +829,7 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
   const saveDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const realtimeSub = useRef<any>(null);
   const [coGMMembers, setCoGMMembers] = useState<CoGMMember[]>([]);
+  const [proposals,   setProposals]   = useState<CoGMProposal[]>([]);
 
   // ── Co-GM mode detection ────────────────────────────────────────────────────
   const isCoGMMode = SUPABASE_ENABLED && !!membership?.franchiseId;
@@ -849,19 +850,31 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => { loadSeason(); loadCustomization(); }, [membership?.franchiseId]);
 
-  // ── Realtime sync subscription ─────────────────────────────────────────────
+  // ── Realtime sync subscription (franchise_seasons + proposals + votes) ───────
 
   useEffect(() => {
     if (!SUPABASE_ENABLED || !membership?.franchiseId) return;
+    const fid = membership.franchiseId;
     realtimeSub.current = supabase
-      .channel(`franchise:${membership.franchiseId}`)
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "franchise_state", filter: `franchise_id=eq.${membership.franchiseId}` }, (payload: any) => {
-        const remoteState = payload.new?.state_json as Season | undefined;
-        if (remoteState && remoteState.year) {
-          setSeason(remoteState);
-          setSyncError(null);
-        }
+      .channel(`vfl:sync:${fid}`)
+      // sim-state changes written by any co-GM
+      .on("postgres_changes", {
+        event: "UPDATE", schema: "public", table: "franchise_seasons",
+        filter: `franchise_id=eq.${fid}`,
+      }, (payload: any) => {
+        const remote = payload.new?.sim_state as Season | undefined;
+        if (remote?.year) { setSeason(remote); setSyncError(null); }
       })
+      // proposal created or status changed
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "franchise_proposals",
+        filter: `franchise_id=eq.${fid}`,
+      }, () => fetchProposals(fid))
+      // vote cast
+      .on("postgres_changes", {
+        event: "INSERT", schema: "public", table: "franchise_votes",
+        filter: `franchise_id=eq.${fid}`,
+      }, () => fetchProposals(fid))
       .subscribe();
     return () => { if (realtimeSub.current) realtimeSub.current.unsubscribe(); };
   }, [membership?.franchiseId]);
@@ -936,6 +949,38 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
     };
   }
 
+  // ── Fetch proposals + votes from Supabase ──────────────────────────────────
+
+  async function fetchProposals(franchiseId?: string) {
+    const fid = franchiseId || membership?.franchiseId;
+    if (!fid || !SUPABASE_ENABLED) return;
+    const { data } = await supabase
+      .from("franchise_proposals")
+      .select("*, franchise_votes(*)")
+      .eq("franchise_id", fid)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (data) {
+      setProposals(data.map(p => ({
+        id:             p.id,
+        type:           p.type as ProposalType,
+        description:    p.description,
+        status:         p.status as 'pending' | 'approved' | 'rejected',
+        createdBy:      p.created_by,
+        createdByName:  p.created_by_name,
+        createdAt:      new Date(p.created_at).getTime(),
+        requiredVotes:  p.required_votes,
+        payload:        p.payload as CoGMProposalPayload,
+        votes: (p.franchise_votes || []).map((v: any) => ({
+          userId:      v.user_id,
+          displayName: v.display_name,
+          vote:        v.vote as 'yes' | 'no',
+          votedAt:     new Date(v.voted_at).getTime(),
+        })),
+      })));
+    }
+  }
+
   async function loadSeason() {
     setIsLoading(true);
     try {
@@ -966,25 +1011,36 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
     setIsSyncing(true);
     try {
       const { data, error } = await supabase
-        .from("franchise_state")
-        .select("state_json")
+        .from("franchise_seasons")
+        .select("sim_state, year, phase, week")
         .eq("franchise_id", franchiseId)
-        .single();
-      if (error || !data) {
+        .maybeSingle();
+
+      if (error || !data?.sim_state) {
+        // No season row yet — seed a fresh one (INSERT-only to avoid clobbering creator's save)
         const s = initSeason(membership?.teamId);
         setSeason(s);
-        // INSERT-only (no upsert): if the creator already wrote a row, skip to avoid overwriting.
-        // This guards against a joiner racing ahead of the creator's first save.
-        await supabase.from("franchise_state").insert({
+        const myTeam = s.teams.find(t => t.id === s.playerTeamId);
+        await supabase.from("franchise_seasons").insert({
           franchise_id: franchiseId,
-          state_json: s,
+          year:  s.year,
+          phase: s.phase,
+          week:  s.currentWeek,
+          record: myTeam
+            ? { wins: myTeam.wins, losses: myTeam.losses, ties: myTeam.ties }
+            : { wins: 0, losses: 0, ties: 0 },
+          sim_state:  s,
           updated_by: user?.id,
         }).then(({ error: iErr }) => {
-          if (iErr && iErr.code !== "23505") console.warn("[VFL] franchise_state seed failed:", iErr.message);
+          if (iErr && iErr.code !== "23505")
+            console.warn("[VFL] franchise_seasons seed failed:", iErr.message);
         });
       } else {
-        setSeason(data.state_json as Season);
+        setSeason(data.sim_state as Season);
       }
+
+      // Load proposals from their own table
+      await fetchProposals(franchiseId);
       setSyncError(null);
     } catch (e: any) {
       setSyncError(e.message);
@@ -996,9 +1052,16 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
   async function saveToSupabase(franchiseId: string, s: Season) {
     setIsSyncing(true);
     try {
-      await supabase.from("franchise_state").upsert({
+      const myTeam = s.teams.find(t => t.id === s.playerTeamId);
+      await supabase.from("franchise_seasons").upsert({
         franchise_id: franchiseId,
-        state_json: s,
+        year:  s.year  ?? 2026,
+        phase: s.phase ?? 'regular',
+        week:  s.currentWeek ?? 1,
+        record: myTeam
+          ? { wins: myTeam.wins, losses: myTeam.losses, ties: myTeam.ties }
+          : { wins: 0, losses: 0, ties: 0 },
+        sim_state:  s,
         updated_by: user?.id,
       }, { onConflict: "franchise_id" });
       setSyncError(null);
@@ -1207,13 +1270,13 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
   // ── Co-GM Proposals ─────────────────────────────────────────────────────────
 
   const pendingProposals = useMemo(() =>
-    (season?.proposals ?? []).filter(p => p.status === "pending"),
-  [season?.proposals]);
+    proposals.filter(p => p.status === 'pending'),
+  [proposals]);
 
   // Execute approved proposal actions (defined before createProposal so it can reference it)
   async function _executeProposal(s: Season, proposal: CoGMProposal) {
     const { payload, type } = proposal;
-    let updatedSeason = { ...s, proposals: (s.proposals ?? []).filter(p => p.id !== proposal.id) };
+    let updatedSeason = { ...s };
 
     if (type === "free_agent_signing" && payload.playerId) {
       const fa = s.freeAgents.find(p => p.id === payload.playerId);
@@ -1226,11 +1289,8 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
         const newsItem = addNewsItem({ headline: `Co-GMs approve: Sign ${fa.name}!`, body: `${fa.name} (${fa.position}, ${fa.overall} OVR) joins on a ${yrs}-yr, $${sal.toFixed(1)}M/yr deal.`, category: "signing", teamId: s.playerTeamId, week: s.currentWeek });
         updatedSeason = { ...updatedSeason, teams: updatedSeason.teams.map(t => t.id === s.playerTeamId ? { ...t, roster: [...t.roster, signed], capSpace: t.capSpace - sal } : t), freeAgents: updatedSeason.freeAgents.filter(p => p.id !== payload.playerId), news: [newsItem, ...updatedSeason.news].slice(0, 50) };
       }
-    } else if (type === "draft_pick" && payload.prospectId) {
-      const prospect = s.draftProspects.find(p => p.id === payload.prospectId);
-      if (prospect) {
-        updatedSeason = { ...updatedSeason, proposals: [...(updatedSeason.proposals ?? []), { ...proposal, type: "draft_pick", status: "approved" as const }] };
-      }
+    } else if (type === "draft_pick") {
+      // Draft pick is a green-light approval; actual pick is executed via userDraftPick
     } else if (type === "phase_advance") {
       // handled by advancePhase
     } else if (type === "trade_submission" && payload.tradeOffer) {
@@ -1248,54 +1308,122 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
   ) => {
     if (!season || !user || !membership) return;
     const requiredVotes = coGMMembers.length || 1;
-    const proposal: CoGMProposal = {
-      id: uid(),
-      type,
-      status: "pending",
-      description,
-      createdBy: user.id,
-      createdByName: membership.displayName,
-      createdAt: Date.now(),
-      requiredVotes,
-      votes: [{ userId: user.id, displayName: membership.displayName, vote: "yes", votedAt: Date.now() }],
-      payload,
-    };
+
+    // Solo / single-member franchise: execute immediately without a vote
     if (requiredVotes <= 1) {
-      await _executeProposal(season, { ...proposal, status: "approved" });
+      const immediateProposal: CoGMProposal = {
+        id: uid(), type, status: "approved", description,
+        createdBy: user.id, createdByName: membership.displayName,
+        createdAt: Date.now(), requiredVotes: 1, votes: [], payload,
+      };
+      await _executeProposal(season, immediateProposal);
       return;
     }
-    await save({ ...season, proposals: [...(season.proposals ?? []), proposal] });
-  }, [season, save, user, membership, coGMMembers]);
+
+    // Co-GM franchise: write to franchise_proposals table
+    if (SUPABASE_ENABLED && membership.franchiseId) {
+      const { data: newProp, error } = await supabase
+        .from("franchise_proposals")
+        .insert({
+          franchise_id:    membership.franchiseId,
+          type,
+          description,
+          payload,
+          required_votes:  requiredVotes,
+          created_by:      user.id,
+          created_by_name: membership.displayName,
+        })
+        .select()
+        .single();
+
+      if (!error && newProp) {
+        // Creator auto-casts the first "yes" vote
+        await supabase.from("franchise_votes").insert({
+          proposal_id:  newProp.id,
+          franchise_id: membership.franchiseId,
+          user_id:      user.id,
+          vote:         "yes",
+          display_name: membership.displayName,
+        });
+        await fetchProposals();
+      }
+    } else {
+      // Offline / no Supabase: local fallback
+      const localProposal: CoGMProposal = {
+        id: uid(), type, status: "pending", description,
+        createdBy: user.id, createdByName: membership.displayName,
+        createdAt: Date.now(), requiredVotes,
+        votes: [{ userId: user.id, displayName: membership.displayName, vote: "yes", votedAt: Date.now() }],
+        payload,
+      };
+      setProposals(prev => [localProposal, ...prev]);
+    }
+  }, [season, user, membership, coGMMembers, fetchProposals]);
 
   const voteOnProposal = useCallback(async (proposalId: string, vote: "yes" | "no") => {
-    if (!season || !user || !membership) return;
-    const proposals = season.proposals ?? [];
-    const idx = proposals.findIndex(p => p.id === proposalId);
-    if (idx === -1) return;
-    const proposal = proposals[idx];
-    if (proposal.status !== "pending") return;
-    if (proposal.votes.some(v => v.userId === user.id)) return;
+    if (!user || !membership?.franchiseId) return;
 
-    const newVote: CoGMVote = { userId: user.id, displayName: membership.displayName, vote, votedAt: Date.now() };
-    const newVotes = [...proposal.votes, newVote];
-    const yesCount = newVotes.filter(v => v.vote === "yes").length;
-    const noCount  = newVotes.filter(v => v.vote === "no").length;
-    const totalMembers = proposal.requiredVotes;
+    // Cast vote — UNIQUE(proposal_id, user_id) prevents double-voting
+    const { error: voteErr } = await supabase.from("franchise_votes").insert({
+      proposal_id:  proposalId,
+      franchise_id: membership.franchiseId,
+      user_id:      user.id,
+      vote,
+      display_name: membership.displayName,
+    });
+    if (voteErr) { console.warn("[VFL] vote error:", voteErr.message); return; }
+
+    // Refresh local proposals list optimistically
+    await fetchProposals();
+
+    // Re-read proposal + all votes from DB to get authoritative counts
+    const { data: prop } = await supabase
+      .from("franchise_proposals")
+      .select("*, franchise_votes(*)")
+      .eq("id", proposalId)
+      .single();
+    if (!prop) return;
+
+    const yesCount = (prop.franchise_votes || []).filter((v: any) => v.vote === "yes").length;
+    const noCount  = (prop.franchise_votes || []).filter((v: any) => v.vote === "no").length;
+    const required = prop.required_votes;
 
     let newStatus: "pending" | "approved" | "rejected" = "pending";
-    if (noCount > 0) newStatus = "rejected";
-    else if (yesCount >= totalMembers) newStatus = "approved";
+    if (noCount  > 0)       newStatus = "rejected";
+    else if (yesCount >= required) newStatus = "approved";
 
-    const updatedProposal: CoGMProposal = { ...proposal, votes: newVotes, status: newStatus };
-    const updatedProposals = proposals.map((p, i) => i === idx ? updatedProposal : p);
-    const updatedSeason = { ...season, proposals: updatedProposals };
+    if (newStatus !== "pending") {
+      // Persist resolved status
+      await supabase.from("franchise_proposals")
+        .update({ status: newStatus, resolved_at: new Date().toISOString() })
+        .eq("id", proposalId);
 
-    if (newStatus === "approved") {
-      await _executeProposal(updatedSeason, updatedProposal);
-    } else {
-      await save(updatedSeason);
+      // If approved, execute the game-state action on THIS device
+      // (the save() call inside _executeProposal pushes the new sim_state
+      //  to franchise_seasons, triggering realtime for all other co-GMs)
+      if (newStatus === "approved" && season) {
+        const proposal: CoGMProposal = {
+          id:            prop.id,
+          type:          prop.type as ProposalType,
+          status:        "approved",
+          description:   prop.description,
+          createdBy:     prop.created_by,
+          createdByName: prop.created_by_name,
+          createdAt:     new Date(prop.created_at).getTime(),
+          requiredVotes: prop.required_votes,
+          payload:       prop.payload as CoGMProposalPayload,
+          votes: (prop.franchise_votes || []).map((v: any) => ({
+            userId: v.user_id, displayName: v.display_name,
+            vote: v.vote as "yes" | "no", votedAt: new Date(v.voted_at).getTime(),
+          })),
+        };
+        await _executeProposal(season, proposal);
+      }
+
+      // Final refresh so UI shows the resolved status
+      await fetchProposals();
     }
-  }, [season, save, user, membership]);
+  }, [season, user, membership, fetchProposals]);
 
   // ── Roster Actions ─────────────────────────────────────────────────────────
 
@@ -1980,6 +2108,7 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       toggleCoGMMode,
       isCoGMMode,
       coGMMembers,
+      proposals,
       pendingProposals,
       createProposal,
       voteOnProposal,

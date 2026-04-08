@@ -45,12 +45,12 @@ export default function WelcomeScreen() {
     setLoading(true);
     try {
       const { data } = await supabase
-        .from("franchise_state")
-        .select("state_json")
+        .from("franchise_seasons")
+        .select("sim_state")
         .eq("franchise_id", membership.franchiseId)
         .maybeSingle();
-      if (data?.state_json) {
-        await bigSet("vfl_season_v1", JSON.stringify(data.state_json));
+      if (data?.sim_state) {
+        await bigSet("vfl_season_v1", JSON.stringify(data.sim_state));
         await AsyncStorage.setItem("vfl_gm_mode", "co-gm");
       }
     } catch {}

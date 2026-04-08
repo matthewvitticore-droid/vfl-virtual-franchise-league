@@ -125,10 +125,18 @@ export default function FranchiseLobbyScreen() {
       await bigSet("vfl_season_v1", JSON.stringify(season));
       await AsyncStorage.setItem("vfl_gm_mode", "co-gm");
       if (franchiseId) {
-        await supabase.from("franchise_state").upsert(
-          { franchise_id: franchiseId, state_json: season, updated_by: user?.id },
-          { onConflict: "franchise_id" }
-        );
+        const myTeam = season.teams.find((t: any) => t.id === season.playerTeamId);
+        await supabase.from("franchise_seasons").upsert({
+          franchise_id: franchiseId,
+          year:  season.year  ?? 2026,
+          phase: season.phase ?? "regular",
+          week:  season.currentWeek ?? 1,
+          record: myTeam
+            ? { wins: myTeam.wins, losses: myTeam.losses, ties: myTeam.ties }
+            : { wins: 0, losses: 0, ties: 0 },
+          sim_state:  season,
+          updated_by: user?.id,
+        }, { onConflict: "franchise_id" });
       }
     } catch {}
     setLoading(false);
@@ -151,12 +159,12 @@ export default function FranchiseLobbyScreen() {
         .maybeSingle();
       if (memberRow?.franchise_id) {
         const { data: stateRow } = await supabase
-          .from("franchise_state")
-          .select("state_json")
+          .from("franchise_seasons")
+          .select("sim_state")
           .eq("franchise_id", memberRow.franchise_id)
           .maybeSingle();
-        if (stateRow?.state_json) {
-          await bigSet("vfl_season_v1", JSON.stringify(stateRow.state_json));
+        if (stateRow?.sim_state) {
+          await bigSet("vfl_season_v1", JSON.stringify(stateRow.sim_state));
         }
       }
       await AsyncStorage.setItem("vfl_gm_mode", "co-gm");
