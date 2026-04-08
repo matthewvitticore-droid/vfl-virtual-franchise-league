@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -17,17 +17,42 @@ import { useColors } from "@/hooks/useColors";
 import { VFLLogo } from "@/components/VFLLogo";
 import { supabase } from "@/lib/supabase";
 
+type SessionState = "waiting" | "ready" | "expired";
+
 export default function ResetPasswordScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
+  const [sessionState, setSessionState] = useState<SessionState>("waiting");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    let resolved = false;
+
+    const resolve = (state: SessionState) => {
+      if (!resolved) { resolved = true; setSessionState(state); }
+    };
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) resolve("ready");
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && session)) {
+        resolve("ready");
+      }
+    });
+
+    const timer = setTimeout(() => resolve("expired"), 10_000);
+
+    return () => { subscription.unsubscribe(); clearTimeout(timer); };
+  }, []);
 
   const handleUpdate = async () => {
     if (password.length < 6) { setError("Password must be at least 6 characters."); return; }
@@ -48,10 +73,35 @@ export default function ResetPasswordScreen() {
         <View style={[styles.successBox, { backgroundColor: "#003087" + "20", borderColor: "#003087" }]}>
           <Feather name="check-circle" size={36} color="#60A5FA" style={{ marginBottom: 12 }} />
           <Text style={[styles.successTitle, { color: colors.foreground }]}>Password updated!</Text>
+          <Text style={[styles.successBody, { color: colors.mutedForeground }]}>Taking you to the app…</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (sessionState === "waiting") {
+    return (
+      <View style={[styles.container, styles.center, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color="#003087" />
+        <Text style={[styles.waitText, { color: colors.mutedForeground }]}>Verifying reset link…</Text>
+      </View>
+    );
+  }
+
+  if (sessionState === "expired") {
+    return (
+      <View style={[styles.container, styles.center, { backgroundColor: colors.background }]}>
+        <View style={[styles.successBox, { backgroundColor: "#C8102E" + "15", borderColor: "#C8102E" + "60" }]}>
+          <Feather name="alert-circle" size={36} color="#C8102E" style={{ marginBottom: 12 }} />
+          <Text style={[styles.successTitle, { color: colors.foreground }]}>Link expired</Text>
           <Text style={[styles.successBody, { color: colors.mutedForeground }]}>
-            Taking you to the app…
+            This reset link is no longer valid. Request a new one from the sign-in screen.
           </Text>
         </View>
+        <TouchableOpacity onPress={() => router.replace("/auth/forgot-password")} style={styles.backBtn}>
+          <Feather name="refresh-cw" size={14} color={colors.mutedForeground} />
+          <Text style={[styles.backText, { color: colors.mutedForeground }]}>Request new link</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -154,7 +204,10 @@ const styles = StyleSheet.create({
   errorText:    { fontSize: 13, fontFamily: "Inter_400Regular", flex: 1 },
   submitBtn:    { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 15, borderRadius: 14 },
   submitText:   { fontSize: 16, fontFamily: "Inter_700Bold", color: "#fff" },
-  successBox:   { width: "100%", padding: 28, borderRadius: 18, borderWidth: 1, alignItems: "center" },
+  successBox:   { width: "100%", padding: 28, borderRadius: 18, borderWidth: 1, alignItems: "center", marginBottom: 24 },
   successTitle: { fontSize: 22, fontFamily: "Inter_700Bold", marginBottom: 10 },
   successBody:  { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 22 },
+  waitText:     { fontSize: 14, fontFamily: "Inter_400Regular", marginTop: 16 },
+  backBtn:      { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 8 },
+  backText:     { fontSize: 13, fontFamily: "Inter_400Regular", textDecorationLine: "underline" },
 });
