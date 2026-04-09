@@ -18,6 +18,7 @@ interface AuthContextType {
   session: Session | null;
   user: User | null;
   membership: FranchiseMembership | null;
+  hasSoloSave: boolean;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<string | null>;
   signUp: (email: string, password: string, displayName: string) => Promise<string | null>;
