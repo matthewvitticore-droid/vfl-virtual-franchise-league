@@ -820,7 +820,7 @@ export function useNFL() {
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function NFLProvider({ children }: { children: React.ReactNode }) {
-  const { user, membership } = useAuth();
+  const { user, membership, refreshMembership } = useAuth();
   const [season, setSeason] = useState<Season | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -828,6 +828,10 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
   const [teamCustomization, setTeamCustomization] = useState<TeamCustomization | null>(null);
   const saveDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const realtimeSub = useRef<any>(null);
+  const holdTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Set to true by applySeasonDirectly (create flow) so loadFromSupabase
+  // does NOT clear the season on poll failure.
+  const seasonAppliedDirectlyRef = useRef(false);
   const [coGMMembers, setCoGMMembers] = useState<CoGMMember[]>([]);
   const [proposals,   setProposals]   = useState<CoGMProposal[]>([]);
 
@@ -838,6 +842,25 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     AsyncStorage.getItem("vfl_gm_mode").then(m => setStoredGmMode(m ?? ""));
   }, []);
+
+  // ── Safety timeout: prevent infinite "Loading franchise…" spinner ────────────
+  // If we're waiting for membership to resolve but it never does, give up after
+  // 20 s and show a recoverable error instead of spinning forever.
+  useEffect(() => {
+    if (!isLoading || season || membership?.franchiseId) {
+      if (holdTimeoutRef.current) clearTimeout(holdTimeoutRef.current);
+      return;
+    }
+    // isLoading=true, no season, no franchiseId — we're in the holding branch.
+    holdTimeoutRef.current = setTimeout(() => {
+      console.warn("[VFL] ⏰ Holding-state timeout — clearing isLoading");
+      setIsLoading(false);
+      setSyncError("Could not verify your franchise membership. Tap Refresh to retry.");
+    }, 20000);
+    return () => {
+      if (holdTimeoutRef.current) clearTimeout(holdTimeoutRef.current);
+    };
+  }, [isLoading, season, membership?.franchiseId]);
 
   // ── Fetch Co-GM members ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -1064,100 +1087,88 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // ── Poll for an initialized franchise_seasons row ─────────────────────────────
-  // CONTRACT: read-only. No writes. No initSeason calls.
-  // Polls until sim_state is non-null (JS check — no DB-level filter).
-  async function pollForFranchiseState(franchiseId: string, maxAttempts = 8, intervalMs = 3000): Promise<Season | null> {
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      if (attempt > 0) await new Promise(r => setTimeout(r, intervalMs));
-      console.log(`[VFL] Poll attempt ${attempt + 1}/${maxAttempts} fid=${franchiseId}`);
-
-      // v2 schema: accept any row, check sim_state in JS
-      const { data: v2, error: v2err } = await supabase
-        .from("franchise_seasons")
-        .select("sim_state")
-        .eq("franchise_id", franchiseId)
-        .maybeSingle();
-      console.log(`[VFL] Poll v2: data=${JSON.stringify(v2?.sim_state ? "<season>" : v2)}, err=${v2err?.message ?? "none"}`);
-      if (v2?.sim_state) return v2.sim_state as Season;
-
-      // v1 fallback: franchise_state (legacy schema, always has state_json)
-      const { data: v1 } = await supabase
-        .from("franchise_state").select("state_json")
-        .eq("franchise_id", franchiseId).maybeSingle();
-      if (v1?.state_json) return v1.state_json as Season;
-    }
-    return null;
-  }
-
   // ── Load franchise state exclusively from Supabase ────────────────────────────
   // CONTRACT:
   //   - NEVER calls initSeason()
   //   - NEVER inserts or updates anything in the DB
-  //   - Checks sim_state in JavaScript (no .not() DB filter — simpler, more reliable)
-  //   - Polls up to 8× at 3 s intervals if no initialized state found yet
+  //   - Polls ONLY for rows where sim_state IS NOT NULL (server-side filter)
+  //   - Up to 8 attempts × 3 s = 24 s maximum wait, then fails cleanly
   async function loadFromSupabase(franchiseId: string) {
     setIsSyncing(true);
+    setSyncError(null);
+    console.log("[VFL] 🔍 loadFromSupabase START fid:", franchiseId);
+
+    const MAX_ATTEMPTS = 8;
+    const INTERVAL_MS  = 3000;
+
     try {
-      console.log("[VFL] loadFromSupabase: querying for fid:", franchiseId);
-      // Query without any sim_state filter — check the value in JS below.
-      const { data: v2, error: v2err } = await supabase
-        .from("franchise_seasons")
-        .select("sim_state")
-        .eq("franchise_id", franchiseId)
-        .maybeSingle();
+      let attempts = 0;
 
-      console.log("[VFL] loadFromSupabase v2 result:", {
-        hasRow: !!v2,
-        simStateSet: !!v2?.sim_state,
-        error: v2err?.message ?? null,
-      });
+      while (attempts < MAX_ATTEMPTS) {
+        console.log(`[VFL] ⏳ Poll attempt ${attempts + 1}/${MAX_ATTEMPTS}…`);
 
-      let simState: Season | null = null;
+        // v2 schema: poll ONLY initialized rows (sim_state IS NOT NULL)
+        const { data: v2, error: v2err } = await supabase
+          .from("franchise_seasons")
+          .select("sim_state")
+          .eq("franchise_id", franchiseId)
+          .not("sim_state", "is", null)
+          .maybeSingle();
 
-      if (v2?.sim_state) {
-        // Row exists with initialized data — use it immediately.
-        simState = v2.sim_state as Season;
-        console.log("[VFL] Loaded franchise state (v2), year:", (simState as any)?.year);
-      } else if (v2err) {
-        // franchise_seasons table error (schema not deployed?) — try v1 legacy table.
-        console.log("[VFL] franchise_seasons error:", v2err.message, "— trying v1 fallback");
-        const { data: v1, error: v1err } = await supabase
-          .from("franchise_state").select("state_json")
-          .eq("franchise_id", franchiseId).maybeSingle();
-        console.log("[VFL] v1 fallback:", { hasRow: !!v1, error: v1err?.message ?? null });
-        if (v1?.state_json) {
-          simState = v1.state_json as Season;
-          console.log("[VFL] Loaded franchise state (v1 fallback)");
+        console.log(`[VFL]   v2 result: hasData=${!!v2?.sim_state}, err=${v2err?.message ?? "none"}`);
+
+        if (v2?.sim_state) {
+          console.log("[VFL] ✅ Season loaded from franchise_seasons");
+          setSeason(v2.sim_state as Season);
+          setSyncError(null);
+          await fetchProposals(franchiseId);
+          return; // ← success path
         }
-      } else {
-        // Row exists but sim_state is null (initializing), OR no row at all.
-        console.log("[VFL] sim_state not yet written (row:", !!v2, ") — polling…");
+
+        // v1 fallback: franchise_state (legacy schema)
+        const { data: v1, error: v1err } = await supabase
+          .from("franchise_state")
+          .select("state_json")
+          .eq("franchise_id", franchiseId)
+          .maybeSingle();
+
+        console.log(`[VFL]   v1 result: hasData=${!!v1?.state_json}, err=${v1err?.message ?? "none"}`);
+
+        if (v1?.state_json) {
+          console.log("[VFL] ✅ Season loaded from franchise_state (v1 fallback)");
+          setSeason(v1.state_json as Season);
+          setSyncError(null);
+          await fetchProposals(franchiseId);
+          return; // ← success path
+        }
+
+        attempts++;
+        if (attempts < MAX_ATTEMPTS) {
+          console.log(`[VFL]   No data yet — waiting ${INTERVAL_MS / 1000}s…`);
+          await new Promise(r => setTimeout(r, INTERVAL_MS));
+        }
       }
 
-      // No initialized state yet (sim_state null or row absent) → poll.
-      // Always poll regardless of whether we got a v2 error or a null row.
-      if (!simState) {
-        simState = await pollForFranchiseState(franchiseId);
-      }
-
-      if (simState) {
-        setSeason(simState);
+      // ── All retries exhausted ──────────────────────────────────────────────
+      console.error("[VFL] ❌ Season failed to load after", MAX_ATTEMPTS, "attempts");
+      // If applySeasonDirectly already set a season (create flow), don't wipe it.
+      // Just log a sync warning — the local season is authoritative until next save.
+      if (seasonAppliedDirectlyRef.current) {
+        console.warn("[VFL] Season was applied directly (create flow) — skipping null on poll exhaustion");
         setSyncError(null);
-        console.log("[VFL] Season set successfully from Supabase");
-      } else {
-        console.warn("[VFL] Franchise state not ready after all retries.");
-        setSeason(null);
-        setSyncError("Season not ready yet. Ask your Commissioner to open their app, then tap Refresh.");
+        return;
       }
-
-      await fetchProposals(franchiseId);
-    } catch (e: any) {
-      console.error("[VFL] loadFromSupabase unexpected error:", e.message);
       setSeason(null);
-      setSyncError(e.message);
+      setSyncError("Failed to load franchise. Tap Refresh to try again, or ask your Commissioner to re-open their app.");
+
+    } catch (e: any) {
+      console.error("[VFL] ❌ loadFromSupabase unexpected error:", e?.message);
+      if (seasonAppliedDirectlyRef.current) return;
+      setSeason(null);
+      setSyncError(e?.message ?? "Unexpected error loading franchise.");
     } finally {
       setIsSyncing(false);
+      console.log("[VFL] 🔍 loadFromSupabase END fid:", franchiseId);
     }
   }
 
@@ -2227,6 +2238,13 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       isWaitingForGM: isCoGMMode && !isLoading && !isSyncing && !season,
       reloadFromCloud: async () => {
         if (membership?.franchiseId) await loadFromSupabase(membership.franchiseId);
+      },
+      applySeasonDirectly: (s: Season) => {
+        seasonAppliedDirectlyRef.current = true;
+        setSeason(s);
+        setIsLoading(false);
+        setIsSyncing(false);
+        setSyncError(null);
       },
       coGMMembers,
       proposals,

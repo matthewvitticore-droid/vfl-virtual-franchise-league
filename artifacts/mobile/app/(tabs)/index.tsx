@@ -46,6 +46,7 @@ export default function HomeScreen() {
     teamCustomization,
     getPlayerTeam, getWeekGames,
     simulateWeek, simulateSeason, advancePhase, toggleCoGMMode,
+    reloadFromCloud, isCoGMMode,
   } = useNFL();
 
   const [simulating,   setSimulating]   = useState(false);
@@ -130,20 +131,33 @@ export default function HomeScreen() {
     router.push(`/(tabs)/frontoffice?tab=${tab}` as any);
   };
 
-  // Show spinner only while we have no season to render yet.
-  // If season is already populated (e.g. from realtime) we show the HQ
-  // even if a background sync is still in-flight (isSyncing).
+  // ── Loading state ─────────────────────────────────────────────────────────
   if ((isLoading || isSyncing) && !season) return (
     <View style={[st.center, { backgroundColor: colors.background }]}>
       <ActivityIndicator color={theme.primary} size="large" />
       <Text style={[st.mutedTxt, { color: colors.mutedForeground }]}>
         {isSyncing ? "Syncing franchise from cloud…" : "Loading franchise…"}
       </Text>
-      {syncError ? (
-        <Text style={[st.mutedTxt, { color: "#EF4444", marginTop: 8, textAlign: "center", paddingHorizontal: 24 }]}>
-          {syncError}
-        </Text>
-      ) : null}
+    </View>
+  );
+
+  // ── Error / failed-to-load state (Co-GM mode only) ───────────────────────
+  // Reached when loading is done but no season was found. Never infinite.
+  if (!season && isCoGMMode) return (
+    <View style={[st.center, { backgroundColor: colors.background, paddingHorizontal: 32 }]}>
+      <Text style={{ fontSize: 40, marginBottom: 16 }}>⚠️</Text>
+      <Text style={[st.mutedTxt, { color: "#EF4444", fontWeight: "700", fontSize: 16, marginBottom: 8, textAlign: "center" }]}>
+        Failed to load franchise
+      </Text>
+      <Text style={[st.mutedTxt, { color: colors.mutedForeground, textAlign: "center", marginBottom: 24 }]}>
+        {syncError ?? "Could not load your franchise data. Please check your connection and try again."}
+      </Text>
+      <TouchableOpacity
+        onPress={() => reloadFromCloud()}
+        style={{ backgroundColor: "#C8102E", paddingHorizontal: 28, paddingVertical: 12, borderRadius: 8 }}
+      >
+        <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>Retry</Text>
+      </TouchableOpacity>
     </View>
   );
 

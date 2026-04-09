@@ -19,7 +19,7 @@ import { NFLTeamBadge } from "@/components/NFLTeamBadge";
 import { VFLLogo } from "@/components/VFLLogo";
 import { useColors } from "@/hooks/useColors";
 import { FranchiseMemberRole, useAuth } from "@/context/AuthContext";
-import { initSeason } from "@/context/NFLContext";
+import { initSeason, useNFL } from "@/context/NFLContext";
 import { bigSet } from "@/utils/bigStorage";
 import { supabase } from "@/lib/supabase";
 
@@ -78,6 +78,7 @@ export default function FranchiseLobbyScreen() {
   const router = useRouter();
   const { initialScreen } = useLocalSearchParams<{ initialScreen?: string }>();
   const { user, membership, createFranchise, joinFranchise, signOut } = useAuth();
+  const { applySeasonDirectly } = useNFL();
 
   const [screen, setScreen] = useState<Screen>((initialScreen as Screen) ?? "type");
   const [soloTeamId, setSoloTeamId] = useState("team-13"); // Coastal Sharks default
@@ -148,12 +149,18 @@ export default function FranchiseLobbyScreen() {
     await AsyncStorage.setItem("vfl_gm_mode", "co-gm");
     await bigSet("vfl_season_v1", JSON.stringify(season));
 
-    // ── Step 4: Single INSERT with full season data ────────────────────────────
-    // No two-step null-placeholder dance. Write the complete sim_state in one
-    // atomic INSERT. 23505 (duplicate key) means a concurrent process beat us
-    // to the slot — safe to ignore since the data is already there.
+    // ── Step 4: Apply season directly to context ───────────────────────────────
+    // This immediately makes the season available in HQ without waiting for any
+    // Supabase poll. The cloud write happens in the background (step 5).
+    applySeasonDirectly(season);
+    setLoading(false); setCreatedJoinCode(created); setScreen("success");
+
+    // ── Step 5: Write sim_state to Supabase in background ─────────────────────
+    // Fire-and-forget: the season is already in memory + local storage.
+    // Co-GMs who join later will poll from Supabase and get this data.
     const myTeam = season.teams.find((t: any) => t.id === season.playerTeamId);
-    const { error: insertErr } = await supabase.from("franchise_seasons").insert({
+    console.log("[VFL] ⬆️  Writing sim_state to franchise_seasons for", franchiseId, "(background)");
+    supabase.from("franchise_seasons").upsert({
       franchise_id: franchiseId,
       year:         season.year         ?? 2026,
       phase:        season.phase        ?? "regular",
@@ -163,20 +170,13 @@ export default function FranchiseLobbyScreen() {
         : { wins: 0, losses: 0, ties: 0 },
       sim_state:    season,
       updated_by:   user?.id,
+    }, { onConflict: "franchise_id" }).then(({ error: upsertErr }) => {
+      if (upsertErr) {
+        console.warn("[VFL] ❌ franchise_seasons background upsert failed:", upsertErr.message, upsertErr.code);
+      } else {
+        console.log("[VFL] ✅ sim_state written to franchise_seasons (background) for", franchiseId);
+      }
     });
-
-    if (insertErr && insertErr.code !== "23505") {
-      console.warn("[VFL] franchise_seasons insert failed:", insertErr.message, "— trying v1 fallback");
-      const { error: v1Err } = await supabase.from("franchise_state").upsert(
-        { franchise_id: franchiseId, state_json: season, updated_by: user?.id },
-        { onConflict: "franchise_id" }
-      );
-      if (v1Err) console.warn("[VFL] v1 fallback also failed:", v1Err.message);
-    } else {
-      console.log("[VFL] franchise_seasons INSERT OK for", franchiseId);
-    }
-
-    setLoading(false); setCreatedJoinCode(created); setScreen("success");
   };
 
   const handleResume = async () => {

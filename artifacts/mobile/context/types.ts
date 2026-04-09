@@ -639,4 +639,5 @@ export interface NFLContextValue {
   pendingProposals: CoGMProposal[];
   createProposal: (type: ProposalType, payload: CoGMProposalPayload, description: string) => Promise<void>;
   voteOnProposal: (proposalId: string, vote: 'yes' | 'no') => Promise<void>;
+  applySeasonDirectly: (s: Season) => void;
 }
