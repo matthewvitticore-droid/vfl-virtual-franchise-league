@@ -252,7 +252,7 @@ export function CoGMMeetingRoom() {
   const theme   = useTeamTheme();
   const router  = useRouter();
   const { user, membership, session, isLoading, refreshMembership } = useAuth();
-  const { season, proposals, pendingProposals, coGMMembers, voteOnProposal } = useNFL();
+  const { season, isWaitingForGM, reloadFromCloud, proposals, pendingProposals, coGMMembers, voteOnProposal } = useNFL();
   const [filter,     setFilter]     = useState<"pending" | "all">("pending");
   const [retrying,   setRetrying]   = useState(false);
   const [copied,     setCopied]     = useState(false);
@@ -387,6 +387,43 @@ export function CoGMMeetingRoom() {
     );
   }
 
+  // ── Co-GM waiting: GM hasn't pushed franchise state yet ───────────────────
+  if (isWaitingForGM) {
+    return (
+      <View style={mr.offlineBox}>
+        <LinearGradient colors={["#F59E0B20", "transparent"]} style={StyleSheet.absoluteFill} />
+        <Text style={{ fontSize: 36, marginBottom: 14 }}>⏳</Text>
+        <Text style={[mr.offlineTitle, { color: colors.foreground }]}>Waiting for Commissioner</Text>
+        <Text style={[mr.offlineSub, { color: colors.mutedForeground }]}>
+          You've joined the franchise! The Commissioner (GM) needs to push the franchise state from their device first. Ask them to open the Franchise tab and tap "Push to Cloud".
+        </Text>
+        {displayCode ? (
+          <View style={[mr.inviteBlock, { borderColor: VFL_GOLD + "40", backgroundColor: VFL_GOLD + "10", marginTop: 18 }]}>
+            <Text style={[mr.inviteLabel, { color: VFL_GOLD, textAlign: "center" }]}>YOUR FRANCHISE CODE</Text>
+            <Text style={[mr.inviteLetterTxt, { color: colors.foreground, textAlign: "center", fontSize: 22, fontFamily: "Inter_700Bold", letterSpacing: 4, marginTop: 6 }]}>
+              {displayCode}
+            </Text>
+          </View>
+        ) : null}
+        <TouchableOpacity
+          onPress={async () => {
+            setRetrying(true);
+            await refreshMembership();
+            await reloadFromCloud();
+            setRetrying(false);
+          }}
+          disabled={retrying}
+          style={[mr.offlineBtn, { backgroundColor: "#F59E0B", marginTop: 14, opacity: retrying ? 0.6 : 1 }]}
+        >
+          {retrying
+            ? <ActivityIndicator size="small" color="#000" />
+            : <Feather name="refresh-cw" size={14} color="#000" />}
+          <Text style={[mr.offlineBtnTxt, { color: "#000" }]}>{retrying ? "Checking…" : "Refresh"}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   // ── Full Meeting Room ──────────────────────────────────────────────────────
   const tc = theme.primary;
   const tc2 = theme.secondary;
@@ -480,16 +517,18 @@ export function CoGMMeetingRoom() {
               </TouchableOpacity>
             </>
           ) : session ? (
-            // Session exists but membership query returned no code — retry fetch
-            <TouchableOpacity
-              onPress={async () => { setRetrying(true); await refreshMembership(); setRetrying(false); }}
-              style={[mr.copyBtn, { backgroundColor: VFL_BLUE, marginTop: 10 }]}
-            >
-              <Feather name="refresh-cw" size={13} color="#fff" />
-              <Text style={[mr.copyBtnTxt, { color: "#fff" }]}>Reload Code</Text>
-            </TouchableOpacity>
+            // Session exists but code not yet in membership — show subtle refresh
+            <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 8, paddingVertical: 10 }}>
+              <Text style={[mr.inviteHint, { color: colors.mutedForeground }]}>Code loading…</Text>
+              <TouchableOpacity
+                onPress={async () => { setRetrying(true); await refreshMembership(); setRetrying(false); }}
+                style={{ padding: 6 }}
+              >
+                <Feather name="refresh-cw" size={14} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            </View>
           ) : (
-            // No session at all — must sign in to fetch the code from Supabase
+            // No session at all — must sign in
             <>
               <Text style={[mr.inviteHint, { color: colors.mutedForeground, textAlign: "center", marginTop: 6, marginBottom: 4 }]}>
                 Sign in to view your franchise invite code

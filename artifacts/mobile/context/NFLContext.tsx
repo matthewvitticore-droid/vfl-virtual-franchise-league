@@ -833,6 +833,11 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
 
   // ── Co-GM mode detection ────────────────────────────────────────────────────
   const isCoGMMode = SUPABASE_ENABLED && !!membership?.franchiseId;
+  // Tracks whether user is in Co-GM mode (even before membership resolves)
+  const [storedGmMode, setStoredGmMode] = useState<string | null>(null);
+  useEffect(() => {
+    AsyncStorage.getItem("vfl_gm_mode").then(m => setStoredGmMode(m ?? ""));
+  }, []);
 
   // ── Fetch Co-GM members ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -846,9 +851,9 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       });
   }, [isCoGMMode, membership?.franchiseId]);
 
-  // ── Load on mount ──────────────────────────────────────────────────────────
+  // ── Load on mount (also re-fires when membership.franchiseId changes) ───────
 
-  useEffect(() => { loadSeason(); loadCustomization(); }, [membership?.franchiseId]);
+  useEffect(() => { loadSeason(); loadCustomization(); }, [membership?.franchiseId, storedGmMode]);
 
   // ── Realtime sync subscription (franchise_seasons + proposals + votes) ───────
 
@@ -857,15 +862,31 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
     const fid = membership.franchiseId;
     realtimeSub.current = supabase
       .channel(`vfl:sync:${fid}`)
-      // v2 schema: franchise_seasons UPDATE
+      // v2 schema: franchise_seasons INSERT or UPDATE
+      .on("postgres_changes", {
+        event: "INSERT", schema: "public", table: "franchise_seasons",
+        filter: `franchise_id=eq.${fid}`,
+      }, (payload: any) => {
+        const remote = payload.new?.sim_state as Season | undefined;
+        if (remote?.year) { setSeason(remote); setSyncError(null);
+          console.log("[VFL] Realtime: franchise_seasons INSERT received"); }
+      })
       .on("postgres_changes", {
         event: "UPDATE", schema: "public", table: "franchise_seasons",
         filter: `franchise_id=eq.${fid}`,
       }, (payload: any) => {
         const remote = payload.new?.sim_state as Season | undefined;
+        if (remote?.year) { setSeason(remote); setSyncError(null);
+          console.log("[VFL] Realtime: franchise_seasons UPDATE received"); }
+      })
+      // v1 fallback: franchise_state INSERT or UPDATE
+      .on("postgres_changes", {
+        event: "INSERT", schema: "public", table: "franchise_state",
+        filter: `franchise_id=eq.${fid}`,
+      }, (payload: any) => {
+        const remote = payload.new?.state_json as Season | undefined;
         if (remote?.year) { setSeason(remote); setSyncError(null); }
       })
-      // v1 fallback: franchise_state UPDATE
       .on("postgres_changes", {
         event: "UPDATE", schema: "public", table: "franchise_state",
         filter: `franchise_id=eq.${fid}`,
@@ -993,14 +1014,24 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     try {
       if (SUPABASE_ENABLED && membership?.franchiseId) {
+        // ── Logged-in Co-GM with franchise: load from cloud ──────────────────
         await loadFromSupabase(membership.franchiseId);
+      } else if (SUPABASE_ENABLED && storedGmMode !== null && (storedGmMode === "co-gm" || storedGmMode === "cogm")) {
+        // ── Co-GM mode but auth/membership not resolved yet ───────────────────
+        // Stay in loading state — the [membership?.franchiseId] dep will re-fire
+        // once membership arrives. DO NOT load local/solo state here.
+        console.log("[VFL] Co-GM mode: waiting for membership to resolve...");
+        return; // keep isLoading = true until membership triggers re-load
+      } else if (storedGmMode === null) {
+        // gmMode not read from AsyncStorage yet — defer until it's known
+        return;
       } else {
+        // ── Solo / offline mode ───────────────────────────────────────────────
         let raw: string | null = null;
         try { raw = await bigGet(CACHE_KEY); } catch {}
         let parsed: Season | null = null;
         if (raw) {
           try { parsed = JSON.parse(raw) as Season; } catch {
-            // Cache corrupted (e.g. "[object Object]") — wipe and reinit
             console.warn("[VFL] Corrupted local cache, resetting");
             try { await bigSet(CACHE_KEY, ""); } catch {}
           }
@@ -1035,15 +1066,29 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
 
   async function loadFromSupabase(franchiseId: string) {
     setIsSyncing(true);
+    const isGM = membership?.role === "GM";
     try {
       const { simState, hasNewSchema } = await tryNewSchema(franchiseId);
 
       if (hasNewSchema) {
         // ── v2 schema: franchise_seasons ─────────────────────────────────────
-        if (!simState) {
-          const s = initSeason(membership?.teamId);
+        if (simState) {
+          // Cloud has data — ALL users load from it (single source of truth)
+          setSeason(simState);
+          console.log("[VFL] Loaded franchise state from cloud, franchiseId:", franchiseId);
+        } else if (isGM) {
+          // ── GM only: seed the cloud state ───────────────────────────────────
+          // Prefer the GM's existing local season over a fresh random init.
+          // This ensures Co-GMs see the same state the GM has been working with.
+          let seedSeason: Season | null = null;
+          try {
+            const raw = await bigGet(CACHE_KEY);
+            if (raw) seedSeason = JSON.parse(raw) as Season;
+          } catch {}
+          const s = seedSeason ?? initSeason(membership?.teamId);
           setSeason(s);
           const myTeam = s.teams.find(t => t.id === s.playerTeamId);
+          console.log("[VFL] GM seeding franchise state, franchiseId:", franchiseId, "teamId:", s.playerTeamId);
           await supabase.from("franchise_seasons").insert({
             franchise_id: franchiseId,
             year: s.year, phase: s.phase, week: s.currentWeek,
@@ -1056,7 +1101,10 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
               console.warn("[VFL] franchise_seasons seed failed:", iErr.message);
           });
         } else {
-          setSeason(simState);
+          // ── Co-GM/Coach/Scout: no cloud data yet — GM hasn't pushed yet ─────
+          // DO NOT generate a random season. Show a waiting state.
+          console.log("[VFL] Co-GM waiting: franchise not seeded yet by GM.");
+          setSeason(null);
         }
         await fetchProposals(franchiseId);
       } else {
@@ -1069,13 +1117,20 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
           .maybeSingle();
         if (oldData?.state_json) {
           setSeason(oldData.state_json as Season);
-        } else {
-          const s = initSeason(membership?.teamId);
+        } else if (isGM) {
+          let seedSeason: Season | null = null;
+          try {
+            const raw = await bigGet(CACHE_KEY);
+            if (raw) seedSeason = JSON.parse(raw) as Season;
+          } catch {}
+          const s = seedSeason ?? initSeason(membership?.teamId);
           setSeason(s);
           await supabase.from("franchise_state").upsert(
             { franchise_id: franchiseId, state_json: s, updated_by: user?.id },
             { onConflict: "franchise_id" }
           );
+        } else {
+          setSeason(null);
         }
       }
 
@@ -2150,6 +2205,10 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       teamCustomization, saveCustomization, setGameDayUniform,
       toggleCoGMMode,
       isCoGMMode,
+      isWaitingForGM: isCoGMMode && !isLoading && !isSyncing && !season,
+      reloadFromCloud: async () => {
+        if (membership?.franchiseId) await loadFromSupabase(membership.franchiseId);
+      },
       coGMMembers,
       proposals,
       pendingProposals,

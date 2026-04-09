@@ -1,0 +1,71 @@
+1. CO-GM FRANCHISE IS NOT SYNCING (DATA MISMATCH)
+
+Problem:
+Users can join via invite code, but they are NOT loading the same franchise state (rosters, uniforms, etc. are different).
+
+Fix:
+	•	Ensure ALL Co-GM users load the same single source of truth from the database:
+	•	franchise
+	•	franchise_seasons
+	•	teams / rosters
+	•	game state
+	•	On join:
+	•	Fetch franchise_id from invite code
+	•	Store it on the user session (or membership)
+	•	ALWAYS load data by franchise_id (never local or fallback state)
+	•	Remove any local/offline initialization when in Co-GM mode
+	•	Ensure no duplicate franchise gets created on join
+	•	Add logging to confirm:
+	•	franchise_id being loaded
+	•	user_id → franchise_id mapping
+
+⸻
+
+2. NO WAY TO LOAD / RE-ENTER EXISTING CO-GM FRANCHISE
+
+Problem:
+If a user leaves or reloads, they are forced to create a new franchise. There is NO “Load Franchise” entry point.
+
+Fix:
+	•	On app launch:
+	•	Check if user has an existing franchise_members row
+	•	If yes → automatically load that franchise
+	•	On “Choose League Type” screen:
+	•	If user has an existing Co-GM membership:
+	•	Show a new card:
+👉 “Resume Franchise”
+	•	Loads their existing franchise مباشرة
+	•	Add fallback:
+	•	Button: “Load Existing Franchise”
+	•	Fetch and list franchises the user belongs to
+	•	This must work even after refresh / logout / returning later
+
+⸻
+
+3. INVITE CODE NOT PERSISTENT OR VISIBLE
+
+Problem:
+Invite code is not clearly visible or persistently stored in the Meeting Room.
+
+Fix:
+	•	Store invite_code permanently on the franchise record
+	•	In Meeting Room:
+	•	Display a clear, large, always-visible Invite Code
+	•	Add:
+	•	Copy button
+	•	Share button (optional)
+	•	Remove “Reload Code” as primary UX
+	•	Only regenerate if explicitly requested
+	•	Ensure ALL Co-GMs see the SAME code
+
+⸻
+
+SUCCESS CRITERIA
+	•	Two users join → see identical rosters, uniforms, and data
+	•	Reload app → automatically returns to same franchise
+	•	No forced “create new franchise” loop
+	•	Invite code is always visible and reusable in Meeting Room
+
+⸻
+
+Fix all three together. Do not partially implement.
