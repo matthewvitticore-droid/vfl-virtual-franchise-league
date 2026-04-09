@@ -252,7 +252,7 @@ export function CoGMMeetingRoom() {
   const theme   = useTeamTheme();
   const router  = useRouter();
   const { user, membership, session, isLoading, refreshMembership } = useAuth();
-  const { season, isWaitingForGM, reloadFromCloud, proposals, pendingProposals, coGMMembers, voteOnProposal } = useNFL();
+  const { season, isWaitingForGM, reloadFromCloud, isSyncing, syncError, proposals, pendingProposals, coGMMembers, voteOnProposal } = useNFL();
   const [filter,     setFilter]     = useState<"pending" | "all">("pending");
   const [retrying,   setRetrying]   = useState(false);
   const [copied,     setCopied]     = useState(false);
@@ -336,6 +336,20 @@ export function CoGMMeetingRoom() {
     setTimeout(() => setCopied(false), 2200);
   }
 
+  // ── Polling DB for franchise state (runs up to ~24 s after join) ────────────
+  // Block ALL UI until real cloud data is confirmed — no local fallback rendered.
+  if (isSyncing && !season) {
+    return (
+      <View style={mr.offlineBox}>
+        <ActivityIndicator size="large" color="#003087" style={{ marginBottom: 14 }} />
+        <Text style={[mr.offlineTitle, { color: colors.foreground }]}>Joining Franchise…</Text>
+        <Text style={[mr.offlineSub, { color: colors.mutedForeground }]}>
+          Fetching roster and season data from the cloud. This takes a few seconds.
+        </Text>
+      </View>
+    );
+  }
+
   // ── Still initializing ─────────────────────────────────────────────────────
   if ((!localLoaded || isLoading || retrying) && !canShowRoom) {
     return (
@@ -387,7 +401,7 @@ export function CoGMMeetingRoom() {
     );
   }
 
-  // ── Co-GM waiting: GM hasn't pushed franchise state yet ───────────────────
+  // ── Co-GM waiting: GM hasn't pushed franchise state yet (or polling exhausted) ─
   if (isWaitingForGM) {
     return (
       <View style={mr.offlineBox}>
@@ -395,7 +409,9 @@ export function CoGMMeetingRoom() {
         <Text style={{ fontSize: 36, marginBottom: 14 }}>⏳</Text>
         <Text style={[mr.offlineTitle, { color: colors.foreground }]}>Waiting for Commissioner</Text>
         <Text style={[mr.offlineSub, { color: colors.mutedForeground }]}>
-          You've joined the franchise! The Commissioner (GM) needs to push the franchise state from their device first. Ask them to open the Franchise tab and tap "Push to Cloud".
+          {syncError
+            ? syncError
+            : "You've joined the franchise! The Commissioner needs to open the app so their franchise state can load, then tap Refresh below."}
         </Text>
         {displayCode ? (
           <View style={[mr.inviteBlock, { borderColor: VFL_GOLD + "40", backgroundColor: VFL_GOLD + "10", marginTop: 18 }]}>

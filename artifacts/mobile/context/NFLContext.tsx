@@ -1053,89 +1053,79 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // Returns true when franchise_seasons table exists (migration v2 applied)
-  async function tryNewSchema(franchiseId: string): Promise<{ simState: Season | null; hasNewSchema: boolean }> {
-    const { data, error } = await supabase
-      .from("franchise_seasons")
-      .select("sim_state")
-      .eq("franchise_id", franchiseId)
-      .maybeSingle();
-    if (error) return { simState: null, hasNewSchema: false };
-    return { simState: data?.sim_state as Season ?? null, hasNewSchema: true };
+  // ── Poll DB until a row appears (safety net for network delays) ──────────────
+  // NEVER generates local state. Only loads from the cloud. Resolves with the
+  // Season when found, or null after all retries are exhausted.
+  async function pollForFranchiseState(franchiseId: string, maxAttempts = 8, intervalMs = 3000): Promise<Season | null> {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (attempt > 0) await new Promise(r => setTimeout(r, intervalMs));
+      console.log(`[VFL] Polling franchise state (attempt ${attempt + 1}/${maxAttempts}) fid=${franchiseId}`);
+
+      // v2: franchise_seasons
+      const { data: v2, error: v2err } = await supabase
+        .from("franchise_seasons").select("sim_state")
+        .eq("franchise_id", franchiseId).maybeSingle();
+      if (!v2err && v2?.sim_state) return v2.sim_state as Season;
+
+      // v1 fallback: franchise_state
+      const { data: v1 } = await supabase
+        .from("franchise_state").select("state_json")
+        .eq("franchise_id", franchiseId).maybeSingle();
+      if (v1?.state_json) return v1.state_json as Season;
+    }
+    return null;
   }
 
+  // ── Load Co-GM franchise state exclusively from Supabase ─────────────────────
+  // CONTRACT: this function NEVER calls initSeason() or generates local data.
+  // If the DB row doesn't exist yet it polls until it does (or times out).
+  // The ONLY place initSeason() is called is franchise/index.tsx handleCreate.
   async function loadFromSupabase(franchiseId: string) {
     setIsSyncing(true);
-    const isGM = membership?.role === "GM";
     try {
-      const { simState, hasNewSchema } = await tryNewSchema(franchiseId);
+      // First attempt — usually the row already exists (seeded by handleCreate)
+      const { data: v2, error: v2err } = await supabase
+        .from("franchise_seasons").select("sim_state")
+        .eq("franchise_id", franchiseId).maybeSingle();
 
-      if (hasNewSchema) {
-        // ── v2 schema: franchise_seasons ─────────────────────────────────────
-        if (simState) {
-          // Cloud has data — ALL users load from it (single source of truth)
-          setSeason(simState);
-          console.log("[VFL] Loaded franchise state from cloud, franchiseId:", franchiseId);
-        } else if (isGM) {
-          // ── GM only: seed the cloud state ───────────────────────────────────
-          // Prefer the GM's existing local season over a fresh random init.
-          // This ensures Co-GMs see the same state the GM has been working with.
-          let seedSeason: Season | null = null;
-          try {
-            const raw = await bigGet(CACHE_KEY);
-            if (raw) seedSeason = JSON.parse(raw) as Season;
-          } catch {}
-          const s = seedSeason ?? initSeason(membership?.teamId);
-          setSeason(s);
-          const myTeam = s.teams.find(t => t.id === s.playerTeamId);
-          console.log("[VFL] GM seeding franchise state, franchiseId:", franchiseId, "teamId:", s.playerTeamId);
-          await supabase.from("franchise_seasons").insert({
-            franchise_id: franchiseId,
-            year: s.year, phase: s.phase, week: s.currentWeek,
-            record: myTeam
-              ? { wins: myTeam.wins, losses: myTeam.losses, ties: myTeam.ties }
-              : { wins: 0, losses: 0, ties: 0 },
-            sim_state: s, updated_by: user?.id,
-          }).then(({ error: iErr }) => {
-            if (iErr && iErr.code !== "23505")
-              console.warn("[VFL] franchise_seasons seed failed:", iErr.message);
-          });
-        } else {
-          // ── Co-GM/Coach/Scout: no cloud data yet — GM hasn't pushed yet ─────
-          // DO NOT generate a random season. Show a waiting state.
-          console.log("[VFL] Co-GM waiting: franchise not seeded yet by GM.");
-          setSeason(null);
-        }
-        await fetchProposals(franchiseId);
-      } else {
-        // ── v1 schema fallback: franchise_state ───────────────────────────────
-        console.log("[VFL] franchise_seasons not found — using legacy franchise_state");
-        const { data: oldData } = await supabase
-          .from("franchise_state")
-          .select("state_json")
-          .eq("franchise_id", franchiseId)
-          .maybeSingle();
-        if (oldData?.state_json) {
-          setSeason(oldData.state_json as Season);
-        } else if (isGM) {
-          let seedSeason: Season | null = null;
-          try {
-            const raw = await bigGet(CACHE_KEY);
-            if (raw) seedSeason = JSON.parse(raw) as Season;
-          } catch {}
-          const s = seedSeason ?? initSeason(membership?.teamId);
-          setSeason(s);
-          await supabase.from("franchise_state").upsert(
-            { franchise_id: franchiseId, state_json: s, updated_by: user?.id },
-            { onConflict: "franchise_id" }
-          );
-        } else {
-          setSeason(null);
+      let simState: Season | null = null;
+
+      if (!v2err && v2?.sim_state) {
+        simState = v2.sim_state as Season;
+        console.log("[VFL] Franchise state loaded from cloud (v2), fid:", franchiseId);
+      } else if (v2err) {
+        // Table error — try v1 (legacy schema)
+        console.log("[VFL] franchise_seasons error, trying v1 fallback:", v2err.message);
+        const { data: v1 } = await supabase
+          .from("franchise_state").select("state_json")
+          .eq("franchise_id", franchiseId).maybeSingle();
+        if (v1?.state_json) {
+          simState = v1.state_json as Season;
+          console.log("[VFL] Franchise state loaded from cloud (v1 fallback), fid:", franchiseId);
         }
       }
+      // v2 returned null row (no data yet) — could be a network race after create
+      // Poll the DB until the row appears. DO NOT generate local state.
+      if (!simState && !v2err) {
+        console.log("[VFL] Franchise state not found on first load — polling...");
+        simState = await pollForFranchiseState(franchiseId);
+      }
 
-      setSyncError(null);
+      if (simState) {
+        setSeason(simState);
+        setSyncError(null);
+      } else {
+        // All polls exhausted — show waiting/error state. Realtime will deliver
+        // the data when the GM eventually pushes from their device.
+        console.warn("[VFL] Could not load franchise state after all retries.");
+        setSeason(null);
+        setSyncError("Franchise data not available yet. Ask your Commissioner to push the state, then refresh.");
+      }
+
+      await fetchProposals(franchiseId);
     } catch (e: any) {
+      console.error("[VFL] loadFromSupabase error:", e.message);
+      setSeason(null);
       setSyncError(e.message);
     } finally {
       setIsSyncing(false);
