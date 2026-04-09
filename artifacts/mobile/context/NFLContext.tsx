@@ -1012,63 +1012,73 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
 
   async function loadSeason() {
     setIsLoading(true);
-    try {
-      if (SUPABASE_ENABLED && membership?.franchiseId) {
-        // ── Logged-in Co-GM with franchise: load from cloud ──────────────────
+
+    // ── Co-GM franchise: load exclusively from cloud ──────────────────────────
+    if (SUPABASE_ENABLED && membership?.franchiseId) {
+      try {
         await loadFromSupabase(membership.franchiseId);
-      } else if (SUPABASE_ENABLED && storedGmMode !== null && (storedGmMode === "co-gm" || storedGmMode === "cogm")) {
-        // ── Co-GM mode but auth/membership not resolved yet ───────────────────
-        // Stay in loading state — the [membership?.franchiseId] dep will re-fire
-        // once membership arrives. DO NOT load local/solo state here.
-        console.log("[VFL] Co-GM mode: waiting for membership to resolve...");
-        return; // keep isLoading = true until membership triggers re-load
-      } else if (storedGmMode === null) {
-        // gmMode not read from AsyncStorage yet — defer until it's known
-        return;
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // ── Co-GM mode signalled but membership not resolved yet ─────────────────
+    // isLoading stays true. The [membership?.franchiseId] dep fires loadSeason
+    // again as soon as auth resolves. DO NOT load local data here — it would
+    // show a random solo roster before the correct cloud data arrives.
+    if (SUPABASE_ENABLED && storedGmMode !== null && (storedGmMode === "co-gm" || storedGmMode === "cogm")) {
+      console.log("[VFL] Co-GM mode: holding loading state until membership resolves…");
+      return; // isLoading stays true intentionally
+    }
+
+    // ── AsyncStorage not yet read — hold loading state ────────────────────────
+    if (storedGmMode === null) {
+      return; // isLoading stays true intentionally
+    }
+
+    // ── Solo / offline mode ───────────────────────────────────────────────────
+    try {
+      let raw: string | null = null;
+      try { raw = await bigGet(CACHE_KEY); } catch {}
+      let parsed: Season | null = null;
+      if (raw) {
+        try { parsed = JSON.parse(raw) as Season; } catch {
+          console.warn("[VFL] Corrupted local cache, resetting");
+          try { await bigSet(CACHE_KEY, ""); } catch {}
+        }
+      }
+      if (parsed) {
+        let s = migrateTeams(parsed);
+        s = await applyCustomizationToSeason(s);
+        setSeason(s);
+        try { await bigSet(CACHE_KEY, JSON.stringify(s)); } catch {}
       } else {
-        // ── Solo / offline mode ───────────────────────────────────────────────
-        let raw: string | null = null;
-        try { raw = await bigGet(CACHE_KEY); } catch {}
-        let parsed: Season | null = null;
-        if (raw) {
-          try { parsed = JSON.parse(raw) as Season; } catch {
-            console.warn("[VFL] Corrupted local cache, resetting");
-            try { await bigSet(CACHE_KEY, ""); } catch {}
-          }
-        }
-        if (parsed) {
-          let s = migrateTeams(parsed);
-          s = await applyCustomizationToSeason(s);
-          setSeason(s);
-          try { await bigSet(CACHE_KEY, JSON.stringify(s)); } catch {}
-        } else {
-          let s = initSeason();
-          s = await applyCustomizationToSeason(s);
-          setSeason(s);
-          try { await bigSet(CACHE_KEY, JSON.stringify(s)); } catch {}
-        }
+        let s = initSeason();
+        s = await applyCustomizationToSeason(s);
+        setSeason(s);
+        try { await bigSet(CACHE_KEY, JSON.stringify(s)); } catch {}
       }
     } finally {
       setIsLoading(false);
     }
   }
 
-  // ── Poll for an initialized row (sim_state IS NOT NULL) ──────────────────────
-  // The .not('sim_state','is',null) filter is evaluated server-side so we never
-  // receive or process placeholder rows (sim_state = null = "initializing").
+  // ── Poll for an initialized franchise_seasons row ─────────────────────────────
   // CONTRACT: read-only. No writes. No initSeason calls.
+  // Polls until sim_state is non-null (JS check — no DB-level filter).
   async function pollForFranchiseState(franchiseId: string, maxAttempts = 8, intervalMs = 3000): Promise<Season | null> {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       if (attempt > 0) await new Promise(r => setTimeout(r, intervalMs));
-      console.log(`[VFL] Polling franchise state (attempt ${attempt + 1}/${maxAttempts}) fid=${franchiseId}`);
+      console.log(`[VFL] Poll attempt ${attempt + 1}/${maxAttempts} fid=${franchiseId}`);
 
-      // v2: only accept fully-initialized rows (sim_state IS NOT NULL)
-      const { data: v2 } = await supabase
+      // v2 schema: accept any row, check sim_state in JS
+      const { data: v2, error: v2err } = await supabase
         .from("franchise_seasons")
         .select("sim_state")
         .eq("franchise_id", franchiseId)
-        .not("sim_state", "is", null)
         .maybeSingle();
+      console.log(`[VFL] Poll v2: data=${JSON.stringify(v2?.sim_state ? "<season>" : v2)}, err=${v2err?.message ?? "none"}`);
       if (v2?.sim_state) return v2.sim_state as Season;
 
       // v1 fallback: franchise_state (legacy schema, always has state_json)
@@ -1084,49 +1094,57 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
   // CONTRACT:
   //   - NEVER calls initSeason()
   //   - NEVER inserts or updates anything in the DB
-  //   - Only accepts rows where sim_state IS NOT NULL (initialized rows)
-  //   - Polls up to 8× at 3 s intervals if no initialized row found yet
-  //   - The ONLY place initSeason() is called: franchise/index.tsx handleCreate
+  //   - Checks sim_state in JavaScript (no .not() DB filter — simpler, more reliable)
+  //   - Polls up to 8× at 3 s intervals if no initialized state found yet
   async function loadFromSupabase(franchiseId: string) {
     setIsSyncing(true);
     try {
-      // First attempt: query for an initialized row (sim_state IS NOT NULL).
-      // Rows with sim_state = null are "initializing" — ignore them entirely.
+      console.log("[VFL] loadFromSupabase: querying for fid:", franchiseId);
+      // Query without any sim_state filter — check the value in JS below.
       const { data: v2, error: v2err } = await supabase
         .from("franchise_seasons")
         .select("sim_state")
         .eq("franchise_id", franchiseId)
-        .not("sim_state", "is", null)
         .maybeSingle();
+
+      console.log("[VFL] loadFromSupabase v2 result:", {
+        hasRow: !!v2,
+        simStateSet: !!v2?.sim_state,
+        error: v2err?.message ?? null,
+      });
 
       let simState: Season | null = null;
 
-      if (!v2err && v2?.sim_state) {
+      if (v2?.sim_state) {
+        // Row exists with initialized data — use it immediately.
         simState = v2.sim_state as Season;
-        console.log("[VFL] Loaded initialized franchise state (v2), fid:", franchiseId);
+        console.log("[VFL] Loaded franchise state (v2), year:", (simState as any)?.year);
       } else if (v2err) {
-        // franchise_seasons table error (schema not deployed?) → try v1 legacy table
-        console.log("[VFL] franchise_seasons error, trying v1 fallback:", v2err.message);
-        const { data: v1 } = await supabase
+        // franchise_seasons table error (schema not deployed?) — try v1 legacy table.
+        console.log("[VFL] franchise_seasons error:", v2err.message, "— trying v1 fallback");
+        const { data: v1, error: v1err } = await supabase
           .from("franchise_state").select("state_json")
           .eq("franchise_id", franchiseId).maybeSingle();
+        console.log("[VFL] v1 fallback:", { hasRow: !!v1, error: v1err?.message ?? null });
         if (v1?.state_json) {
           simState = v1.state_json as Season;
-          console.log("[VFL] Loaded franchise state from v1 fallback, fid:", franchiseId);
+          console.log("[VFL] Loaded franchise state (v1 fallback)");
         }
+      } else {
+        // Row exists but sim_state is null (initializing), OR no row at all.
+        console.log("[VFL] sim_state not yet written (row:", !!v2, ") — polling…");
       }
 
-      // No initialized row yet (row absent OR sim_state = null) → poll.
-      // This happens when the GM's handleCreate reserved the slot but hasn't
-      // finished the UPDATE step yet. Realtime will also fire once it does.
+      // No initialized state yet (sim_state null or row absent) → poll.
+      // Always poll regardless of whether we got a v2 error or a null row.
       if (!simState) {
-        console.log("[VFL] No initialized row on first load — polling...");
         simState = await pollForFranchiseState(franchiseId);
       }
 
       if (simState) {
         setSeason(simState);
         setSyncError(null);
+        console.log("[VFL] Season set successfully from Supabase");
       } else {
         console.warn("[VFL] Franchise state not ready after all retries.");
         setSeason(null);
@@ -1135,7 +1153,7 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
 
       await fetchProposals(franchiseId);
     } catch (e: any) {
-      console.error("[VFL] loadFromSupabase error:", e.message);
+      console.error("[VFL] loadFromSupabase unexpected error:", e.message);
       setSeason(null);
       setSyncError(e.message);
     } finally {

@@ -137,12 +137,11 @@ export default function LaunchScreen() {
   const fadeAnim  = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
-  // When auth finishes loading and user has a Co-GM membership, auto-enter the franchise
+  // When auth finishes and user has a Co-GM membership, land them on the saves
+  // tab so they can see the franchise resume card (with join code) and tap RESUME.
   useEffect(() => {
     if (!authLoading && membership) {
-      AsyncStorage.setItem("vfl_gm_mode", "co-gm").then(() => {
-        router.replace("/(tabs)");
-      });
+      setActiveView("saves");
     }
   }, [authLoading, membership]);
 

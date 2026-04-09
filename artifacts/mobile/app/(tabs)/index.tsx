@@ -130,10 +130,20 @@ export default function HomeScreen() {
     router.push(`/(tabs)/frontoffice?tab=${tab}` as any);
   };
 
-  if (isLoading) return (
+  // Show spinner only while we have no season to render yet.
+  // If season is already populated (e.g. from realtime) we show the HQ
+  // even if a background sync is still in-flight (isSyncing).
+  if ((isLoading || isSyncing) && !season) return (
     <View style={[st.center, { backgroundColor: colors.background }]}>
       <ActivityIndicator color={theme.primary} size="large" />
-      <Text style={[st.mutedTxt, { color: colors.mutedForeground }]}>Loading franchise…</Text>
+      <Text style={[st.mutedTxt, { color: colors.mutedForeground }]}>
+        {isSyncing ? "Syncing franchise from cloud…" : "Loading franchise…"}
+      </Text>
+      {syncError ? (
+        <Text style={[st.mutedTxt, { color: "#EF4444", marginTop: 8, textAlign: "center", paddingHorizontal: 24 }]}>
+          {syncError}
+        </Text>
+      ) : null}
     </View>
   );
 

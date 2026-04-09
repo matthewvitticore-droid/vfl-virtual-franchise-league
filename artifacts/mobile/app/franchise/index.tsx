@@ -125,73 +125,55 @@ export default function FranchiseLobbyScreen() {
     if (err || !franchiseId) { setLoading(false); setError(err ?? "Failed to create franchise."); return; }
 
     // ── Step 2: Duplicate guard ────────────────────────────────────────────────
-    // ANY existing row — even one with sim_state = null (still initializing) —
-    // means another process already holds the lock. Stop immediately; do NOT
-    // call initSeason under any circumstances.
+    // If a row already exists for this franchise (any state), skip initSeason.
     const { data: existing } = await supabase
       .from("franchise_seasons")
-      .select("franchise_id")
+      .select("franchise_id, sim_state")
       .eq("franchise_id", franchiseId)
       .maybeSingle();
 
     if (existing) {
-      console.log("[VFL] franchise_seasons row already exists for", franchiseId, "— aborting init");
+      console.log("[VFL] franchise_seasons already exists for", franchiseId, "sim_state set:", !!existing.sim_state);
       await AsyncStorage.setItem("vfl_gm_mode", "co-gm");
+      if (existing.sim_state) await bigSet("vfl_season_v1", JSON.stringify(existing.sim_state));
       setLoading(false); setCreatedJoinCode(created); setScreen("success");
       return;
     }
 
-    // ── Step 3: INSERT placeholder row FIRST (the distributed lock) ───────────
-    // sim_state is intentionally NULL — signals "initializing, not yet ready".
-    // The UNIQUE(franchise_id) constraint ensures only ONE process holds the lock.
-    // 23505 = duplicate key → another process beat us here → abort, never init.
-    // Supabase JS returns errors in-band (never throws), so we check the error field.
-    const { error: reserveErr } = await supabase
-      .from("franchise_seasons")
-      .insert({ franchise_id: franchiseId });
-
-    if (reserveErr) {
-      if (reserveErr.code === "23505") {
-        console.log("[VFL] 23505: another process reserved the slot — aborting");
-        await AsyncStorage.setItem("vfl_gm_mode", "co-gm");
-        setLoading(false); setCreatedJoinCode(created); setScreen("success");
-        return;
-      }
-      console.error("[VFL] franchise_seasons reserve failed:", reserveErr.message);
-      setLoading(false);
-      setError("Could not reserve franchise slot. Please try again.");
-      return;
-    }
-
-    // ── Step 4: Generate season data ──────────────────────────────────────────
-    // initSeason() runs ONLY here, ONLY once, ONLY for brand-new franchises.
+    // ── Step 3: Generate season in memory ─────────────────────────────────────
+    // initSeason() runs ONLY here — at franchise creation — never in any load path.
+    console.log("[VFL] Creating franchise season for", franchiseId, "team:", selectedTeamId);
     const season = initSeason(selectedTeamId);
+    console.log("[VFL] Season generated:", season.year, "playerTeamId:", season.playerTeamId, "teams:", season.teams.length);
     await AsyncStorage.setItem("vfl_gm_mode", "co-gm");
     await bigSet("vfl_season_v1", JSON.stringify(season));
 
-    // ── Step 5: UPDATE the placeholder with the full season state ─────────────
-    // After this UPDATE, sim_state is non-null → the row is "initialized".
-    // All polling clients (loadFromSupabase / pollForFranchiseState) will now
-    // accept this row and render the correct, shared roster.
+    // ── Step 4: Single INSERT with full season data ────────────────────────────
+    // No two-step null-placeholder dance. Write the complete sim_state in one
+    // atomic INSERT. 23505 (duplicate key) means a concurrent process beat us
+    // to the slot — safe to ignore since the data is already there.
     const myTeam = season.teams.find((t: any) => t.id === season.playerTeamId);
-    const { error: updateErr } = await supabase.from("franchise_seasons").update({
-      year:       season.year       ?? 2026,
-      phase:      season.phase      ?? "regular",
-      week:       season.currentWeek ?? 1,
-      record:     myTeam
+    const { error: insertErr } = await supabase.from("franchise_seasons").insert({
+      franchise_id: franchiseId,
+      year:         season.year         ?? 2026,
+      phase:        season.phase        ?? "regular",
+      week:         season.currentWeek  ?? 1,
+      record:       myTeam
         ? { wins: myTeam.wins, losses: myTeam.losses, ties: myTeam.ties }
         : { wins: 0, losses: 0, ties: 0 },
-      sim_state:  season,
-      updated_by: user?.id,
-    }).eq("franchise_id", franchiseId);
+      sim_state:    season,
+      updated_by:   user?.id,
+    });
 
-    if (updateErr) {
-      console.warn("[VFL] franchise_seasons update failed:", updateErr.message, "— v1 fallback");
-      // v1 schema fallback for users on the old franchise_state table
-      await supabase.from("franchise_state").upsert(
+    if (insertErr && insertErr.code !== "23505") {
+      console.warn("[VFL] franchise_seasons insert failed:", insertErr.message, "— trying v1 fallback");
+      const { error: v1Err } = await supabase.from("franchise_state").upsert(
         { franchise_id: franchiseId, state_json: season, updated_by: user?.id },
         { onConflict: "franchise_id" }
       );
+      if (v1Err) console.warn("[VFL] v1 fallback also failed:", v1Err.message);
+    } else {
+      console.log("[VFL] franchise_seasons INSERT OK for", franchiseId);
     }
 
     setLoading(false); setCreatedJoinCode(created); setScreen("success");
