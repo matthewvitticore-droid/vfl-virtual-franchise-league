@@ -205,7 +205,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .from("franchise_members")
       .insert({ franchise_id: franchise.id, user_id: user.id, display_name: displayName, role });
 
-    if (mErr) return mErr.message;
+    // 23505 = duplicate key — user is already a member, treat as success
+    if (mErr && mErr.code !== "23505") return mErr.message;
 
     await fetchMembership(user.id);
     return null;

@@ -326,7 +326,7 @@ export function CoGMMeetingRoom() {
   const codeLoading = !!session && !membership && (isLoading || retrying);
 
   // Can we show the full room? Yes if Supabase membership, OR if local franchise exists
-  const isLocalFranchise = localLoaded && (localGmMode === "cogm" || localGmMode === "join") && !!season;
+  const isLocalFranchise = localLoaded && (localGmMode === "co-gm" || localGmMode === "cogm" || localGmMode === "join") && !!season;
   const canShowRoom      = !!membership || isLocalFranchise;
 
   function copyCode() {
