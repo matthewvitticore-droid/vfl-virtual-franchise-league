@@ -60,8 +60,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) fetchMembership(session.user.id);
-      else { setMembership(null); setIsLoading(false); }
+      if (session?.user) {
+        setIsLoading(true); // keep AuthGate on splash until membership resolves
+        fetchMembership(session.user.id);
+      } else {
+        setMembership(null);
+        setIsLoading(false);
+      }
     });
 
     return () => subscription.unsubscribe();

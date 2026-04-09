@@ -37,6 +37,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     return <Redirect href="/auth/login" />;
   }
 
+  // Logged in WITH membership and NOT mid-flow → go straight to Franchise HQ
+  // Covers returning users and post-login redirects.
+  // Excludes /franchise (user may be on success screen mid-create).
+  if (session && membership && !inTabsGroup && !inAuthGroup && !inFranchiseGroup) {
+    return <Redirect href="/(tabs)" />;
+  }
+
   // Logged in but no franchise yet → franchise lobby
   if (session && !membership && !inFranchiseGroup && !inTabsGroup && !inAuthGroup) {
     return <Redirect href="/franchise" />;

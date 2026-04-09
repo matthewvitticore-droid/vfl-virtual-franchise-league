@@ -100,6 +100,14 @@ export default function FranchiseLobbyScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // If membership already exists when this screen mounts (e.g. returning user who
+  // somehow ended up here), redirect straight to HQ — no need to create/join again.
+  useEffect(() => {
+    if (membership?.franchiseId && screen === "type") {
+      router.replace("/(tabs)");
+    }
+  }, [membership?.franchiseId]);
+
   // Pre-fill join code if coming from the launch screen "Join Franchise" flow
   useEffect(() => {
     AsyncStorage.getItem("vfl_pending_join_code").then(code => {
@@ -184,12 +192,15 @@ export default function FranchiseLobbyScreen() {
     setLoading(true);
     try {
       await AsyncStorage.setItem("vfl_gm_mode", "co-gm");
-      // Pull latest state from cloud
+      // Pull latest state from cloud and apply immediately (no polling wait)
       const { data: row } = await supabase
         .from("franchise_seasons").select("sim_state")
-        .eq("franchise_id", membership.franchiseId).maybeSingle();
+        .eq("franchise_id", membership.franchiseId)
+        .not("sim_state", "is", null)
+        .maybeSingle();
       if (row?.sim_state) {
         await bigSet("vfl_season_v1", JSON.stringify(row.sim_state));
+        applySeasonDirectly(row.sim_state as any);
       }
       router.replace("/(tabs)");
     } catch {}
@@ -200,33 +211,44 @@ export default function FranchiseLobbyScreen() {
     if (!joinCode.trim()) { setError("Please enter the 6-character join code."); return; }
     if (!joinDisplayName.trim()) { setError("Please enter your display name."); return; }
     setLoading(true); setError(null);
+
     const err = await joinFranchise(joinCode.trim(), joinRole, joinDisplayName.trim());
-    if (err) { setLoading(false); setError(err); return; }
+    if (err) {
+      // Already a member → just navigate into the franchise instead of showing error
+      if (err.toLowerCase().includes("already a member") && membership?.franchiseId) {
+        await AsyncStorage.setItem("vfl_gm_mode", "co-gm");
+        setLoading(false);
+        router.replace("/(tabs)");
+        return;
+      }
+      setLoading(false); setError(err); return;
+    }
+
     // Pull the shared franchise state from Supabase so this co-GM has the same save
     try {
-      const { data: memberRow } = await supabase
-        .from("franchise_members")
-        .select("franchise_id")
-        .eq("user_id", user?.id)
-        .maybeSingle();
-      if (memberRow?.franchise_id) {
-        const { data: newRow, error: newErr } = await supabase
+      const fid = membership?.franchiseId; // joinFranchise → fetchMembership already updated this
+      if (fid) {
+        // Try v2 schema first (franchise_seasons)
+        const { data: v2 } = await supabase
           .from("franchise_seasons").select("sim_state")
-          .eq("franchise_id", memberRow.franchise_id).maybeSingle();
-        if (!newErr && newRow?.sim_state) {
-          await bigSet("vfl_season_v1", JSON.stringify(newRow.sim_state));
+          .eq("franchise_id", fid).not("sim_state", "is", null).maybeSingle();
+        if (v2?.sim_state) {
+          await bigSet("vfl_season_v1", JSON.stringify(v2.sim_state));
+          applySeasonDirectly(v2.sim_state as any);
         } else {
           // v1 fallback
-          const { data: oldRow } = await supabase
+          const { data: v1 } = await supabase
             .from("franchise_state").select("state_json")
-            .eq("franchise_id", memberRow.franchise_id).maybeSingle();
-          if (oldRow?.state_json) {
-            await bigSet("vfl_season_v1", JSON.stringify(oldRow.state_json));
+            .eq("franchise_id", fid).maybeSingle();
+          if (v1?.state_json) {
+            await bigSet("vfl_season_v1", JSON.stringify(v1.state_json));
+            applySeasonDirectly(v1.state_json as any);
           }
         }
       }
       await AsyncStorage.setItem("vfl_gm_mode", "co-gm");
     } catch {}
+
     setLoading(false);
     router.replace("/(tabs)");
   };
