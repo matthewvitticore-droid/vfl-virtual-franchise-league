@@ -137,9 +137,13 @@ export default function LaunchScreen() {
   const fadeAnim  = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
-  // When auth finishes loading and user has a membership, ensure saves view is shown
+  // When auth finishes loading and user has a Co-GM membership, auto-enter the franchise
   useEffect(() => {
-    if (!authLoading && membership) setActiveView("saves");
+    if (!authLoading && membership) {
+      AsyncStorage.setItem("vfl_gm_mode", "co-gm").then(() => {
+        router.replace("/(tabs)");
+      });
+    }
   }, [authLoading, membership]);
 
   useEffect(() => {

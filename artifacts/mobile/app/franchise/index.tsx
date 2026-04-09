@@ -77,7 +77,7 @@ export default function FranchiseLobbyScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { initialScreen } = useLocalSearchParams<{ initialScreen?: string }>();
-  const { user, createFranchise, joinFranchise, signOut } = useAuth();
+  const { user, membership, createFranchise, joinFranchise, signOut } = useAuth();
 
   const [screen, setScreen] = useState<Screen>((initialScreen as Screen) ?? "type");
   const [soloTeamId, setSoloTeamId] = useState("team-13"); // Coastal Sharks default
@@ -149,6 +149,23 @@ export default function FranchiseLobbyScreen() {
     setLoading(false);
     setCreatedJoinCode(created);
     setScreen("success");
+  };
+
+  const handleResume = async () => {
+    if (!membership) return;
+    setLoading(true);
+    try {
+      await AsyncStorage.setItem("vfl_gm_mode", "co-gm");
+      // Pull latest state from cloud
+      const { data: row } = await supabase
+        .from("franchise_seasons").select("sim_state")
+        .eq("franchise_id", membership.franchiseId).maybeSingle();
+      if (row?.sim_state) {
+        await bigSet("vfl_season_v1", JSON.stringify(row.sim_state));
+      }
+      router.replace("/(tabs)");
+    } catch {}
+    setLoading(false);
   };
 
   const handleJoin = async () => {
@@ -398,6 +415,28 @@ export default function FranchiseLobbyScreen() {
                 </Text>
               </View>
             </View>
+
+            {/* Resume if already a member */}
+            {membership && (
+              <TouchableOpacity
+                onPress={handleResume}
+                disabled={loading}
+                style={[styles.optionCard, { backgroundColor: "#10B98115", borderColor: "#10B98170", borderWidth: 2 }]}
+              >
+                <View style={[styles.optionIcon, { backgroundColor: "#10B98125" }]}>
+                  <Feather name="play-circle" size={22} color="#10B981" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.optionTitle, { color: "#10B981" }]}>Resume Franchise</Text>
+                  <Text style={[styles.optionDesc, { color: colors.mutedForeground }]}>
+                    {membership.franchiseName || "Your Co-GM franchise"} · {membership.role}
+                  </Text>
+                </View>
+                {loading
+                  ? <ActivityIndicator size="small" color="#10B981" />
+                  : <Feather name="chevron-right" size={18} color="#10B981" />}
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               onPress={() => setScreen("create")}

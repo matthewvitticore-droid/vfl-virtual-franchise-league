@@ -1,4 +1,5 @@
 import { Session, User } from "@supabase/supabase-js";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase, SUPABASE_ENABLED } from "@/lib/supabase";
 
@@ -76,14 +77,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (data && !error) {
         const franchise = data.franchises as any;
-        setMembership({
+        const mem: FranchiseMembership = {
           franchiseId: data.franchise_id,
           franchiseName: franchise?.name ?? "",
           teamId: franchise?.team_id ?? "",
           joinCode: franchise?.join_code ?? "",
           role: data.role as FranchiseMemberRole,
           displayName: data.display_name,
-        });
+        };
+        setMembership(mem);
+        // Persist join code and franchise name locally so Meeting Room can
+        // show them even before membership fully loads on next app open.
+        if (franchise?.join_code) {
+          AsyncStorage.setItem("vfl_franchise_code", franchise.join_code).catch(() => {});
+          AsyncStorage.setItem("vfl_franchise_name", franchise.name ?? "").catch(() => {});
+        }
       } else {
         setMembership(null);
       }
