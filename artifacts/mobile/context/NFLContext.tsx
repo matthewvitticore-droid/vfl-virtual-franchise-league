@@ -997,9 +997,16 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       } else {
         let raw: string | null = null;
         try { raw = await bigGet(CACHE_KEY); } catch {}
+        let parsed: Season | null = null;
         if (raw) {
-          let s: Season = JSON.parse(raw);
-          s = migrateTeams(s);
+          try { parsed = JSON.parse(raw) as Season; } catch {
+            // Cache corrupted (e.g. "[object Object]") — wipe and reinit
+            console.warn("[VFL] Corrupted local cache, resetting");
+            try { await bigSet(CACHE_KEY, ""); } catch {}
+          }
+        }
+        if (parsed) {
+          let s = migrateTeams(parsed);
           s = await applyCustomizationToSeason(s);
           setSeason(s);
           try { await bigSet(CACHE_KEY, JSON.stringify(s)); } catch {}
