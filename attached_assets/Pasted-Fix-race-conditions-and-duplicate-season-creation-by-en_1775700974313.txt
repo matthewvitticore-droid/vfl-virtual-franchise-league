@@ -1,0 +1,125 @@
+Fix race conditions and duplicate season creation by enforcing a strict create vs load lifecycle for `franchise_seasons`.
+
+GOALS:
+- initSeason() must ONLY run during creation
+- Load paths must NEVER generate or modify data
+- Prevent duplicate initialization completely
+- Handle multi-user joins safely (including mid-init)
+- UI must only render fully initialized data
+
+1. RESTRICT initSeason USAGE
+- Allow ONLY in: handleCreate, handleSoloCreate
+- REMOVE from: loadFromSupabase and any load/read paths
+
+2. CREATE FLOW (STRICT ORDER)
+
+Step 0: Check if row already exists
+const { data: existing } = await supabase
+  .from('franchise_seasons')
+  .select('*')
+  .eq('franchise_id', franchiseId)
+  .maybeSingle()
+
+IMPORTANT:
+If ANY row exists (even sim_state = null), STOP immediately
+if (existing) return
+
+Step 1: INSERT placeholder row (reserve slot)
+try {
+  await supabase
+    .from('franchise_seasons')
+    .insert({
+      franchise_id: franchiseId,
+      sim_state: null
+    })
+} catch (e) {
+  if (e.code === '23505') return
+  throw e
+}
+
+Step 2: Generate season in memory ONLY
+const season = await initSeason(...)
+
+Step 3: UPDATE row with real data
+await supabase
+  .from('franchise_seasons')
+  .update({
+    sim_state: season
+  })
+  .eq('franchise_id', franchiseId)
+
+CRITICAL RULE:
+- Row existence = lock
+- sim_state = null means "initializing"
+- NEVER run initSeason if row exists
+
+3. LOAD FROM SUPABASE (READ-ONLY)
+
+RULES:
+- NEVER call initSeason
+- NEVER insert/update anything
+
+FLOW:
+
+const { data } = await supabase
+  .from('franchise_seasons')
+  .select('*')
+  .eq('franchise_id', franchiseId)
+  .not('sim_state', 'is', null)
+  .maybeSingle()
+
+if (data) {
+  setSeason(data)
+  return
+}
+
+If not ready, poll:
+
+for (let i = 0; i < 8; i++) {
+  await new Promise(r => setTimeout(r, 3000))
+
+  const { data } = await supabase
+    .from('franchise_seasons')
+    .select('*')
+    .eq('franchise_id', franchiseId)
+    .not('sim_state', 'is', null)
+    .maybeSingle()
+
+  if (data) {
+    setSeason(data)
+    return
+  }
+}
+
+Timeout:
+setSeason(null)
+setError('Season not ready yet')
+
+4. UI LOADING GUARD
+
+While:
+isSyncing && !season
+
+Show full-screen loading:
+- No roster
+- No game state
+- No partial UI
+
+5. REMOVE UPSERT
+
+- Replace ALL upsert with insert
+- Never overwrite existing data
+- Handle duplicates via 23505 error only
+
+6. DATA LIFECYCLE RULES
+
+- No row → safe to create
+- Row exists + sim_state null → initializing → DO NOT create again
+- Row exists + sim_state filled → ready → load it
+
+IMPORTANT:
+- ALL generation happens ONLY in create flow
+- LOAD paths must remain 100% read-only
+- Do NOT introduce any writes in load logic
+
+Make minimal changes necessary, but strictly enforce all rules above.

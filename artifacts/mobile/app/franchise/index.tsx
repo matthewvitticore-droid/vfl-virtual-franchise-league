@@ -125,40 +125,42 @@ export default function FranchiseLobbyScreen() {
     if (err || !franchiseId) { setLoading(false); setError(err ?? "Failed to create franchise."); return; }
 
     // ── Step 2: Duplicate guard ────────────────────────────────────────────────
-    // If a row already exists this franchise was already initialized (e.g. user
-    // retried after a network timeout). Do NOT call initSeason again.
+    // ANY existing row — even one with sim_state = null (still initializing) —
+    // means another process already holds the lock. Stop immediately; do NOT
+    // call initSeason under any circumstances.
     const { data: existing } = await supabase
       .from("franchise_seasons")
-      .select("franchise_id, sim_state")
+      .select("franchise_id")
       .eq("franchise_id", franchiseId)
       .maybeSingle();
 
-    if (existing?.sim_state) {
-      // Fully initialized row already present — nothing to do.
-      console.log("[VFL] franchise_seasons already initialized for", franchiseId);
+    if (existing) {
+      console.log("[VFL] franchise_seasons row already exists for", franchiseId, "— aborting init");
       await AsyncStorage.setItem("vfl_gm_mode", "co-gm");
-      await bigSet("vfl_season_v1", JSON.stringify(existing.sim_state));
       setLoading(false); setCreatedJoinCode(created); setScreen("success");
       return;
     }
 
-    // ── Step 3: INSERT placeholder row FIRST ──────────────────────────────────
-    // sim_state is intentionally omitted (NULL). This reserves the unique slot
-    // and prevents any concurrent process from racing to initialize the same
-    // franchise. loadFromSupabase treats NULL sim_state as "not yet ready"
-    // and will poll until this UPDATE (step 5) populates it.
-    if (!existing) {
-      const { error: reserveErr } = await supabase.from("franchise_seasons").insert({
-        franchise_id: franchiseId,
-        // sim_state: null  (default — signals "initializing, not yet ready")
-      });
-      if (reserveErr && reserveErr.code !== "23505") {
-        // Non-duplicate DB error — bail rather than silently proceeding
-        console.error("[VFL] franchise_seasons reserve failed:", reserveErr.message);
-        setLoading(false);
-        setError("Could not reserve franchise slot. Please try again.");
+    // ── Step 3: INSERT placeholder row FIRST (the distributed lock) ───────────
+    // sim_state is intentionally NULL — signals "initializing, not yet ready".
+    // The UNIQUE(franchise_id) constraint ensures only ONE process holds the lock.
+    // 23505 = duplicate key → another process beat us here → abort, never init.
+    // Supabase JS returns errors in-band (never throws), so we check the error field.
+    const { error: reserveErr } = await supabase
+      .from("franchise_seasons")
+      .insert({ franchise_id: franchiseId });
+
+    if (reserveErr) {
+      if (reserveErr.code === "23505") {
+        console.log("[VFL] 23505: another process reserved the slot — aborting");
+        await AsyncStorage.setItem("vfl_gm_mode", "co-gm");
+        setLoading(false); setCreatedJoinCode(created); setScreen("success");
         return;
       }
+      console.error("[VFL] franchise_seasons reserve failed:", reserveErr.message);
+      setLoading(false);
+      setError("Could not reserve franchise slot. Please try again.");
+      return;
     }
 
     // ── Step 4: Generate season data ──────────────────────────────────────────
