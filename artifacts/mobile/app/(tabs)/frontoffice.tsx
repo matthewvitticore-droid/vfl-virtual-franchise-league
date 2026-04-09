@@ -16,9 +16,8 @@ import { PlayerStatsModal } from "@/components/PlayerStatsModal";
 import { ProspectModal } from "@/components/ProspectModal";
 import { CombineMeasurables } from "@/context/types";
 import { TradeBuilder } from "@/components/TradeBuilder";
-import { CoGMMeetingRoom } from "@/components/CoGMMeetingRoom";
 
-type Tab = "freeAgency" | "draft" | "trades" | "meetingRoom";
+type Tab = "freeAgency" | "draft" | "trades";
 type DraftView = "combine" | "warRoom";
 type SortKey = "grade" | "fortyYardDash" | "benchPress" | "verticalJump" | "broadJump" | "shuttleRun" | "threeCone" | "speed" | "acceleration" | "agility" | "explosion" | "strength";
 type FASortKey = "overall" | "age" | "speed" | "acceleration" | "agility" | "faInterestLevel" | "yearsExperience" | "salary";
@@ -47,7 +46,6 @@ export default function FrontOfficeScreen() {
   const { membership } = useAuth();
   const { season, getPlayerTeam, signFreeAgent, userDraftPick, simulateDraftPick, simPicksUntilUserTurn, simRemainderOfDraft, unlockScouting, proposeTrade, respondToTrade, isCoGMMode, pendingProposals } = useNFL();
   const params = useLocalSearchParams<{ tab?: string }>();
-  const [gmMode, setGmMode] = useState("solo");
   const [isSimming, setIsSimming] = useState(false);
   const [isSimRemainder, setIsSimRemainder] = useState(false);
   const [actionToast, setActionToast] = useState<{ msg: string; type: "success" | "proposed" | "error" } | null>(null);
@@ -75,10 +73,6 @@ export default function FrontOfficeScreen() {
   const [expandedProspect, setExpandedProspect] = useState<string | null>(null);
   const [selectedProspect, setSelectedProspect] = useState<DraftProspect | null>(null);
   const [warRoomIds, setWarRoomIds] = useState<string[]>([]);
-
-  useEffect(() => {
-    AsyncStorage.getItem("vfl_gm_mode").then(v => { if (v) setGmMode(v); });
-  }, []);
 
   // Persist war room board to AsyncStorage
   useEffect(() => {
@@ -353,8 +347,8 @@ export default function FrontOfficeScreen() {
         <Text style={[st.headerTitle, { color: colors.foreground }]}>Front Office</Text>
         <View style={st.tabBar}>
           {(["freeAgency","draft","trades"] as Tab[]).map(t => {
-            const labels: Record<Tab, string> = { freeAgency:"Free Agency", draft:"Draft", trades:"Trades", meetingRoom:"Meeting Room" };
-            const icons: Record<Tab, any> = { freeAgency:"user-plus", draft:"award", trades:"git-merge", meetingRoom:"users" };
+            const labels: Record<Tab, string> = { freeAgency:"Free Agency", draft:"Draft", trades:"Trades" };
+            const icons: Record<Tab, any> = { freeAgency:"user-plus", draft:"award", trades:"git-merge" };
             return (
               <TouchableOpacity key={t} onPress={() => setTab(t)}
                 style={[st.tabBtn, { backgroundColor: tab === t ? teamColor : colors.secondary, borderColor: tab === t ? teamColor : colors.border }]}>
@@ -363,18 +357,6 @@ export default function FrontOfficeScreen() {
               </TouchableOpacity>
             );
           })}
-          {(isCoGMMode || gmMode === "cogm" || gmMode === "join") && (
-            <TouchableOpacity onPress={() => setTab("meetingRoom")}
-              style={[st.tabBtn, { backgroundColor: tab === "meetingRoom" ? "#8B5CF6" : colors.secondary, borderColor: tab === "meetingRoom" ? "#8B5CF6" : colors.border, position: "relative" }]}>
-              <Feather name="users" size={13} color={tab === "meetingRoom" ? "#fff" : colors.mutedForeground} />
-              <Text style={[st.tabLabel, { color: tab === "meetingRoom" ? "#fff" : colors.mutedForeground }]}>Room</Text>
-              {pendingProposals.length > 0 && (
-                <View style={{ position:"absolute", top:-4, right:-4, backgroundColor:"#EF4444", borderRadius:8, minWidth:16, height:16, alignItems:"center", justifyContent:"center" }}>
-                  <Text style={{ fontFamily:"Inter_700Bold", fontSize:9, color:"#fff" }}>{pendingProposals.length}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          )}
         </View>
       </View>
 
@@ -984,13 +966,6 @@ export default function FrontOfficeScreen() {
             })}
           </View>
         </ScrollView>
-      )}
-
-      {/* ── MEETING ROOM (Co-GM only) ──────────────────────────────────────── */}
-      {tab === "meetingRoom" && (
-        <View style={{ flex: 1 }}>
-          <CoGMMeetingRoom />
-        </View>
       )}
 
       {/* ── Prospect Full Detail Modal ─── */}

@@ -4,7 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react"; // useRef kept for ScrollView ref
 import {
-  Alert, Platform, ScrollView, Share, StyleSheet,
+  Alert, Platform, ScrollView, StyleSheet,
   Text, TouchableOpacity, View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -16,7 +16,6 @@ import { useTeamTheme } from "@/hooks/useTeamTheme";
 import { useNFL } from "@/context/NFLContext";
 import { useAuth } from "@/context/AuthContext";
 import { bigSet, bigGet, bigDelete } from "@/utils/bigStorage";
-import { supabase } from "@/lib/supabase";
 
 const SEASON_KEY  = "vfl_season_v1";
 const CUSTOM_KEY  = "vfl_customization_v1";
@@ -107,7 +106,7 @@ export default function LoadSaveScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { season, teamCustomization, isCoGMMode, pendingProposals } = useNFL();
-  const { membership, user } = useAuth();
+  const { membership } = useAuth();
 
   const [saves,       setSaves]       = useState<SaveSlot[]>([]);
   const [saving,      setSaving]      = useState(false);
@@ -115,11 +114,6 @@ export default function LoadSaveScreen() {
   const [saveError,   setSaveError]   = useState<string | null>(null);
   const [gmMode,      setGmMode]      = useState<string>("solo");
   const [activeView,  setActiveView]  = useState<"franchise" | "meeting">("meeting");
-  const [syncing,     setSyncing]     = useState(false);
-  const [syncMsg,     setSyncMsg]     = useState<string | null>(null);
-
-  // Accept both spellings + Supabase membership as signal of co-GM mode
-  const isCoGM = isCoGMMode || gmMode === "co-gm" || gmMode === "cogm" || gmMode === "join" || !!membership;
 
   const scrollRef = useRef<ScrollView>(null);
 
@@ -238,70 +232,6 @@ export default function LoadSaveScreen() {
     );
   }
 
-  async function handlePushToCloud() {
-    if (!season || !membership?.franchiseId) return;
-    setSyncing(true); setSyncMsg(null);
-    try {
-      const myTeam = season.teams.find(t => t.id === season.playerTeamId);
-      const { error: newErr } = await supabase
-        .from("franchise_seasons")
-        .upsert({
-          franchise_id: membership.franchiseId,
-          year:  season.year  ?? 2026,
-          phase: season.phase ?? "regular",
-          week:  season.currentWeek ?? 1,
-          record: myTeam
-            ? { wins: myTeam.wins, losses: myTeam.losses, ties: myTeam.ties }
-            : { wins: 0, losses: 0, ties: 0 },
-          sim_state:  season,
-          updated_by: user?.id,
-        }, { onConflict: "franchise_id" });
-      if (newErr) {
-        // v1 fallback
-        const { error: oldErr } = await supabase.from("franchise_state").upsert(
-          { franchise_id: membership.franchiseId, state_json: season, updated_by: user?.id },
-          { onConflict: "franchise_id" }
-        );
-        setSyncMsg(oldErr ? "Push failed — check connection" : "State pushed to cloud!");
-      } else {
-        setSyncMsg("State pushed to cloud!");
-      }
-    } catch { setSyncMsg("Push failed"); }
-    setSyncing(false);
-    setTimeout(() => setSyncMsg(null), 3500);
-  }
-
-  async function handlePullFromCloud() {
-    if (!membership?.franchiseId) return;
-    setSyncing(true); setSyncMsg(null);
-    try {
-      // Try v2 table first, fall back to v1
-      const { data: newData, error: newErr } = await supabase
-        .from("franchise_seasons")
-        .select("sim_state")
-        .eq("franchise_id", membership.franchiseId)
-        .maybeSingle();
-      if (!newErr && newData?.sim_state) {
-        await bigSet("vfl_season_v1", JSON.stringify(newData.sim_state));
-        setSyncMsg("Pulled! Loading fresh state…");
-        setTimeout(() => router.replace("/(tabs)"), 900);
-      } else {
-        const { data: oldData } = await supabase
-          .from("franchise_state").select("state_json")
-          .eq("franchise_id", membership.franchiseId).maybeSingle();
-        if (oldData?.state_json) {
-          await bigSet("vfl_season_v1", JSON.stringify(oldData.state_json));
-          setSyncMsg("Pulled! Loading fresh state…");
-          setTimeout(() => router.replace("/(tabs)"), 900);
-        } else {
-          setSyncMsg("No cloud state found yet. Ask your GM to push first.");
-        }
-      }
-    } catch { setSyncMsg("Pull failed"); }
-    setSyncing(false);
-    setTimeout(() => setSyncMsg(null), 4500);
-  }
-
   function handleReturnToLaunch() {
     router.replace("/launch");
   }
@@ -336,25 +266,25 @@ export default function LoadSaveScreen() {
           <View style={{ flex: 1 }}>
             <Text style={[styles.pageTitle, { color: colors.foreground }]}>Franchise</Text>
             <Text style={[styles.pageSub, { color: colors.mutedForeground }]}>
-              {isCoGM ? "Co-GM Mode" : "Solo GM Mode"}
+              {gmMode === "cogm" ? "Co-GM Mode" : gmMode === "join" ? "Joined Franchise" : "Solo GM Mode"}
             </Text>
           </View>
           <View style={[
             styles.modePill,
             {
-              backgroundColor: isCoGM ? colors.nflGold + "25" : colors.nflBlue + "25",
-              borderColor:     isCoGM ? colors.nflGold + "60" : colors.nflBlue + "60",
+              backgroundColor: gmMode === "solo" ? colors.nflBlue + "25" : colors.nflGold + "25",
+              borderColor:     gmMode === "solo" ? colors.nflBlue + "60" : colors.nflGold + "60",
             },
           ]}>
-            <Feather name={isCoGM ? "users" : "lock"} size={11} color={isCoGM ? colors.nflGold : colors.nflBlue} />
-            <Text style={[styles.modePillText, { color: isCoGM ? colors.nflGold : colors.nflBlue }]}>
-              {isCoGM ? "CO-GM" : "SOLO"}
+            <Feather name={gmMode === "solo" ? "lock" : "users"} size={11} color={gmMode === "solo" ? colors.nflBlue : colors.nflGold} />
+            <Text style={[styles.modePillText, { color: gmMode === "solo" ? colors.nflBlue : colors.nflGold }]}>
+              {gmMode === "solo" ? "SOLO" : "CO-GM"}
             </Text>
           </View>
         </View>
 
         {/* ── Co-GM Tab Switcher ─────────────────────────────────────────── */}
-        {isCoGM && (
+        {isCoGMMode && (
           <View style={styles.cogmTabRow}>
             {([
               { key: "meeting", label: "Meeting Room", icon: "users" as const },
@@ -385,10 +315,10 @@ export default function LoadSaveScreen() {
         )}
 
         {/* ── Meeting Room (Co-GM only) ─────────────────────────────────── */}
-        {isCoGM && activeView === "meeting" && <CoGMMeetingRoom />}
+        {isCoGMMode && activeView === "meeting" && <CoGMMeetingRoom />}
 
         {/* ── Below only shown in franchise (save/load) view ─────────────── */}
-        {(!isCoGM || activeView === "franchise") && <>
+        {(!isCoGMMode || activeView === "franchise") && <>
 
         {/* ── Active franchise card ────────────────────────────────────────── */}
         {season && myTeam ? (
@@ -475,40 +405,6 @@ export default function LoadSaveScreen() {
                 </View>
               )}
 
-              {/* ── Co-GM Cloud Sync ─────────────────────────────────────── */}
-              {isCoGM && membership && (
-                <>
-                  <View style={[styles.cardDivider, { backgroundColor: "#10B98130", marginVertical: 10 }]} />
-                  <Text style={{ color: "#10B981", fontFamily: "Inter_700Bold", fontSize: 10, letterSpacing: 0.8, marginBottom: 6 }}>
-                    CO-GM CLOUD SYNC
-                  </Text>
-
-                  <TouchableOpacity
-                    onPress={handlePushToCloud}
-                    disabled={syncing || !season}
-                    style={[styles.actionBtn, { backgroundColor: "#10B981", opacity: syncing || !season ? 0.55 : 1 }]}
-                  >
-                    <Feather name="upload-cloud" size={16} color="#fff" />
-                    <Text style={styles.actionBtnText}>{syncing ? "Syncing…" : "Push State to Cloud"}</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={handlePullFromCloud}
-                    disabled={syncing}
-                    style={[styles.actionBtnOutline, { borderColor: "#10B98160", backgroundColor: "#10B98112", marginTop: 8, opacity: syncing ? 0.55 : 1 }]}
-                  >
-                    <Feather name="download-cloud" size={16} color="#10B981" />
-                    <Text style={[styles.actionBtnOutlineText, { color: "#10B981" }]}>Pull Latest from Cloud</Text>
-                  </TouchableOpacity>
-
-                  {syncMsg && (
-                    <View style={{ backgroundColor: "#10B98118", borderRadius: 8, padding: 10, marginTop: 6, borderWidth: 1, borderColor: "#10B98140" }}>
-                      <Text style={{ color: "#10B981", fontSize: 12, fontFamily: "Inter_400Regular" }}>{syncMsg}</Text>
-                    </View>
-                  )}
-                </>
-              )}
-
               <TouchableOpacity
                 onPress={handleReturnToLaunch}
                 style={[styles.actionBtnOutline, { borderColor: colors.nflBlue + "60", backgroundColor: colors.nflBlue + "12" }]}
@@ -539,35 +435,20 @@ export default function LoadSaveScreen() {
         {/* ── Co-GM invite code ────────────────────────────────────────────── */}
         {gmMode !== "solo" && season?.inviteCode && (
           <>
-            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>INVITE CO-GMs</Text>
+            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>CO-GM</Text>
             <View style={[styles.saveCard, { backgroundColor: colors.card, borderColor: colors.nflGold + "50" }]}>
               <View style={styles.saveRow}>
                 <View style={[styles.saveIconWrap, { backgroundColor: colors.nflGold + "20" }]}>
                   <Feather name="users" size={18} color={colors.nflGold} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.saveTitle, { color: colors.foreground }]}>Franchise Invite Code</Text>
-                  <Text style={[styles.saveSub, { color: colors.mutedForeground }]}>Send to a friend — they enter it in the VFL app</Text>
+                  <Text style={[styles.saveTitle, { color: colors.foreground }]}>Invite Code</Text>
+                  <Text style={[styles.saveSub, { color: colors.mutedForeground }]}>Share with your co-GMs to join</Text>
                 </View>
               </View>
               <View style={[styles.codeBox, { backgroundColor: colors.nflGold + "15", borderColor: colors.nflGold + "50" }]}>
                 <Text style={[styles.codeText, { color: colors.nflGold }]}>{season.inviteCode}</Text>
               </View>
-              <TouchableOpacity
-                onPress={async () => {
-                  try {
-                    await Share.share({
-                      message: `🏈 Join my VFL franchise as a Co-GM!\n\nOpen the VFL app → Franchise → Join with Code → enter:\n\n${season.inviteCode}\n\nSee you in the war room!`,
-                      title: "VFL Franchise Invite",
-                    });
-                  } catch {}
-                }}
-                style={[styles.actionBtn, { backgroundColor: colors.nflGold, marginTop: 8 }]}
-                activeOpacity={0.8}
-              >
-                <Feather name="share-2" size={16} color="#000" />
-                <Text style={[styles.actionBtnText, { color: "#000" }]}>Send Invite via iMessage / Email…</Text>
-              </TouchableOpacity>
             </View>
           </>
         )}

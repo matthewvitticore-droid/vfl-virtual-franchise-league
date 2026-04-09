@@ -1,7 +1,6 @@
 import { Feather } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -17,38 +16,18 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
 import { VFLLogo } from "@/components/VFLLogo";
-import { supabase } from "@/lib/supabase";
 
 export default function LoginScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { signIn, joinFranchise, createFranchise } = useAuth();
+  const { signIn } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
-
-  // If franchise was just created (code stored), go straight to the success screen.
-  // This fires even after AuthGate briefly unmounts/remounts this component.
-  useEffect(() => {
-    AsyncStorage.getItem("vfl_created_join_code").then(code => {
-      if (code) router.replace("/auth/franchise-created");
-    });
-  }, []);
-
-  const handleGoogleSignIn = async () => {
-    setError(null);
-    const redirectTo = typeof window !== "undefined" ? window.location.origin + "/auth/callback" : undefined;
-    const { error: err } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo },
-    });
-    if (err) setError(err.message);
-  };
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
@@ -57,68 +36,9 @@ export default function LoginScreen() {
     }
     setLoading(true);
     setError(null);
-    setStatus(null);
-
-    const signInErr = await signIn(email.trim(), password);
-    if (signInErr) {
-      setLoading(false);
-      setError(signInErr);
-      return;
-    }
-
-    // Process any pending Co-GM action (create or join)
-    try {
-      const raw = await AsyncStorage.getItem("vfl_pending_action");
-      if (raw) {
-        const action = JSON.parse(raw);
-
-        if (action.type === "create") {
-          setStatus("Creating franchise…");
-          const { error: err, joinCode } = await createFranchise(
-            action.franchiseName,
-            action.teamId,
-            action.role ?? "GM",
-            action.displayName ?? "Commissioner",
-          );
-          if (err) {
-            setLoading(false);
-            setError(`Franchise creation failed: ${err}`);
-            return;
-          }
-          await AsyncStorage.removeItem("vfl_pending_action");
-          await AsyncStorage.setItem("vfl_gm_mode", "cogm");
-          // Temp key — read by franchise-created screen then cleared
-          await AsyncStorage.setItem("vfl_created_join_code", joinCode ?? "");
-          await AsyncStorage.setItem("vfl_created_franchise_name", action.franchiseName ?? "");
-          // Permanent key — Meeting Room reads this forever (never cleared)
-          if (joinCode) await AsyncStorage.setItem("vfl_franchise_code", joinCode);
-          if (action.franchiseName) await AsyncStorage.setItem("vfl_franchise_name", action.franchiseName);
-          setLoading(false);
-          router.replace("/auth/franchise-created");
-          return;
-
-        } else if (action.type === "join") {
-          setStatus("Joining franchise…");
-          const err = await joinFranchise(
-            action.code,
-            action.role ?? "Coach",
-            action.displayName ?? "Co-GM",
-          );
-          if (err) {
-            setLoading(false);
-            setError(`Join failed: ${err}`);
-            return;
-          }
-          await AsyncStorage.removeItem("vfl_pending_action");
-          await AsyncStorage.setItem("vfl_gm_mode", "cogm");
-        }
-      }
-    } catch (e) {
-      console.warn("[VFL] Pending action failed:", e);
-    }
-
+    const err = await signIn(email.trim(), password);
     setLoading(false);
-    router.replace("/(tabs)");
+    if (err) setError(err);
   };
 
   return (
@@ -131,6 +51,7 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        {/* VFL Logo + Wordmark */}
         <View style={styles.logoSection}>
           <VFLLogo size="lg" showWordmark />
           <View style={[styles.dividerAccent, { backgroundColor: colors.nflGold }]} />
@@ -138,23 +59,10 @@ export default function LoginScreen() {
 
         <Text style={[styles.heading, { color: colors.foreground }]}>Sign In</Text>
         <Text style={[styles.subheading, { color: colors.mutedForeground }]}>
-          Sign in to create or join a franchise and play in real time with your co-GMs.
+          Join your franchise and manage your roster with your co-GMs in real time.
         </Text>
 
-        <TouchableOpacity
-          onPress={handleGoogleSignIn}
-          style={[styles.googleBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-        >
-          <Text style={styles.googleG}>G</Text>
-          <Text style={[styles.googleText, { color: colors.foreground }]}>Continue with Google</Text>
-        </TouchableOpacity>
-
-        <View style={styles.dividerRow}>
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          <Text style={[styles.dividerText, { color: colors.mutedForeground }]}>or sign in with email</Text>
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-        </View>
-
+        {/* Form */}
         <View style={styles.form}>
           <View style={styles.field}>
             <Text style={[styles.label, { color: colors.mutedForeground }]}>Email</Text>
@@ -198,13 +106,6 @@ export default function LoginScreen() {
             </View>
           )}
 
-          {status && !error && (
-            <View style={[styles.statusBox, { backgroundColor: "#003087" + "30", borderColor: "#003087" }]}>
-              <ActivityIndicator size="small" color="#60A5FA" />
-              <Text style={[styles.errorText, { color: "#60A5FA" }]}>{status}</Text>
-            </View>
-          )}
-
           <TouchableOpacity
             onPress={handleLogin}
             disabled={loading}
@@ -218,10 +119,6 @@ export default function LoginScreen() {
                 <Text style={styles.submitText}>Sign In</Text>
               </>
             )}
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => router.push("/auth/forgot-password")} style={styles.forgotBtn}>
-            <Text style={[styles.forgotText, { color: colors.mutedForeground }]}>Forgot password?</Text>
           </TouchableOpacity>
         </View>
 
@@ -239,36 +136,37 @@ export default function LoginScreen() {
           <Text style={[styles.secondaryText, { color: colors.nflBlue }]}>Create Account</Text>
         </TouchableOpacity>
 
+        <TouchableOpacity onPress={() => router.replace("/(tabs)")} style={styles.offlineBtn}>
+          <Text style={[styles.offlineText, { color: colors.mutedForeground }]}>
+            Continue Offline (local only)
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container:    { flex: 1 },
-  content:      { paddingHorizontal: 24 },
-  logoSection:  { alignItems: "flex-start", marginBottom: 36, gap: 16 },
-  dividerAccent:{ height: 2, width: 40, borderRadius: 1 },
-  heading:      { fontSize: 30, fontFamily: "Inter_700Bold", letterSpacing: -0.5, marginBottom: 8 },
-  subheading:   { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 20, marginBottom: 32 },
-  form:         { gap: 16, marginBottom: 24 },
-  field:        { gap: 6 },
-  label:        { fontSize: 12, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.5 },
-  inputWrap:    { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13 },
-  input:        { flex: 1, fontSize: 15, fontFamily: "Inter_400Regular" },
-  errorBox:     { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 10, borderWidth: 1 },
-  statusBox:    { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 10, borderWidth: 1 },
-  errorText:    { fontSize: 13, fontFamily: "Inter_400Regular", flex: 1 },
-  submitBtn:    { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 15, borderRadius: 14 },
-  submitText:   { fontSize: 16, fontFamily: "Inter_700Bold", color: "#fff" },
-  dividerRow:   { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 16 },
-  divider:      { flex: 1, height: 1 },
-  dividerText:  { fontSize: 12, fontFamily: "Inter_400Regular" },
-  googleBtn:    { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, marginBottom: 20 },
-  googleG:      { fontSize: 18, fontFamily: "Inter_700Bold", color: "#4285F4" },
-  googleText:   { fontSize: 15, fontFamily: "Inter_600SemiBold" },
-  forgotBtn:    { alignItems: "center", paddingVertical: 10 },
-  forgotText:   { fontSize: 13, fontFamily: "Inter_400Regular", textDecorationLine: "underline" },
+  container: { flex: 1 },
+  content: { paddingHorizontal: 24 },
+  logoSection: { alignItems: "flex-start", marginBottom: 36, gap: 16 },
+  dividerAccent: { height: 2, width: 40, borderRadius: 1 },
+  heading: { fontSize: 30, fontFamily: "Inter_700Bold", letterSpacing: -0.5, marginBottom: 8 },
+  subheading: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 20, marginBottom: 32 },
+  form: { gap: 16, marginBottom: 24 },
+  field: { gap: 6 },
+  label: { fontSize: 12, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.5 },
+  inputWrap: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13 },
+  input: { flex: 1, fontSize: 15, fontFamily: "Inter_400Regular" },
+  errorBox: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 10, borderWidth: 1 },
+  errorText: { fontSize: 13, fontFamily: "Inter_400Regular", flex: 1 },
+  submitBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 15, borderRadius: 14 },
+  submitText: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#fff" },
+  dividerRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 16 },
+  divider: { flex: 1, height: 1 },
+  dividerText: { fontSize: 12, fontFamily: "Inter_400Regular" },
   secondaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, marginBottom: 20 },
-  secondaryText:{ fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  secondaryText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  offlineBtn: { alignItems: "center", paddingVertical: 8 },
+  offlineText: { fontSize: 12, fontFamily: "Inter_400Regular", textDecorationLine: "underline" },
 });

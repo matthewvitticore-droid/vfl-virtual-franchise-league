@@ -1,17 +1,14 @@
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import {
-  ActivityIndicator, Clipboard, ScrollView, StyleSheet, Text,
+  ActivityIndicator, ScrollView, StyleSheet, Text,
   TouchableOpacity, View,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/useColors";
 import { useTeamTheme } from "@/hooks/useTeamTheme";
 import { useAuth } from "@/context/AuthContext";
 import { useNFL } from "@/context/NFLContext";
-import { supabase, SUPABASE_ENABLED } from "@/lib/supabase";
 import type { CoGMProposal, CoGMMember } from "@/context/types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -250,204 +247,20 @@ const pc = StyleSheet.create({
 export function CoGMMeetingRoom() {
   const colors  = useColors();
   const theme   = useTeamTheme();
-  const router  = useRouter();
-  const { user, membership, session, isLoading, refreshMembership } = useAuth();
-  const { season, isWaitingForGM, reloadFromCloud, isSyncing, syncError, proposals, pendingProposals, coGMMembers, voteOnProposal } = useNFL();
-  const [filter,     setFilter]     = useState<"pending" | "all">("pending");
-  const [retrying,   setRetrying]   = useState(false);
-  const [copied,     setCopied]     = useState(false);
-  const [onlineIds,  setOnlineIds]  = useState<string[]>([]);
-  // Local storage fallbacks — shown when Supabase session isn't active
-  const [localGmMode,          setLocalGmMode]          = useState("");
-  const [storedCode,           setStoredCode]           = useState("");
-  const [storedFranchiseName,  setStoredFranchiseName]  = useState("");
-  const [localLoaded,          setLocalLoaded]          = useState(false);
-  const channelRef    = useRef<any>(null);
-  const autoAttempted = useRef(false);
+  const { user, membership } = useAuth();
+  const { season, pendingProposals, coGMMembers, voteOnProposal, isCoGMMode } = useNFL();
+  const [filter, setFilter] = useState<"pending" | "all">("pending");
 
-  // ── Load local fallback data from AsyncStorage ─────────────────────────────
-  useEffect(() => {
-    Promise.all([
-      AsyncStorage.getItem("vfl_gm_mode"),
-      AsyncStorage.getItem("vfl_franchise_code"),
-      AsyncStorage.getItem("vfl_franchise_name"),
-      // Also try the temp key in case they haven't cleared it yet
-      AsyncStorage.getItem("vfl_created_join_code"),
-      AsyncStorage.getItem("vfl_created_franchise_name"),
-    ]).then(([mode, code, name, tmpCode, tmpName]) => {
-      if (mode) setLocalGmMode(mode);
-      if (code || tmpCode) setStoredCode(code || tmpCode || "");
-      if (name || tmpName) setStoredFranchiseName(name || tmpName || "");
-      setLocalLoaded(true);
-    });
-  }, []);
+  if (!isCoGMMode || !membership) return null;
 
-  // ── Auto-reconnect: fires once when auth finishes loading but no membership ─
-  useEffect(() => {
-    if (!isLoading && session && !membership && !autoAttempted.current) {
-      autoAttempted.current = true;
-      setRetrying(true);
-      refreshMembership().finally(() => setRetrying(false));
-    }
-  }, [isLoading, session, membership]);
-
-  // ── Supabase Realtime presence — tracks who's online ───────────────────────
-  useEffect(() => {
-    if (!membership?.franchiseId || !user?.id || !SUPABASE_ENABLED) return;
-    const ch = supabase.channel(`vfl:presence:${membership.franchiseId}`, {
-      config: { presence: { key: user.id } },
-    });
-    ch.on("presence", { event: "sync" }, () => {
-      setOnlineIds(Object.keys(ch.presenceState()));
-    });
-    ch.subscribe(async (status: string) => {
-      if (status === "SUBSCRIBED") {
-        await ch.track({ userId: user.id, displayName: membership.displayName });
-        setOnlineIds(prev => prev.includes(user.id) ? prev : [...prev, user.id]);
-      }
-    });
-    channelRef.current = ch;
-    return () => { ch.unsubscribe(); };
-  }, [membership?.franchiseId, user?.id]);
-
-  // ── Derived display values — Supabase preferred, local fallback ────────────
-  const myTeam = season?.teams?.find((t: any) => t.id === season?.playerTeamId);
-  const localTeamName = myTeam ? `${myTeam.city} ${myTeam.name}` : "My Franchise";
-
-  const displayFranchiseName = membership?.franchiseName || storedFranchiseName || localTeamName;
-  // Raw 6-char code — Supabase preferred, then permanent local key, then temp local key
-  const rawCode     = membership?.joinCode || storedCode;
-  // Formatted for display: always VFL-XXXXXX
-  const displayCode = rawCode ? (rawCode.startsWith("VFL-") ? rawCode : `VFL-${rawCode}`) : "";
-  const displayRole = membership?.role          || "GM";
-  const displayName = membership?.displayName   || user?.email?.split("@")[0] || "Co-GM";
-
-  // Code is still loading when session exists but membership hasn't arrived yet
-  const codeLoading = !!session && !membership && (isLoading || retrying);
-
-  // Can we show the full room? Yes if Supabase membership, OR if local franchise exists
-  const isLocalFranchise = localLoaded && (localGmMode === "co-gm" || localGmMode === "cogm" || localGmMode === "join") && !!season;
-  const canShowRoom      = !!membership || isLocalFranchise;
-
-  function copyCode() {
-    // Copy the raw code without VFL- prefix so it can be pasted directly into the join field
-    Clipboard.setString(rawCode ?? displayCode ?? "");
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2200);
-  }
-
-  // ── Polling DB for franchise state (runs up to ~24 s after join) ────────────
-  // Block ALL UI until real cloud data is confirmed — no local fallback rendered.
-  if (isSyncing && !season) {
-    return (
-      <View style={mr.offlineBox}>
-        <ActivityIndicator size="large" color="#003087" style={{ marginBottom: 14 }} />
-        <Text style={[mr.offlineTitle, { color: colors.foreground }]}>Joining Franchise…</Text>
-        <Text style={[mr.offlineSub, { color: colors.mutedForeground }]}>
-          Fetching roster and season data from the cloud. This takes a few seconds.
-        </Text>
-      </View>
-    );
-  }
-
-  // ── Still initializing ─────────────────────────────────────────────────────
-  if ((!localLoaded || isLoading || retrying) && !canShowRoom) {
-    return (
-      <View style={mr.offlineBox}>
-        <ActivityIndicator size="large" color="#003087" style={{ marginBottom: 14 }} />
-        <Text style={[mr.offlineTitle, { color: colors.foreground }]}>Loading Franchise…</Text>
-        <Text style={[mr.offlineSub, { color: colors.mutedForeground }]}>Connecting to your Co-GM account</Text>
-      </View>
-    );
-  }
-
-  // ── Not in a franchise at all ──────────────────────────────────────────────
-  if (!canShowRoom) {
-    if (session) {
-      return (
-        <View style={mr.offlineBox}>
-          <LinearGradient colors={["#003087" + "30", "transparent"]} style={StyleSheet.absoluteFill} />
-          <Feather name="alert-circle" size={32} color={colors.mutedForeground} style={{ marginBottom: 12 }} />
-          <Text style={[mr.offlineTitle, { color: colors.foreground }]}>No Franchise Linked</Text>
-          <Text style={[mr.offlineSub, { color: colors.mutedForeground }]}>
-            Your account doesn't have a franchise yet. Create one from the launch screen or ask your commissioner for an invite code.
-          </Text>
-          <TouchableOpacity
-            onPress={async () => { setRetrying(true); await refreshMembership(); setRetrying(false); }}
-            style={[mr.offlineBtn, { backgroundColor: "#003087" }]}
-          >
-            <Feather name="refresh-cw" size={14} color="#fff" />
-            <Text style={mr.offlineBtnTxt}>Refresh</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-    return (
-      <View style={mr.offlineBox}>
-        <LinearGradient colors={["#C8102E20", "transparent"]} style={StyleSheet.absoluteFill} />
-        <Feather name="lock" size={32} color={colors.mutedForeground} style={{ marginBottom: 12 }} />
-        <Text style={[mr.offlineTitle, { color: colors.foreground }]}>Sign In to Access</Text>
-        <Text style={[mr.offlineSub, { color: colors.mutedForeground }]}>
-          Sign in with your Co-GM account to open the Meeting Room and sync with your franchise.
-        </Text>
-        <TouchableOpacity
-          onPress={() => router.push("/auth/login")}
-          style={[mr.offlineBtn, { backgroundColor: "#C8102E" }]}
-        >
-          <Feather name="log-in" size={14} color="#fff" />
-          <Text style={mr.offlineBtnTxt}>Sign In</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  // ── Co-GM waiting: GM hasn't pushed franchise state yet (or polling exhausted) ─
-  if (isWaitingForGM) {
-    return (
-      <View style={mr.offlineBox}>
-        <LinearGradient colors={["#F59E0B20", "transparent"]} style={StyleSheet.absoluteFill} />
-        <Text style={{ fontSize: 36, marginBottom: 14 }}>⏳</Text>
-        <Text style={[mr.offlineTitle, { color: colors.foreground }]}>Waiting for Commissioner</Text>
-        <Text style={[mr.offlineSub, { color: colors.mutedForeground }]}>
-          {syncError
-            ? syncError
-            : "You've joined the franchise! The Commissioner needs to open the app so their franchise state can load, then tap Refresh below."}
-        </Text>
-        {displayCode ? (
-          <View style={[mr.inviteBlock, { borderColor: VFL_GOLD + "40", backgroundColor: VFL_GOLD + "10", marginTop: 18 }]}>
-            <Text style={[mr.inviteLabel, { color: VFL_GOLD, textAlign: "center" }]}>YOUR FRANCHISE CODE</Text>
-            <Text style={[mr.inviteLetterTxt, { color: colors.foreground, textAlign: "center", fontSize: 22, fontFamily: "Inter_700Bold", letterSpacing: 4, marginTop: 6 }]}>
-              {displayCode}
-            </Text>
-          </View>
-        ) : null}
-        <TouchableOpacity
-          onPress={async () => {
-            setRetrying(true);
-            await refreshMembership();
-            await reloadFromCloud();
-            setRetrying(false);
-          }}
-          disabled={retrying}
-          style={[mr.offlineBtn, { backgroundColor: "#F59E0B", marginTop: 14, opacity: retrying ? 0.6 : 1 }]}
-        >
-          {retrying
-            ? <ActivityIndicator size="small" color="#000" />
-            : <Feather name="refresh-cw" size={14} color="#000" />}
-          <Text style={[mr.offlineBtnTxt, { color: "#000" }]}>{retrying ? "Checking…" : "Refresh"}</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  // ── Full Meeting Room ──────────────────────────────────────────────────────
   const tc = theme.primary;
   const tc2 = theme.secondary;
-  const allProposals  = proposals;
+  const allProposals  = season?.proposals ?? [];
   const shownProposals = filter === "pending"
     ? allProposals.filter(p => p.status === "pending")
     : allProposals;
 
+  // Phase gate info
   const phase = season?.phase ?? "regular";
   const isGated = ["draft", "freeAgency"].includes(phase);
   const phaseProposals = pendingProposals.filter(p => p.type === "phase_advance");
@@ -462,101 +275,30 @@ export function CoGMMeetingRoom() {
       <View style={[mr.header, { backgroundColor: colors.card, borderBottomColor: tc + "50" }]}>
         <LinearGradient colors={[tc + "40", tc + "15", "transparent"]} style={StyleSheet.absoluteFill} />
         <View style={mr.headerTop}>
-          <View style={{ flex: 1 }}>
-            <Text style={[mr.franchiseName, { color: colors.foreground }]}>{displayFranchiseName}</Text>
+          <View>
+            <Text style={[mr.franchiseName, { color: colors.foreground }]}>{membership.franchiseName}</Text>
             <Text style={[mr.headerSub, { color: colors.mutedForeground }]}>
-              {displayRole} · {displayName}
+              {membership.role} · {membership.displayName}
             </Text>
+          </View>
+          {/* Join Code */}
+          <View style={[mr.codeBox, { backgroundColor: VFL_GOLD + "20", borderColor: VFL_GOLD + "60" }]}>
+            <Feather name="link" size={11} color={VFL_GOLD} />
+            <Text style={[mr.codeLabel, { color: VFL_GOLD }]}>Join Code</Text>
+            <Text style={[mr.codeVal, { color: colors.foreground }]}>{membership.joinCode}</Text>
           </View>
         </View>
 
-        {/* Members with online status */}
+        {/* Members */}
         <View style={mr.membersRow}>
-          {coGMMembers.map(m => {
-            const isOnline = onlineIds.includes(m.userId);
-            return (
-              <View key={m.userId} style={{ alignItems: "center" }}>
-                <View style={{ position: "relative" }}>
-                  <MemberAvatar member={m} accent={tc} />
-                  <View style={[mr.onlineDot, {
-                    backgroundColor: isOnline ? "#10B981" : "#6B7280",
-                    borderColor: colors.card,
-                  }]} />
-                </View>
-                <Text style={[mr.onlineLabel, { color: isOnline ? "#10B981" : colors.mutedForeground }]}>
-                  {isOnline ? "online" : "offline"}
-                </Text>
-              </View>
-            );
-          })}
+          {coGMMembers.map(m => (
+            <MemberAvatar key={m.userId} member={m} accent={tc} />
+          ))}
           {coGMMembers.length < 3 && (
             <View style={[mr.addSlot, { borderColor: colors.border }]}>
               <Feather name="user-plus" size={16} color={colors.mutedForeground} />
               <Text style={[mr.addSlotText, { color: colors.mutedForeground }]}>Invite</Text>
             </View>
-          )}
-        </View>
-
-        {/* ── Invite Code ─────────────────────────────────────────────────── */}
-        <View style={[mr.inviteBlock, { borderColor: VFL_GOLD + "40", backgroundColor: VFL_GOLD + "10" }]}>
-          <View style={mr.inviteTop}>
-            <Feather name="share-2" size={13} color={VFL_GOLD} />
-            <Text style={[mr.inviteLabel, { color: VFL_GOLD }]}>FRANCHISE INVITE CODE</Text>
-            <Text style={[mr.inviteHint, { color: colors.mutedForeground }]}>Share with Co-GMs</Text>
-          </View>
-          {codeLoading ? (
-            <View style={{ alignItems: "center", paddingVertical: 14 }}>
-              <ActivityIndicator size="small" color={VFL_GOLD} />
-            </View>
-          ) : displayCode ? (
-            <>
-              <View style={mr.inviteCodeRow}>
-                {displayCode.split("").map((ch, i) => (
-                  <View
-                    key={i}
-                    style={[
-                      mr.inviteLetter,
-                      {
-                        backgroundColor: colors.background,
-                        borderColor: ch === "-" ? "transparent" : VFL_GOLD + "60",
-                        minWidth: ch === "-" ? 8 : undefined,
-                      },
-                    ]}
-                  >
-                    <Text style={[mr.inviteLetterTxt, { color: ch === "-" ? VFL_GOLD : colors.foreground }]}>{ch}</Text>
-                  </View>
-                ))}
-              </View>
-              <TouchableOpacity onPress={copyCode} style={[mr.copyBtn, { backgroundColor: copied ? "#10B981" : VFL_GOLD }]}>
-                <Feather name={copied ? "check" : "copy"} size={13} color="#000" />
-                <Text style={mr.copyBtnTxt}>{copied ? "COPIED!" : "COPY CODE"}</Text>
-              </TouchableOpacity>
-            </>
-          ) : session ? (
-            // Session exists but code not yet in membership — show subtle refresh
-            <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 8, paddingVertical: 10 }}>
-              <Text style={[mr.inviteHint, { color: colors.mutedForeground }]}>Code loading…</Text>
-              <TouchableOpacity
-                onPress={async () => { setRetrying(true); await refreshMembership(); setRetrying(false); }}
-                style={{ padding: 6 }}
-              >
-                <Feather name="refresh-cw" size={14} color={colors.mutedForeground} />
-              </TouchableOpacity>
-            </View>
-          ) : (
-            // No session at all — must sign in
-            <>
-              <Text style={[mr.inviteHint, { color: colors.mutedForeground, textAlign: "center", marginTop: 6, marginBottom: 4 }]}>
-                Sign in to view your franchise invite code
-              </Text>
-              <TouchableOpacity
-                onPress={() => router.push("/auth/login")}
-                style={[mr.copyBtn, { backgroundColor: "#C8102E", marginTop: 6 }]}
-              >
-                <Feather name="log-in" size={13} color="#fff" />
-                <Text style={[mr.copyBtnTxt, { color: "#fff" }]}>Sign In to View Code</Text>
-              </TouchableOpacity>
-            </>
           )}
         </View>
       </View>
@@ -719,25 +461,4 @@ const mr = StyleSheet.create({
   howIcon:     { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   howLabel:    { fontFamily: "Inter_700Bold", fontSize: 13, marginBottom: 2 },
   howDesc:     { fontFamily: "Inter_400Regular", fontSize: 11, lineHeight: 16 },
-  offlineBox:  { margin: 16, borderRadius: 16, padding: 28, alignItems: "center", overflow: "hidden",
-                 borderWidth: 1, borderColor: "#003087" + "50", backgroundColor: "#07182E" },
-  offlineTitle:{ fontFamily: "Inter_700Bold", fontSize: 17, marginBottom: 6, textAlign: "center" },
-  offlineSub:  { fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center", lineHeight: 18, marginBottom: 20 },
-  offlineBtn:  { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 24,
-                 paddingVertical: 12, borderRadius: 12 },
-  offlineBtnTxt: { fontFamily: "Inter_700Bold", fontSize: 14, color: "#fff" },
-  inviteBlock: { borderRadius: 12, borderWidth: 1, padding: 14, marginTop: 16, alignItems: "center", gap: 10 },
-  inviteTop:   { flexDirection: "row", alignItems: "center", gap: 7, alignSelf: "stretch" },
-  inviteLabel: { fontFamily: "Inter_700Bold", fontSize: 11, letterSpacing: 1, flex: 1 },
-  inviteHint:  { fontFamily: "Inter_400Regular", fontSize: 10 },
-  inviteCodeRow: { flexDirection: "row", gap: 8 },
-  inviteLetter:{ width: 38, height: 46, borderRadius: 8, borderWidth: 1.5,
-                 alignItems: "center", justifyContent: "center" },
-  inviteLetterTxt: { fontFamily: "Inter_700Bold", fontSize: 22, letterSpacing: 0 },
-  copyBtn:     { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 24,
-                 paddingVertical: 10, borderRadius: 10, alignSelf: "stretch", justifyContent: "center" },
-  copyBtnTxt:  { fontFamily: "Inter_700Bold", fontSize: 13, color: "#000", letterSpacing: 0.5 },
-  onlineDot:   { position: "absolute", bottom: 2, right: 2, width: 10, height: 10,
-                 borderRadius: 5, borderWidth: 2 },
-  onlineLabel: { fontFamily: "Inter_400Regular", fontSize: 9, letterSpacing: 0.3, marginTop: 2 },
 });

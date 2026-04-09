@@ -1,13 +1,12 @@
 import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -16,12 +15,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { NFLTeamBadge } from "@/components/NFLTeamBadge";
-import { VFLLogo } from "@/components/VFLLogo";
 import { useColors } from "@/hooks/useColors";
 import { FranchiseMemberRole, useAuth } from "@/context/AuthContext";
-import { initSeason, useNFL } from "@/context/NFLContext";
-import { bigSet } from "@/utils/bigStorage";
-import { supabase } from "@/lib/supabase";
 
 const VFL_TEAMS = [
   // Ironclad Conference — East
@@ -67,21 +62,20 @@ const VFL_TEAMS = [
 ];
 
 const ROLES: { value: FranchiseMemberRole; label: string; desc: string; icon: string }[] = [
-  { value: "GM", label: "Co-General Manager", desc: "Team up and make proposals to elevate your roster and bring a shared vision for a team to life across seasons!", icon: "briefcase" },
+  { value: "GM",    label: "General Manager", desc: "Roster, contracts, trades, draft. Build the team.",         icon: "briefcase" },
+  { value: "Coach", label: "Head Coach",      desc: "Depth chart, game plan, formations. Win on gameday.",       icon: "target"    },
+  { value: "Scout", label: "Scout",           desc: "View everything, suggest draft prospects. Read-only.",      icon: "search"    },
 ];
 
-type Screen = "type" | "choose" | "create" | "join" | "success" | "solo-team";
+type Screen = "choose" | "create" | "join" | "success";
 
 export default function FranchiseLobbyScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { initialScreen } = useLocalSearchParams<{ initialScreen?: string }>();
-  const { user, membership, createFranchise, joinFranchise, signOut } = useAuth();
-  const { applySeasonDirectly } = useNFL();
+  const { user, createFranchise, joinFranchise, signOut } = useAuth();
 
-  const [screen, setScreen] = useState<Screen>((initialScreen as Screen) ?? "type");
-  const [soloTeamId, setSoloTeamId] = useState("team-13"); // Coastal Sharks default
+  const [screen, setScreen] = useState<Screen>("choose");
 
   // Create state
   const [franchiseName, setFranchiseName] = useState("");
@@ -91,22 +85,11 @@ export default function FranchiseLobbyScreen() {
 
   // Join state
   const [joinCode, setJoinCode] = useState("");
-  const [joinRole, setJoinRole] = useState<FranchiseMemberRole>("GM");
+  const [joinRole, setJoinRole] = useState<FranchiseMemberRole>("Coach");
   const [joinDisplayName, setJoinDisplayName] = useState("");
-
-  // Created franchise join code (shown on success screen)
-  const [createdJoinCode, setCreatedJoinCode] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // If membership already exists when this screen mounts (e.g. returning user who
-  // somehow ended up here), redirect straight to HQ — no need to create/join again.
-  useEffect(() => {
-    if (membership?.franchiseId && screen === "type") {
-      router.replace("/(tabs)");
-    }
-  }, [membership?.franchiseId]);
 
   // Pre-fill join code if coming from the launch screen "Join Franchise" flow
   useEffect(() => {
@@ -119,152 +102,26 @@ export default function FranchiseLobbyScreen() {
     });
   }, []);
 
-  const selectedTeam     = VFL_TEAMS.find(t => t.id === selectedTeamId) ?? VFL_TEAMS[13];
-  const selectedSoloTeam = VFL_TEAMS.find(t => t.id === soloTeamId) ?? VFL_TEAMS[13];
+  const selectedTeam = VFL_TEAMS.find(t => t.id === selectedTeamId) ?? VFL_TEAMS[13];
 
   const handleCreate = async () => {
     if (!franchiseName.trim()) { setError("Please enter a franchise name."); return; }
     if (!displayName.trim()) { setError("Please enter your display name."); return; }
     setLoading(true); setError(null);
-
-    // ── Step 1: Create franchise + member rows ─────────────────────────────────
-    const { error: err, joinCode: created, franchiseId } = await createFranchise(
-      franchiseName.trim(), selectedTeamId, createRole, displayName.trim()
-    );
-    if (err || !franchiseId) { setLoading(false); setError(err ?? "Failed to create franchise."); return; }
-
-    // ── Step 2: Duplicate guard ────────────────────────────────────────────────
-    // If a row already exists for this franchise (any state), skip initSeason.
-    const { data: existing } = await supabase
-      .from("franchise_seasons")
-      .select("franchise_id, sim_state")
-      .eq("franchise_id", franchiseId)
-      .maybeSingle();
-
-    if (existing) {
-      console.log("[VFL] franchise_seasons already exists for", franchiseId, "sim_state set:", !!existing.sim_state);
-      await AsyncStorage.setItem("vfl_gm_mode", "co-gm");
-      if (existing.sim_state) await bigSet("vfl_season_v1", JSON.stringify(existing.sim_state));
-      setLoading(false); setCreatedJoinCode(created); setScreen("success");
-      return;
-    }
-
-    // ── Step 3: Generate season in memory ─────────────────────────────────────
-    // initSeason() runs ONLY here — at franchise creation — never in any load path.
-    console.log("[VFL] Creating franchise season for", franchiseId, "team:", selectedTeamId);
-    const season = initSeason(selectedTeamId);
-    console.log("[VFL] Season generated:", season.year, "playerTeamId:", season.playerTeamId, "teams:", season.teams.length);
-    await AsyncStorage.setItem("vfl_gm_mode", "co-gm");
-    await bigSet("vfl_season_v1", JSON.stringify(season));
-
-    // ── Step 4: Apply season directly to context ───────────────────────────────
-    // This immediately makes the season available in HQ without waiting for any
-    // Supabase poll. The cloud write happens in the background (step 5).
-    applySeasonDirectly(season);
-    setLoading(false); setCreatedJoinCode(created); setScreen("success");
-
-    // ── Step 5: Write sim_state to Supabase in background ─────────────────────
-    // Fire-and-forget: the season is already in memory + local storage.
-    // Co-GMs who join later will poll from Supabase and get this data.
-    const myTeam = season.teams.find((t: any) => t.id === season.playerTeamId);
-    console.log("[VFL] ⬆️  Writing sim_state to franchise_seasons for", franchiseId, "(background)");
-    supabase.from("franchise_seasons").upsert({
-      franchise_id: franchiseId,
-      year:         season.year         ?? 2026,
-      phase:        season.phase        ?? "regular",
-      week:         season.currentWeek  ?? 1,
-      record:       myTeam
-        ? { wins: myTeam.wins, losses: myTeam.losses, ties: myTeam.ties }
-        : { wins: 0, losses: 0, ties: 0 },
-      sim_state:    season,
-      updated_by:   user?.id,
-    }, { onConflict: "franchise_id" }).then(({ error: upsertErr }) => {
-      if (upsertErr) {
-        console.warn("[VFL] ❌ franchise_seasons background upsert failed:", upsertErr.message, upsertErr.code);
-      } else {
-        console.log("[VFL] ✅ sim_state written to franchise_seasons (background) for", franchiseId);
-      }
-    });
-  };
-
-  const handleResume = async () => {
-    if (!membership) return;
-    setLoading(true);
-    try {
-      await AsyncStorage.setItem("vfl_gm_mode", "co-gm");
-      // Pull latest state from cloud and apply immediately (no polling wait)
-      const { data: row } = await supabase
-        .from("franchise_seasons").select("sim_state")
-        .eq("franchise_id", membership.franchiseId)
-        .not("sim_state", "is", null)
-        .maybeSingle();
-      if (row?.sim_state) {
-        await bigSet("vfl_season_v1", JSON.stringify(row.sim_state));
-        applySeasonDirectly(row.sim_state as any);
-      }
-      router.replace("/(tabs)");
-    } catch {}
+    const err = await createFranchise(franchiseName.trim(), selectedTeamId, createRole, displayName.trim());
     setLoading(false);
+    if (err) { setError(err); return; }
+    setScreen("success");
   };
 
   const handleJoin = async () => {
     if (!joinCode.trim()) { setError("Please enter the 6-character join code."); return; }
     if (!joinDisplayName.trim()) { setError("Please enter your display name."); return; }
     setLoading(true); setError(null);
-
     const err = await joinFranchise(joinCode.trim(), joinRole, joinDisplayName.trim());
-    if (err) {
-      // Already a member → just navigate into the franchise instead of showing error
-      if (err.toLowerCase().includes("already a member") && membership?.franchiseId) {
-        await AsyncStorage.setItem("vfl_gm_mode", "co-gm");
-        setLoading(false);
-        router.replace("/(tabs)");
-        return;
-      }
-      setLoading(false); setError(err); return;
-    }
-
-    // Pull the shared franchise state from Supabase so this co-GM has the same save
-    try {
-      const fid = membership?.franchiseId; // joinFranchise → fetchMembership already updated this
-      if (fid) {
-        // Try v2 schema first (franchise_seasons)
-        const { data: v2 } = await supabase
-          .from("franchise_seasons").select("sim_state")
-          .eq("franchise_id", fid).not("sim_state", "is", null).maybeSingle();
-        if (v2?.sim_state) {
-          await bigSet("vfl_season_v1", JSON.stringify(v2.sim_state));
-          applySeasonDirectly(v2.sim_state as any);
-        } else {
-          // v1 fallback
-          const { data: v1 } = await supabase
-            .from("franchise_state").select("state_json")
-            .eq("franchise_id", fid).maybeSingle();
-          if (v1?.state_json) {
-            await bigSet("vfl_season_v1", JSON.stringify(v1.state_json));
-            applySeasonDirectly(v1.state_json as any);
-          }
-        }
-      }
-      await AsyncStorage.setItem("vfl_gm_mode", "co-gm");
-    } catch {}
-
     setLoading(false);
+    if (err) { setError(err); return; }
     router.replace("/(tabs)");
-  };
-
-  const handleSoloCreate = async () => {
-    setLoading(true);
-    try {
-      const season = initSeason(soloTeamId);
-      await bigSet("vfl_season_v1", JSON.stringify(season));
-      await AsyncStorage.setItem("vfl_gm_mode", "solo");
-      router.replace("/(tabs)");
-    } catch (e) {
-      setError("Failed to create franchise. Please try again.");
-    } finally {
-      setLoading(false);
-    }
   };
 
   return (
@@ -279,24 +136,14 @@ export default function FranchiseLobbyScreen() {
       >
         {/* Header */}
         <View style={styles.headerRow}>
-          {screen !== "type" && (
-            <TouchableOpacity onPress={() => {
-              if (screen === "choose" || screen === "solo-team") setScreen("type");
-              else if (screen === "create" || screen === "join") setScreen("choose");
-              setError(null);
-            }}>
+          {screen !== "choose" && (
+            <TouchableOpacity onPress={() => { setScreen("choose"); setError(null); }}>
               <Feather name="arrow-left" size={20} color={colors.foreground} />
             </TouchableOpacity>
           )}
-          {screen === "type" && <VFLLogo size="sm" />}
           <View style={{ flex: 1 }}>
             <Text style={[styles.heading, { color: colors.foreground }]}>
-              {screen === "type" ? "Choose League Type"
-                : screen === "solo-team" ? "Pick Your Team"
-                : screen === "choose" ? "Co-GM Mode"
-                : screen === "create" ? "Create Franchise"
-                : screen === "join" ? "Join Franchise"
-                : "Franchise Created!"}
+              {screen === "choose" ? "Your Franchise" : screen === "create" ? "Create Franchise" : screen === "join" ? "Join Franchise" : "Franchise Created!"}
             </Text>
             <Text style={[styles.userEmail, { color: colors.mutedForeground }]}>Signed in as {user?.email}</Text>
           </View>
@@ -306,122 +153,6 @@ export default function FranchiseLobbyScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* ── TYPE SELECTOR ──────────────────────────────────────────────── */}
-        {screen === "type" && (
-          <>
-            <Text style={[styles.typeSubtitle, { color: colors.mutedForeground }]}>
-              How do you want to run your franchise?
-            </Text>
-
-            {/* Solo GM */}
-            <TouchableOpacity
-              onPress={() => setScreen("solo-team")}
-              style={[styles.typeCard, { backgroundColor: colors.card, borderColor: "#003087" + "70" }]}
-            >
-              <View style={[styles.typeIconWrap, { backgroundColor: "#003087" + "25" }]}>
-                <Feather name="user" size={26} color="#003087" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.typeTitle, { color: colors.foreground }]}>Solo GM</Text>
-                <Text style={[styles.typeDesc, { color: colors.mutedForeground }]}>
-                  Just you. Run every aspect of your franchise — roster, trades, draft, and sim.
-                </Text>
-                <View style={[styles.typePill, { backgroundColor: "#003087" + "20", borderColor: "#003087" + "50" }]}>
-                  <Text style={[styles.typePillTxt, { color: "#003087" }]}>OFFLINE · INSTANT START</Text>
-                </View>
-              </View>
-              <Feather name="chevron-right" size={20} color="#003087" />
-            </TouchableOpacity>
-
-            {/* Co-GM */}
-            <TouchableOpacity
-              onPress={() => setScreen("choose")}
-              style={[styles.typeCard, { backgroundColor: colors.card, borderColor: "#C8102E" + "70" }]}
-            >
-              <View style={[styles.typeIconWrap, { backgroundColor: "#C8102E" + "25" }]}>
-                <Feather name="users" size={26} color="#C8102E" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.typeTitle, { color: colors.foreground }]}>Co-GM</Text>
-                <Text style={[styles.typeDesc, { color: colors.mutedForeground }]}>
-                  One team, up to 3 GMs. Share decisions — trades and signings need group approval.
-                </Text>
-                <View style={[styles.typePill, { backgroundColor: "#C8102E" + "20", borderColor: "#C8102E" + "50" }]}>
-                  <Text style={[styles.typePillTxt, { color: "#C8102E" }]}>CLOUD · UP TO 3 USERS · 1 TEAM</Text>
-                </View>
-              </View>
-              <Feather name="chevron-right" size={20} color="#C8102E" />
-            </TouchableOpacity>
-
-            {/* Multiplayer - Coming Soon */}
-            <View style={[styles.typeCard, { backgroundColor: colors.card, borderColor: colors.border, opacity: 0.45 }]}>
-              <View style={[styles.typeIconWrap, { backgroundColor: "#D97706" + "25" }]}>
-                <Feather name="globe" size={26} color="#D97706" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.typeTitle, { color: colors.foreground }]}>Multiplayer League</Text>
-                <Text style={[styles.typeDesc, { color: colors.mutedForeground }]}>
-                  Each user controls their own team. Up to 32 GMs in one live league.
-                </Text>
-                <View style={[styles.typePill, { backgroundColor: "#D97706" + "20", borderColor: "#D97706" + "50" }]}>
-                  <Text style={[styles.typePillTxt, { color: "#D97706" }]}>COMING SOON · UP TO 32 USERS</Text>
-                </View>
-              </View>
-              <Feather name="lock" size={18} color={colors.mutedForeground} />
-            </View>
-          </>
-        )}
-
-        {/* ── SOLO TEAM PICKER ────────────────────────────────────────────── */}
-        {screen === "solo-team" && (
-          <View style={{ gap: 16 }}>
-            <View style={[styles.banner, { backgroundColor: "#003087" + "18", borderColor: "#003087" + "50" }]}>
-              <Text style={{ fontSize: 36 }}>🏈</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.bannerTitle, { color: colors.foreground }]}>Your Team</Text>
-                <Text style={[styles.bannerSub, { color: colors.mutedForeground }]}>
-                  Pick the franchise you want to build into a dynasty.
-                </Text>
-              </View>
-            </View>
-
-            <View style={[styles.selectedTeamRow, { backgroundColor: selectedSoloTeam.color + "20", borderColor: selectedSoloTeam.color + "60" }]}>
-              <NFLTeamBadge abbreviation={selectedSoloTeam.abbr} primaryColor={selectedSoloTeam.color} size="md" />
-              <Text style={[styles.selectedTeamName, { color: colors.foreground }]}>
-                {selectedSoloTeam.city} {selectedSoloTeam.name}
-              </Text>
-            </View>
-
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.teamPickerRow}>
-              {VFL_TEAMS.map(t => (
-                <TouchableOpacity
-                  key={t.id}
-                  onPress={() => setSoloTeamId(t.id)}
-                  style={[styles.teamPickerItem, {
-                    borderColor: soloTeamId === t.id ? t.color : "transparent",
-                    backgroundColor: soloTeamId === t.id ? t.color + "25" : colors.card,
-                  }]}
-                >
-                  <Text style={[styles.teamPickerAbbr, { color: t.color }]}>{t.abbr}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            {error && <ErrorBox error={error} />}
-
-            <TouchableOpacity
-              onPress={handleSoloCreate}
-              disabled={loading}
-              style={[styles.submitBtn, { backgroundColor: loading ? colors.secondary : "#003087" }]}
-            >
-              {loading
-                ? <ActivityIndicator color="#fff" size="small" />
-                : <><Feather name="play" size={18} color="#fff" /><Text style={styles.submitText}>Start My Franchise →</Text></>
-              }
-            </TouchableOpacity>
-          </View>
-        )}
-
         {/* ── SUCCESS ────────────────────────────────────────────────────── */}
         {screen === "success" && (
           <View style={styles.successContainer}>
@@ -429,26 +160,25 @@ export default function FranchiseLobbyScreen() {
               <Text style={{ fontSize: 54 }}>🏆</Text>
             </View>
             <Text style={[styles.successTitle, { color: colors.foreground }]}>
-              Franchise Created!
+              You're a GM!
             </Text>
             <Text style={[styles.successSub, { color: colors.mutedForeground }]}>
-              Share this code with your co-GM so they can join.
+              Your franchise is ready. Customize your team's identity, logo, and uniforms — or jump right in.
             </Text>
-            {createdJoinCode && (
-              <TouchableOpacity
-                onPress={() => Share.share({ message: `Join my VFL franchise! Use code: ${createdJoinCode}` })}
-                style={[styles.joinCodeBox, { backgroundColor: colors.card, borderColor: colors.nflGold }]}
-              >
-                <Text style={[styles.joinCodeText, { color: colors.nflGold }]}>{createdJoinCode}</Text>
-                <Feather name="share-2" size={16} color={colors.nflGold} style={{ marginTop: 6 }} />
-              </TouchableOpacity>
-            )}
             <TouchableOpacity
-              onPress={() => router.replace("/(tabs)")}
+              onPress={() => router.replace("/customize")}
               style={[styles.successBtnPrimary, { backgroundColor: colors.nflBlue }]}
             >
-              <Feather name="arrow-right" size={16} color="#fff" />
-              <Text style={styles.successBtnText}>Enter Franchise HQ</Text>
+              <Feather name="edit-2" size={16} color="#fff" />
+              <Text style={styles.successBtnText}>Customize Team →</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.replace("/(tabs)")}
+              style={[styles.successBtnSecondary, { borderColor: colors.border }]}
+            >
+              <Text style={[styles.successBtnSecondaryText, { color: colors.mutedForeground }]}>
+                Skip for Now
+              </Text>
             </TouchableOpacity>
           </View>
         )}
@@ -465,28 +195,6 @@ export default function FranchiseLobbyScreen() {
                 </Text>
               </View>
             </View>
-
-            {/* Resume if already a member */}
-            {membership && (
-              <TouchableOpacity
-                onPress={handleResume}
-                disabled={loading}
-                style={[styles.optionCard, { backgroundColor: "#10B98115", borderColor: "#10B98170", borderWidth: 2 }]}
-              >
-                <View style={[styles.optionIcon, { backgroundColor: "#10B98125" }]}>
-                  <Feather name="play-circle" size={22} color="#10B981" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.optionTitle, { color: "#10B981" }]}>Resume Franchise</Text>
-                  <Text style={[styles.optionDesc, { color: colors.mutedForeground }]}>
-                    {membership.franchiseName || "Your Co-GM franchise"} · {membership.role}
-                  </Text>
-                </View>
-                {loading
-                  ? <ActivityIndicator size="small" color="#10B981" />
-                  : <Feather name="chevron-right" size={18} color="#10B981" />}
-              </TouchableOpacity>
-            )}
 
             <TouchableOpacity
               onPress={() => setScreen("create")}
@@ -550,6 +258,23 @@ export default function FranchiseLobbyScreen() {
               ))}
             </ScrollView>
 
+            {/* Role Picker */}
+            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Your Role</Text>
+            {ROLES.map(r => (
+              <TouchableOpacity
+                key={r.value}
+                onPress={() => setCreateRole(r.value)}
+                style={[styles.roleOption, { backgroundColor: createRole === r.value ? colors.nflBlue + "20" : colors.card, borderColor: createRole === r.value ? colors.nflBlue : colors.border }]}
+              >
+                <Feather name={r.icon as any} size={18} color={createRole === r.value ? colors.nflBlue : colors.mutedForeground} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.roleLabel, { color: createRole === r.value ? colors.nflBlue : colors.foreground }]}>{r.label}</Text>
+                  <Text style={[styles.roleDesc, { color: colors.mutedForeground }]}>{r.desc}</Text>
+                </View>
+                {createRole === r.value && <Feather name="check-circle" size={16} color={colors.nflBlue} />}
+              </TouchableOpacity>
+            ))}
+
             {error && <ErrorBox error={error} />}
 
             <TouchableOpacity onPress={handleCreate} disabled={loading} style={[styles.submitBtn, { backgroundColor: loading ? colors.secondary : colors.nflBlue }]}>
@@ -578,6 +303,22 @@ export default function FranchiseLobbyScreen() {
             </Text>
 
             <InputField label="Your Display Name" placeholder="e.g. CoachMike" value={joinDisplayName} onChangeText={setJoinDisplayName} icon="user" />
+
+            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Choose a Role</Text>
+            {ROLES.map(r => (
+              <TouchableOpacity
+                key={r.value}
+                onPress={() => setJoinRole(r.value)}
+                style={[styles.roleOption, { backgroundColor: joinRole === r.value ? colors.nflRed + "20" : colors.card, borderColor: joinRole === r.value ? colors.nflRed : colors.border }]}
+              >
+                <Feather name={r.icon as any} size={18} color={joinRole === r.value ? colors.nflRed : colors.mutedForeground} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.roleLabel, { color: joinRole === r.value ? colors.nflRed : colors.foreground }]}>{r.label}</Text>
+                  <Text style={[styles.roleDesc, { color: colors.mutedForeground }]}>{r.desc}</Text>
+                </View>
+                {joinRole === r.value && <Feather name="check-circle" size={16} color={colors.nflRed} />}
+              </TouchableOpacity>
+            ))}
 
             {error && <ErrorBox error={error} />}
 
@@ -650,8 +391,8 @@ const styles = StyleSheet.create({
   roleOption: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 12, borderWidth: 1.5 },
   roleLabel: { fontSize: 14, fontFamily: "Inter_700Bold" },
   roleDesc: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2, lineHeight: 16 },
-  codeInputWrap: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 16, borderWidth: 2, paddingHorizontal: 16, paddingVertical: 16 },
-  codeInput: { flex: 1, fontSize: 22, fontFamily: "Inter_700Bold", letterSpacing: 4 },
+  codeInputWrap: { flexDirection: "row", alignItems: "center", gap: 14, borderRadius: 16, borderWidth: 2, paddingHorizontal: 20, paddingVertical: 16 },
+  codeInput: { flex: 1, fontSize: 32, fontFamily: "Inter_700Bold", letterSpacing: 8 },
   codeHint: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: -6 },
   submitBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 15, borderRadius: 14, marginTop: 4 },
   submitText: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#fff" },
@@ -665,22 +406,4 @@ const styles = StyleSheet.create({
   successBtnText: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#fff" },
   successBtnSecondary: { paddingVertical: 14, borderRadius: 14, borderWidth: 1, width: "100%" as any, alignItems: "center" },
   successBtnSecondaryText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  joinCodeBox: { alignItems: "center", borderRadius: 16, borderWidth: 2, paddingVertical: 20, paddingHorizontal: 32, width: "100%" as any },
-  joinCodeText: { fontSize: 32, fontFamily: "Inter_700Bold", letterSpacing: 6 },
-  typeSubtitle: { fontSize: 13, fontFamily: "Inter_400Regular", marginBottom: 16, lineHeight: 20 },
-  typeCard: {
-    flexDirection: "row", alignItems: "center", gap: 14,
-    padding: 16, borderRadius: 16, borderWidth: 1.5, marginBottom: 14,
-  },
-  typeIconWrap: {
-    width: 52, height: 52, borderRadius: 14,
-    alignItems: "center", justifyContent: "center",
-  },
-  typeTitle: { fontSize: 17, fontFamily: "Inter_700Bold", marginBottom: 4 },
-  typeDesc: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 17, marginBottom: 8 },
-  typePill: {
-    alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 3,
-    borderRadius: 6, borderWidth: 1,
-  },
-  typePillTxt: { fontSize: 9, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
 });

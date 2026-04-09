@@ -632,12 +632,8 @@ export interface NFLContextValue {
   // Co-GM mode
   toggleCoGMMode: () => Promise<void>;
   isCoGMMode: boolean;
-  isWaitingForGM: boolean;
-  reloadFromCloud: () => Promise<void>;
   coGMMembers: CoGMMember[];
-  proposals: CoGMProposal[];
   pendingProposals: CoGMProposal[];
   createProposal: (type: ProposalType, payload: CoGMProposalPayload, description: string) => Promise<void>;
   voteOnProposal: (proposalId: string, vote: 'yes' | 'no') => Promise<void>;
-  applySeasonDirectly: (s: Season) => void;
 }

@@ -5,10 +5,11 @@ import {
   Inter_700Bold,
   useFonts,
 } from "@expo-google-fonts/inter";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Redirect, Stack, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -17,6 +18,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { VFLSplash } from "@/components/VFLSplash";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { NFLProvider } from "@/context/NFLContext";
+import { SUPABASE_ENABLED } from "@/lib/supabase";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -25,26 +27,41 @@ const queryClient = new QueryClient();
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { session, membership, isLoading } = useAuth();
   const segments = useSegments();
+  const [gmMode, setGmMode] = useState<string | null>(null);
+  const [modeLoaded, setModeLoaded] = useState(false);
 
-  if (isLoading) return <VFLSplash />;
+  useEffect(() => {
+    AsyncStorage.getItem("vfl_gm_mode").then(m => {
+      setGmMode(m);
+      setModeLoaded(true);
+    });
+  }, [session]);
+
+  if (isLoading || !modeLoaded) return <VFLSplash />;
 
   const inAuthGroup      = segments[0] === "auth";
   const inFranchiseGroup = segments[0] === "franchise";
   const inTabsGroup      = segments[0] === "(tabs)";
+  // "/" = app/index.tsx (segments=[]), "/launch" = app/launch.tsx (segments=["launch"])
+  const inLaunchScreen   = segments.length === 0 || segments[0] === "launch";
 
-  // No session → always require login first
+  // Solo GM or Supabase not configured → skip auth entirely
+  const skipAuth = !SUPABASE_ENABLED || gmMode === "solo";
+
+  if (skipAuth) {
+    if (inAuthGroup || inFranchiseGroup) return <Redirect href="/(tabs)" />;
+    return <>{children}</>;
+  }
+
+  // Launch screen is always accessible
+  if (inLaunchScreen) return <>{children}</>;
+
+  // Co-GM / Join: require login
   if (!session && !inAuthGroup) {
     return <Redirect href="/auth/login" />;
   }
 
-  // Logged in WITH membership and NOT mid-flow → go straight to Franchise HQ
-  // Covers returning users and post-login redirects.
-  // Excludes /franchise (user may be on success screen mid-create).
-  if (session && membership && !inTabsGroup && !inAuthGroup && !inFranchiseGroup) {
-    return <Redirect href="/(tabs)" />;
-  }
-
-  // Logged in but no franchise yet → franchise lobby
+  // Logged in but no franchise yet → force to franchise lobby
   if (session && !membership && !inFranchiseGroup && !inTabsGroup && !inAuthGroup) {
     return <Redirect href="/franchise" />;
   }
@@ -60,13 +77,8 @@ function RootLayoutNav() {
           <Stack.Screen name="index"  options={{ animation: "none" }} />
           <Stack.Screen name="launch" options={{ animation: "none" }} />
           <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="auth/welcome"           options={{ animation: "none" }} />
-          <Stack.Screen name="auth/login"             options={{ animation: "slide_from_right" }} />
-          <Stack.Screen name="auth/register"          options={{ animation: "slide_from_right" }} />
-          <Stack.Screen name="auth/callback"          options={{ animation: "none" }} />
-          <Stack.Screen name="auth/forgot-password"   options={{ animation: "slide_from_right" }} />
-          <Stack.Screen name="auth/reset-password"    options={{ animation: "none" }} />
-          <Stack.Screen name="auth/franchise-created" options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="auth/login" />
+          <Stack.Screen name="auth/register" />
           <Stack.Screen name="franchise/index" />
           <Stack.Screen
             name="game/[id]"
