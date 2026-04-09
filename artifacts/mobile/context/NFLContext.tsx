@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { bigGet, bigSet } from "@/utils/bigStorage";
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { supabase, SUPABASE_ENABLED } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { simulateFullGame, mergePlayerStats } from "./SimEngine";
@@ -11,7 +11,6 @@ import type {
   OffenseScheme, Conference, Division, PlayerSeasonStats, DevelopmentTrait,
   DraftState, CompletedDraftPick, TeamCustomization, PosRatings, CombineMeasurables,
   EthnicityCode, FaceVariant, PlayoffSeed, PlayoffRound,
-  CoGMProposal, CoGMProposalPayload, CoGMVote, CoGMMember, ProposalType,
 } from "./types";
 
 export type { Season, NFLTeam, Player, DraftProspect, DraftPick, NFLGame, NewsItem,
@@ -19,8 +18,7 @@ export type { Season, NFLTeam, Player, DraftProspect, DraftPick, NFLGame, NewsIt
   OffenseScheme, Conference, Division, PlayerSeasonStats, DevelopmentTrait,
   TeamCustomization, UniformSet, TeamLogo, JerseyStyle, NumberFont, PantStripeStyle,
   HelmetLogoPlacement, LogoType, AnimalMascot, ShieldStyle, LogoFontStyle,
-  PosRatings, EthnicityCode, FaceVariant, PlayoffSeed, PlayoffRound,
-  CoGMProposal, CoGMProposalPayload, CoGMMember, ProposalType } from "./types";
+  PosRatings, EthnicityCode, FaceVariant, PlayoffSeed, PlayoffRound } from "./types";
 export { POS_RATING_KEYS, POS_RATING_LABELS } from "./types";
 
 const CACHE_KEY   = "vfl_season_v1";
@@ -828,22 +826,6 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
   const [teamCustomization, setTeamCustomization] = useState<TeamCustomization | null>(null);
   const saveDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const realtimeSub = useRef<any>(null);
-  const [coGMMembers, setCoGMMembers] = useState<CoGMMember[]>([]);
-
-  // ── Co-GM mode detection ────────────────────────────────────────────────────
-  const isCoGMMode = SUPABASE_ENABLED && !!membership?.franchiseId;
-
-  // ── Fetch Co-GM members ─────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!isCoGMMode || !membership?.franchiseId) { setCoGMMembers([]); return; }
-    supabase
-      .from("franchise_members")
-      .select("user_id, display_name, role")
-      .eq("franchise_id", membership.franchiseId)
-      .then(({ data }) => {
-        if (data) setCoGMMembers(data.map(r => ({ userId: r.user_id, displayName: r.display_name, role: r.role as any })));
-      });
-  }, [isCoGMMode, membership?.franchiseId]);
 
   // ── Load on mount ──────────────────────────────────────────────────────────
 
@@ -1196,118 +1178,16 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
     await save(current);
   }, [season, save]);
 
-  // ── Co-GM Proposals ─────────────────────────────────────────────────────────
-
-  const pendingProposals = useMemo(() =>
-    (season?.proposals ?? []).filter(p => p.status === "pending"),
-  [season?.proposals]);
-
-  // Execute approved proposal actions (defined before createProposal so it can reference it)
-  async function _executeProposal(s: Season, proposal: CoGMProposal) {
-    const { payload, type } = proposal;
-    let updatedSeason = { ...s, proposals: (s.proposals ?? []).filter(p => p.id !== proposal.id) };
-
-    if (type === "free_agent_signing" && payload.playerId) {
-      const fa = s.freeAgents.find(p => p.id === payload.playerId);
-      const playerTeam = s.teams.find(t => t.id === s.playerTeamId);
-      if (fa && playerTeam) {
-        const yrs = payload.contractYears ?? 1;
-        const sal = payload.contractSalary ?? fa.salary;
-        const signingBonus = Math.round(sal * 0.2 * 10) / 10;
-        const signed: Player = { ...fa, status: "Backup", depthOrder: 2, contractYears: yrs, salary: sal, signingBonus, guaranteedMoney: Math.round(sal * 0.5 * 10) / 10, deadCap: signingBonus * 0.5 };
-        const newsItem = addNewsItem({ headline: `Co-GMs approve: Sign ${fa.name}!`, body: `${fa.name} (${fa.position}, ${fa.overall} OVR) joins on a ${yrs}-yr, $${sal.toFixed(1)}M/yr deal.`, category: "signing", teamId: s.playerTeamId, week: s.currentWeek });
-        updatedSeason = { ...updatedSeason, teams: updatedSeason.teams.map(t => t.id === s.playerTeamId ? { ...t, roster: [...t.roster, signed], capSpace: t.capSpace - sal } : t), freeAgents: updatedSeason.freeAgents.filter(p => p.id !== payload.playerId), news: [newsItem, ...updatedSeason.news].slice(0, 50) };
-      }
-    } else if (type === "draft_pick" && payload.prospectId) {
-      const prospect = s.draftProspects.find(p => p.id === payload.prospectId);
-      if (prospect) {
-        updatedSeason = { ...updatedSeason, proposals: [...(updatedSeason.proposals ?? []), { ...proposal, type: "draft_pick", status: "approved" as const }] };
-      }
-    } else if (type === "phase_advance") {
-      // handled by advancePhase
-    } else if (type === "trade_submission" && payload.tradeOffer) {
-      const offer = payload.tradeOffer;
-      const newsItem = addNewsItem({ headline: `Co-GMs approve trade proposal!`, body: `Trade sent to ${payload.toTeamName ?? "opponent"} for review.`, category: "trade", teamId: s.playerTeamId, week: s.currentWeek });
-      updatedSeason = { ...updatedSeason, tradeOffers: [...updatedSeason.tradeOffers, { ...offer, status: "pending" as const }], news: [newsItem, ...updatedSeason.news].slice(0, 50) };
-    }
-    await save(updatedSeason);
-  }
-
-  const createProposal = useCallback(async (
-    type: ProposalType,
-    payload: CoGMProposalPayload,
-    description: string,
-  ) => {
-    if (!season || !user || !membership) return;
-    const requiredVotes = coGMMembers.length || 1;
-    const proposal: CoGMProposal = {
-      id: uid(),
-      type,
-      status: "pending",
-      description,
-      createdBy: user.id,
-      createdByName: membership.displayName,
-      createdAt: Date.now(),
-      requiredVotes,
-      votes: [{ userId: user.id, displayName: membership.displayName, vote: "yes", votedAt: Date.now() }],
-      payload,
-    };
-    if (requiredVotes <= 1) {
-      await _executeProposal(season, { ...proposal, status: "approved" });
-      return;
-    }
-    await save({ ...season, proposals: [...(season.proposals ?? []), proposal] });
-  }, [season, save, user, membership, coGMMembers]);
-
-  const voteOnProposal = useCallback(async (proposalId: string, vote: "yes" | "no") => {
-    if (!season || !user || !membership) return;
-    const proposals = season.proposals ?? [];
-    const idx = proposals.findIndex(p => p.id === proposalId);
-    if (idx === -1) return;
-    const proposal = proposals[idx];
-    if (proposal.status !== "pending") return;
-    if (proposal.votes.some(v => v.userId === user.id)) return;
-
-    const newVote: CoGMVote = { userId: user.id, displayName: membership.displayName, vote, votedAt: Date.now() };
-    const newVotes = [...proposal.votes, newVote];
-    const yesCount = newVotes.filter(v => v.vote === "yes").length;
-    const noCount  = newVotes.filter(v => v.vote === "no").length;
-    const totalMembers = proposal.requiredVotes;
-
-    let newStatus: "pending" | "approved" | "rejected" = "pending";
-    if (noCount > 0) newStatus = "rejected";
-    else if (yesCount >= totalMembers) newStatus = "approved";
-
-    const updatedProposal: CoGMProposal = { ...proposal, votes: newVotes, status: newStatus };
-    const updatedProposals = proposals.map((p, i) => i === idx ? updatedProposal : p);
-    const updatedSeason = { ...season, proposals: updatedProposals };
-
-    if (newStatus === "approved") {
-      await _executeProposal(updatedSeason, updatedProposal);
-    } else {
-      await save(updatedSeason);
-    }
-  }, [season, save, user, membership]);
-
   // ── Roster Actions ─────────────────────────────────────────────────────────
 
-  const signFreeAgent = useCallback(async (playerId: string, contractYears: number, salary: number): Promise<'signed' | 'proposed' | 'error'> => {
-    if (!season) return 'error';
+  const signFreeAgent = useCallback(async (playerId: string, contractYears: number, salary: number) => {
+    if (!season) return;
     const fa = season.freeAgents.find(p => p.id === playerId);
-    if (!fa) return 'error';
+    if (!fa) return;
     const playerTeam = getPlayerTeam();
-    if (!playerTeam) return 'error';
+    if (!playerTeam) return;
     const totalCapUsed = playerTeam.roster.reduce((s, p) => s + p.salary, 0);
-    if (totalCapUsed + salary > playerTeam.totalCap) return 'error'; // over cap
-    // In Co-GM mode: create proposal instead of signing directly
-    if (isCoGMMode && coGMMembers.length > 1) {
-      await createProposal('free_agent_signing', {
-        playerId: fa.id, playerName: fa.name, playerPosition: fa.position,
-        playerOverall: fa.overall, playerAge: fa.age,
-        contractYears, contractSalary: salary,
-      }, `Sign ${fa.name} (${fa.position}, ${fa.overall} OVR) — ${contractYears}yr, $${salary.toFixed(1)}M/yr`);
-      return 'proposed';
-    }
+    if (totalCapUsed + salary > playerTeam.totalCap) return; // over cap
     const signingBonus = Math.round(salary * 0.2 * 10) / 10;
     const signedPlayer: Player = { ...fa, status: "Backup", depthOrder: 2, contractYears, salary, signingBonus, guaranteedMoney: Math.round(salary * 0.5 * 10) / 10, deadCap: signingBonus * 0.5 };
     const newsItem: Omit<NewsItem,"id"|"timestamp"> = {
@@ -1320,8 +1200,7 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       : t);
     const newFAs = season.freeAgents.filter(p => p.id !== playerId);
     await save({ ...season, teams: newTeams, freeAgents: newFAs, news: [addNewsItem(newsItem), ...season.news].slice(0, 50) });
-    return 'signed';
-  }, [season, save, getPlayerTeam, isCoGMMode, coGMMembers, createProposal]);
+  }, [season, save, getPlayerTeam]);
 
   const releasePlayer = useCallback(async (playerId: string) => {
     if (!season) return;
@@ -1406,23 +1285,13 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
     await save({ ...season, draftProspects: newProspects });
   }, [season, save]);
 
-  const userDraftPick = useCallback(async (prospectId: string): Promise<'picked' | 'proposed' | 'error'> => {
-    if (!season) return 'error';
+  const userDraftPick = useCallback(async (prospectId: string) => {
+    if (!season) return;
     const { draftState, draftProspects, teams } = season;
-    if (!draftState.isUserTurn || draftState.isComplete) return 'error';
+    if (!draftState.isUserTurn || draftState.isComplete) return;
     const prospect = draftProspects.find(p => p.id === prospectId);
-    if (!prospect || prospect.isPickedUp) return 'error';
+    if (!prospect || prospect.isPickedUp) return;
     const playerTeam = getPlayerTeam()!;
-    // In Co-GM mode: create proposal instead of picking directly
-    if (isCoGMMode && coGMMembers.length > 1) {
-      await createProposal('draft_pick', {
-        prospectId: prospect.id, prospectName: prospect.name,
-        prospectPosition: prospect.position, prospectGrade: prospect.overallGrade,
-        prospectCollege: prospect.college, draftRound: draftState.currentRound,
-        draftPickNum: draftState.overallPick,
-      }, `Draft ${prospect.name} (${prospect.position}, ${prospect.college}) — Rd ${draftState.currentRound}, Pick #${draftState.overallPick}`);
-      return 'proposed';
-    }
 
     const completedPick: CompletedDraftPick = {
       round: draftState.currentRound,
@@ -1488,8 +1357,7 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
     const newDraftState = advanceDraftState(draftState, completedPick, season.playerTeamId);
 
     await save({ ...season, teams: newTeams, draftProspects: newProspects, draftState: newDraftState, news: [addNewsItem(newsItem), ...season.news].slice(0, 50) });
-    return 'picked';
-  }, [season, save, getPlayerTeam, isCoGMMode, coGMMembers, createProposal]);
+  }, [season, save, getPlayerTeam]);
 
   // Shared helper — converts a prospect into a roster-ready Player for any team
   function draftProspectToPlayer(prospect: DraftProspect, round: number, overallPick: number, teamId: string, seasonYear: number): Player {
@@ -1852,47 +1720,6 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       const { games: newGames, byeWeeks: newBye } = generateSchedule(newTeams);
       const newDraftProspects = generateDraftClass(season.year + 1, 252);
       const newDraftState = initDraftState(newTeams.map(t => t.id), season.playerTeamId);
-      // ── Capture championship history before rolling year over ──────────────
-      const prevHistory = season.history ?? { vflBowls: [], hofEntries: [] };
-      let newHistory = { ...prevHistory, vflBowls: [...prevHistory.vflBowls], hofEntries: [...prevHistory.hofEntries] };
-      if (season.vflBowlWinnerId) {
-        const winnerTeam = season.teams.find(t => t.id === season.vflBowlWinnerId);
-        const vflBowlGame = season.games.find(g => g.playoffRound === "vflBowl" && g.status === "final");
-        if (winnerTeam && vflBowlGame) {
-          const isHomeWin   = vflBowlGame.homeTeamId === season.vflBowlWinnerId;
-          const loserTeamId = isHomeWin ? vflBowlGame.awayTeamId : vflBowlGame.homeTeamId;
-          const loserTeam   = season.teams.find(t => t.id === loserTeamId);
-          // Auto-select MVP: top impact score from winning team
-          let mvpName = "Team MVP"; let mvpPos: any = "QB";
-          if (vflBowlGame.playerStats) {
-            let best = 0;
-            for (const [pid, st] of Object.entries(vflBowlGame.playerStats)) {
-              const p = winnerTeam.roster.find(r => r.id === pid);
-              if (!p) continue;
-              const sc = (st.passingYards ?? 0) * 0.04 + (st.passingTDs ?? 0) * 10
-                + (st.rushingYards ?? 0) * 0.06 + (st.rushingTDs ?? 0) * 10
-                + (st.receivingYards ?? 0) * 0.06 + (st.receivingTDs ?? 0) * 10
-                + (st.tackles ?? 0) * 1.5 + (st.sacks ?? 0) * 8 + (st.defensiveINTs ?? 0) * 12;
-              if (sc > best) { best = sc; mvpName = p.name; mvpPos = p.position; }
-            }
-          }
-          newHistory.vflBowls = [...prevHistory.vflBowls, {
-            year: season.year,
-            winnerTeamId: winnerTeam.id,
-            winnerTeamName: winnerTeam.name,
-            winnerTeamCity: winnerTeam.city,
-            winnerTeamColor: winnerTeam.primaryColor,
-            loserTeamId,
-            loserTeamName: loserTeam?.name ?? "Opponent",
-            loserTeamCity: loserTeam?.city ?? "",
-            winnerScore: isHomeWin ? vflBowlGame.homeScore : vflBowlGame.awayScore,
-            loserScore:  isHomeWin ? vflBowlGame.awayScore : vflBowlGame.homeScore,
-            mvpPlayerName: mvpName,
-            mvpPosition: mvpPos,
-          }];
-        }
-      }
-
       const nextYearSeason: Season = {
         ...season,
         year: season.year + 1,
@@ -1909,7 +1736,6 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
         draftProspects: newDraftProspects,
         draftState: newDraftState,
         freeAgents: generateFreeAgents(60),
-        history: newHistory,
         news: [{
           id: uid(), timestamp: Date.now(),
           headline: `VFL ${season.year + 1} Season Kicks Off!`,
@@ -1957,7 +1783,6 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-
   return (
     <NFLContext.Provider value={{
       season, isLoading, isSyncing, syncError,
@@ -1970,11 +1795,6 @@ export function NFLProvider({ children }: { children: React.ReactNode }) {
       advancePhase, addNews, resetSeason,
       teamCustomization, saveCustomization, setGameDayUniform,
       toggleCoGMMode,
-      isCoGMMode,
-      coGMMembers,
-      pendingProposals,
-      createProposal,
-      voteOnProposal,
     }}>
       {children}
     </NFLContext.Provider>

@@ -115,13 +115,6 @@ export default function TabLayout() {
           tabBarIcon: ({ size, focused }) => <TabIcon name="bar-chart-2" size={size} focused={focused} teamColor={theme.primary} />,
         }}
       />
-      <Tabs.Screen
-        name="legacy"
-        options={{
-          title: "Legacy",
-          tabBarIcon: ({ size, focused }) => <TabIcon name="award" size={size} focused={focused} teamColor={theme.primary} />,
-        }}
-      />
     </Tabs>
   );
 }

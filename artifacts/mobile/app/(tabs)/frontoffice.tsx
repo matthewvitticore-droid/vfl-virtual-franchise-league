@@ -44,16 +44,10 @@ export default function FrontOfficeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { membership } = useAuth();
-  const { season, getPlayerTeam, signFreeAgent, userDraftPick, simulateDraftPick, simPicksUntilUserTurn, simRemainderOfDraft, unlockScouting, proposeTrade, respondToTrade, isCoGMMode, pendingProposals } = useNFL();
+  const { season, getPlayerTeam, signFreeAgent, userDraftPick, simulateDraftPick, simPicksUntilUserTurn, simRemainderOfDraft, unlockScouting, proposeTrade, respondToTrade } = useNFL();
   const params = useLocalSearchParams<{ tab?: string }>();
   const [isSimming, setIsSimming] = useState(false);
   const [isSimRemainder, setIsSimRemainder] = useState(false);
-  const [actionToast, setActionToast] = useState<{ msg: string; type: "success" | "proposed" | "error" } | null>(null);
-
-  function showToast(msg: string, type: "success" | "proposed" | "error") {
-    setActionToast({ msg, type });
-    setTimeout(() => setActionToast(null), 3200);
-  }
   const [spotlightPick, setSpotlightPick] = useState<{ name: string; position: string; college: string; grade: number; devTrait: string; round: number; pick: number } | null>(null);
   const [tab, setTab] = useState<Tab>(() => (params.tab === "draft" || params.tab === "trades") ? params.tab : "freeAgency");
 
@@ -271,11 +265,7 @@ export default function FrontOfficeScreen() {
     const prospect = season?.draftProspects.find(p => p.id === prospectId);
     const round = ds?.currentRound ?? 1;
     const pick  = ds?.overallPick  ?? 1;
-    const result = await userDraftPick(prospectId);
-    if (result === "proposed") {
-      showToast(`📋 Draft pick proposed to Meeting Room`, "proposed");
-      return;
-    }
+    await userDraftPick(prospectId);
     if (prospect) {
       setSpotlightPick({
         name:     prospect.name,
@@ -329,19 +319,6 @@ export default function FrontOfficeScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Co-GM Action Toast */}
-      {actionToast && (
-        <View style={[st.toastBanner, {
-          backgroundColor: actionToast.type === "proposed" ? "#8B5CF6" : actionToast.type === "success" ? "#10B981" : "#EF4444",
-          top: topPad + 8,
-        }]}>
-          <Text style={st.toastText}>{actionToast.msg}</Text>
-          {actionToast.type === "proposed" && (
-            <Text style={st.toastSub}>Go to Franchise → Meeting Room to vote</Text>
-          )}
-        </View>
-      )}
-
       {/* Header */}
       <View style={[st.header, { paddingTop: topPad + 8, borderBottomColor: colors.border, backgroundColor: colors.background }]}>
         <Text style={[st.headerTitle, { color: colors.foreground }]}>Front Office</Text>
@@ -399,13 +376,12 @@ export default function FrontOfficeScreen() {
                 </View>
                 {freeAgents.map((p, idx) => (
                   <FARow key={p.id} p={p} rank={idx + 1} colors={colors} teamColor={teamColor} isGM={isGM}
-                    onSign={async (yrs, sal) => {
-                      const result = await signFreeAgent(p.id, yrs, sal);
-                      if (result === "proposed") showToast(`📋 Signing proposed to Meeting Room`, "proposed");
-                      else if (result === "signed") showToast(`✅ ${p.name} signed!`, "success");
-                      else showToast("Could not sign player", "error");
+                    onSign={(yrs, sal) => {
+                      Alert.alert(`Sign ${p.name}?`, `${yrs}-year deal, $${sal}M/yr.\nInterest: ${p.faInterestLevel >= 4 ? "High" : p.faInterestLevel >= 3 ? "Medium" : "Low"}`, [
+                        { text: "Cancel" },
+                        { text: "Sign Player", onPress: () => signFreeAgent(p.id, yrs, sal) },
+                      ]);
                     }}
-                    isCoGMMode={isCoGMMode}
                   />
                 ))}
               </View>
@@ -1327,25 +1303,32 @@ function FASortHeader({ label, sortKey: key, current, asc, onSort, colors, teamC
 }
 
 // ─── FA Row ───────────────────────────────────────────────────────────────────
-function FARow({ p, rank, colors, teamColor, isGM, onSign, isCoGMMode }: {
-  p: Player; rank: number; colors: any; teamColor: string; isGM: boolean; isCoGMMode?: boolean;
+function FARow({ p, rank, colors, teamColor, isGM, onSign }: {
+  p: Player; rank: number; colors: any; teamColor: string; isGM: boolean;
   onSign: (yrs: number, sal: number) => void;
 }) {
-  const [expanded, setExpanded] = React.useState(false);
   const ratingColor = (v: number) => v >= 90 ? "#FFD700" : v >= 80 ? colors.success : v >= 70 ? colors.foreground : colors.mutedForeground;
   const interestColor = (v: number) => v >= 5 ? "#FFD700" : v >= 4 ? colors.success : v >= 3 ? colors.foreground : colors.mutedForeground;
   const acc = p.posRatings?.acceleration ?? 50;
   const agi = p.posRatings?.agility ?? 50;
 
   const interestDots = Array.from({ length: 5 }, (_, i) => i < p.faInterestLevel);
-  const signLabel = isCoGMMode ? "PROPOSE" : "SIGN";
 
   return (
-    <View style={[st.combineRowContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
     <TouchableOpacity
       activeOpacity={isGM ? 0.75 : 1}
-      onPress={isGM ? () => setExpanded(e => !e) : undefined}
-      style={{ flexDirection: "row", alignItems: "center" }}
+      onPress={isGM ? () => {
+        const options = [1, 2, 3].map(yrs => {
+          const sal = parseFloat((p.salary * (1 + (yrs - 1) * 0.03)).toFixed(1));
+          return { text: `${yrs}yr · $${sal}M/yr`, onPress: () => onSign(yrs, sal) };
+        });
+        Alert.alert(
+          `Sign ${p.name}`,
+          `${p.position} · Age ${p.age} · ${p.faInterestLevel >= 4 ? "High" : p.faInterestLevel >= 3 ? "Medium" : "Low"} Interest`,
+          [{ text: "Cancel", style: "cancel" }, ...options],
+        );
+      } : undefined}
+      style={[st.combineRowContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}
     >
       {/* Fixed name cell — wider to include age */}
       <View style={st.faNameCell}>
@@ -1376,33 +1359,19 @@ function FARow({ p, rank, colors, teamColor, isGM, onSign, isCoGMMode }: {
       <ColCell value={`${p.yearsExperience}yr`} color={colors.foreground} />
       <ColCell value={`$${parseFloat(p.salary.toFixed(1))}M`} color={p.salary >= 15 ? colors.danger : p.salary >= 8 ? colors.nflGold : colors.success} />
       {isGM && (
-        <Feather name={expanded ? "chevron-up" : "chevron-down"} size={14} color={teamColor} style={{ marginRight: 8 }} />
+        <TouchableOpacity onPress={(e) => {
+          e.stopPropagation?.();
+          const options = [1, 2, 3].map(yrs => {
+            const sal = parseFloat((p.salary * (1 + (yrs - 1) * 0.03)).toFixed(1));
+            return { text: `${yrs}yr · $${sal}M/yr`, onPress: () => onSign(yrs, sal) };
+          });
+          Alert.alert(`Sign ${p.name}`, `${p.position} · Age ${p.age}`, [{ text: "Cancel", style: "cancel" }, ...options]);
+        }}
+          style={[st.draftBtnSm, { backgroundColor: teamColor }]}>
+          <Text style={st.draftBtnSmText}>Sign</Text>
+        </TouchableOpacity>
       )}
     </TouchableOpacity>
-    {/* Inline contract options (no Alert.alert — web-safe) */}
-    {isGM && expanded && (
-      <View style={{ flexDirection: "row", gap: 6, padding: 10, paddingTop: 0, flexWrap: "wrap" }}>
-        {[1, 2, 3].map(yrs => {
-          const sal = parseFloat((p.salary * (1 + (yrs - 1) * 0.03)).toFixed(1));
-          return (
-            <TouchableOpacity
-              key={yrs}
-              onPress={() => { setExpanded(false); onSign(yrs, sal); }}
-              style={[st.draftBtnSm, { backgroundColor: teamColor, paddingHorizontal: 12 }]}
-            >
-              <Text style={st.draftBtnSmText}>{signLabel} {yrs}yr · ${sal}M</Text>
-            </TouchableOpacity>
-          );
-        })}
-        <TouchableOpacity
-          onPress={() => setExpanded(false)}
-          style={[st.draftBtnSm, { backgroundColor: "transparent", borderWidth: 1, borderColor: "rgba(255,255,255,0.2)" }]}
-        >
-          <Text style={[st.draftBtnSmText, { color: "rgba(255,255,255,0.55)" }]}>Cancel</Text>
-        </TouchableOpacity>
-      </View>
-    )}
-    </View>
   );
 }
 
@@ -1719,10 +1688,6 @@ function RosterNeedGrid({ team, colors, teamColor }: { team: any; colors: any; t
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const st = StyleSheet.create({
-  toastBanner:      { position:"absolute", left:16, right:16, zIndex:999, borderRadius:12, padding:12,
-                      alignItems:"center", shadowColor:"#000", shadowOpacity:0.35, shadowRadius:10, elevation:12 },
-  toastText:        { fontFamily:"Inter_700Bold", fontSize:14, color:"#fff", textAlign:"center" },
-  toastSub:         { fontFamily:"Inter_400Regular", fontSize:11, color:"rgba(255,255,255,0.8)", marginTop:2 },
   header:           { paddingHorizontal:16, paddingBottom:10, borderBottomWidth:1 },
   headerTitle:      { fontSize:20, fontFamily:"Inter_700Bold", marginBottom:12 },
   tabBar:           { flexDirection:"row", gap:8 },
